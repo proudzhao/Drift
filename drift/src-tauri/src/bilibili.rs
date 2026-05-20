@@ -223,8 +223,9 @@ async fn run_with_reconnect(app: AppHandle, room_id: u64) {
                 break;
             }
             Err(error) => {
-                if error.contains("房间号不存在") {
-                    emit_status(&app, "invalid_room", error);
+                let user_error = classify_connection_error(&error);
+                if user_error.is_terminal {
+                    emit_status(&app, user_error.status, user_error.message);
                     break;
                 }
 
@@ -239,13 +240,75 @@ async fn run_with_reconnect(app: AppHandle, room_id: u64) {
                 );
                 emit_status(
                     &app,
-                    "reconnecting",
-                    format!("连接失败：{}，{} 秒后重试", error, delay.as_secs()),
+                    user_error.status,
+                    format!("{}，{} 秒后重试", user_error.message, delay.as_secs()),
                 );
                 tokio::time::sleep(delay).await;
                 attempt += 1;
             }
         }
+    }
+}
+
+struct UserConnectionError {
+    status: &'static str,
+    message: String,
+    is_terminal: bool,
+}
+
+fn classify_connection_error(error: &str) -> UserConnectionError {
+    if error.contains("房间号不存在") || error.contains("room_init 返回错误") {
+        return UserConnectionError {
+            status: "invalid_room",
+            message: "房间号不存在或当前不可访问，请检查输入的直播间号".to_string(),
+            is_terminal: true,
+        };
+    }
+
+    if error.contains("-799") || error.contains("请求过于频繁") {
+        return UserConnectionError {
+            status: "reconnecting",
+            message: "B 站接口请求过于频繁".to_string(),
+            is_terminal: false,
+        };
+    }
+
+    if error.contains("-352") {
+        return UserConnectionError {
+            status: "reconnecting",
+            message: "B 站接口风控或签名校验失败".to_string(),
+            is_terminal: false,
+        };
+    }
+
+    if error.contains("HTTP") {
+        return UserConnectionError {
+            status: "reconnecting",
+            message: "B 站接口 HTTP 响应异常，请稍后重试".to_string(),
+            is_terminal: false,
+        };
+    }
+
+    if error.contains("WebSocket") || error.contains("服务器关闭连接") {
+        return UserConnectionError {
+            status: "reconnecting",
+            message: "弹幕服务器连接异常".to_string(),
+            is_terminal: false,
+        };
+    }
+
+    if error.contains("请求失败") || error.contains("响应读取失败") {
+        return UserConnectionError {
+            status: "reconnecting",
+            message: "网络请求失败，请检查网络后等待重试".to_string(),
+            is_terminal: false,
+        };
+    }
+
+    UserConnectionError {
+        status: "reconnecting",
+        message: "弹幕连接失败".to_string(),
+        is_terminal: false,
     }
 }
 
