@@ -16,6 +16,15 @@ type ControlPanelProps = {
   status: DanmakuStatus;
 };
 
+type ApiTestStep = {
+  key: string;
+  label: string;
+  status: "success" | "warning" | "failed";
+  durationMs: number;
+  message: string;
+  detail: string;
+};
+
 const DENSITY_LABELS: Record<AppearanceConfig["density"], string> = {
   low: "低",
   medium: "中",
@@ -34,6 +43,9 @@ export function ControlPanel({
     config.shortcuts.toggleEditMode,
   );
   const [shortcutError, setShortcutError] = useState("");
+  const [apiTestSteps, setApiTestSteps] = useState<ApiTestStep[]>([]);
+  const [apiTestError, setApiTestError] = useState("");
+  const [isApiTesting, setIsApiTesting] = useState(false);
 
   useEffect(() => {
     setDraftRoomId(config.roomId);
@@ -97,6 +109,29 @@ export function ControlPanel({
 
   async function handleConnect() {
     await connectRoom(draftRoomId);
+  }
+
+  async function testApi() {
+    const numericRoomId = Number(draftRoomId.trim());
+    if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
+      setApiTestError("请输入有效的直播间房间号");
+      setApiTestSteps([]);
+      return;
+    }
+
+    setApiTestError("");
+    setApiTestSteps([]);
+    setIsApiTesting(true);
+    try {
+      const steps = await invoke<ApiTestStep[]>("test_bilibili_api", {
+        roomId: numericRoomId,
+      });
+      setApiTestSteps(steps);
+    } catch (error) {
+      setApiTestError(String(error));
+    } finally {
+      setIsApiTesting(false);
+    }
   }
 
   async function resetAppearance() {
@@ -193,6 +228,40 @@ export function ControlPanel({
           <span>主播：{anchorName}</span>
         </div>
         <p className="control-status">{status.message}</p>
+      </section>
+
+      <section className="control-section">
+        <h2>API 测试</h2>
+        <div className="control-actions">
+          <button
+            disabled={isApiTesting || !draftRoomId.trim()}
+            onClick={testApi}
+            type="button"
+          >
+            {isApiTesting ? "测试中" : "测试 API"}
+          </button>
+          <button onClick={() => invoke("open_log_dir")} type="button">
+            打开日志目录
+          </button>
+        </div>
+        {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
+        {apiTestSteps.length > 0 ? (
+          <div className="api-test-list">
+            {apiTestSteps.map((step) => (
+              <div className="api-test-item" data-status={step.status} key={step.key}>
+                <span className="api-test-mark">{apiTestMark(step.status)}</span>
+                <div>
+                  <div className="api-test-title">
+                    <strong>{step.label}</strong>
+                    <span>{step.durationMs} ms</span>
+                  </div>
+                  <p>{step.message}</p>
+                  <small>{step.detail}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="control-section">
@@ -335,6 +404,18 @@ export function ControlPanel({
       </footer>
     </main>
   );
+}
+
+function apiTestMark(status: ApiTestStep["status"]) {
+  switch (status) {
+    case "success":
+      return "OK";
+    case "warning":
+      return "!";
+    case "failed":
+    default:
+      return "X";
+  }
 }
 
 function roomStatusText(status: DanmakuStatus) {

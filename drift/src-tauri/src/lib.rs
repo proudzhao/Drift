@@ -38,7 +38,8 @@ pub fn run() {
             window_control::save_window_layout,
             window_control::load_window_layout,
             bilibili::start_bilibili_danmaku,
-            bilibili::stop_bilibili_danmaku
+            bilibili::stop_bilibili_danmaku,
+            bilibili::test_bilibili_api
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

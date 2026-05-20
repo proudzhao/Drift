@@ -291,13 +291,14 @@ button {
 
 .room-form button:hover:not(:disabled),
 .control-header button:hover,
-.control-actions button:hover,
+.control-actions button:hover:not(:disabled),
 .control-footer button:hover,
 .segmented-control button:hover {
   background: rgba(126, 168, 196, 0.24);
 }
 
 .room-form button:disabled,
+.control-actions button:disabled,
 .room-form input:disabled {
   color: rgba(255, 255, 255, 0.42);
   cursor: default;
@@ -407,6 +408,77 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.api-test-list {
+  display: grid;
+  gap: 8px;
+}
+
+.api-test-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(126, 168, 196, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.api-test-mark {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(126, 168, 196, 0.18);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.api-test-item[data-status="success"] .api-test-mark {
+  background: rgba(157, 226, 174, 0.18);
+  color: rgba(157, 226, 174, 0.95);
+}
+
+.api-test-item[data-status="warning"] .api-test-mark,
+.api-test-item[data-status="failed"] .api-test-mark {
+  background: rgba(245, 169, 98, 0.18);
+  color: rgba(245, 169, 98, 0.95);
+}
+
+.api-test-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.api-test-title strong {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.api-test-title span,
+.api-test-item small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.api-test-item p {
+  margin: 4px 0 2px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.api-test-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shortcut-form {
