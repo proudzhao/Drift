@@ -29,7 +29,7 @@ export function DiagnosticsSettings({
   onTestApi,
 }: DiagnosticsSettingsProps) {
   return (
-    <div className="settings-page diagnostics-page">
+    <div className="settings-page diagnostics-settings">
       <div className="settings-actions">
         <button
           disabled={isApiTesting || !draftRoomId.trim()}
@@ -44,7 +44,7 @@ export function DiagnosticsSettings({
       </div>
       {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
       {apiTestSteps.length > 0 ? (
-        <div className="api-test-list">
+        <div className="api-test-list settings-scroll-list">
           {apiTestSteps.map((step) => {
             const isExpanded = expandedApiStepKey === step.key;
 

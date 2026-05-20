@@ -20,7 +20,7 @@ export function DisplaySettings({
   onUpdateAppearance,
 }: DisplaySettingsProps) {
   return (
-    <div className="settings-page display-page">
+    <div className="settings-page display-settings">
       <ControlSlider
         label="字号"
         max={32}

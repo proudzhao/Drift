@@ -16,7 +16,7 @@ export function ShortcutSettings({
   shortcutError,
 }: ShortcutSettingsProps) {
   return (
-    <div className="settings-page shortcut-page">
+    <div className="settings-page shortcut-settings">
       <div className="settings-row shortcut-form">
         <label htmlFor="shortcut-input">编辑模式</label>
         <input

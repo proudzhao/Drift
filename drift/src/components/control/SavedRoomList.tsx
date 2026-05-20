@@ -38,7 +38,7 @@ export function SavedRoomList({
   }
 
   return (
-    <div className="saved-room-list">
+    <div className="saved-room-list settings-scroll-list">
       {rooms.map((room) => {
         const isEditing = editingSavedRoom?.id === room.id;
 

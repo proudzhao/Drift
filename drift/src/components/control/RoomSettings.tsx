@@ -43,7 +43,7 @@ export function RoomSettings({
   const anchorName = status.anchorName || "未知";
 
   return (
-    <div className="settings-page room-page">
+    <div className="settings-page room-settings">
       <div className="settings-row room-form">
         <label htmlFor="control-room-id">房间号</label>
         <input

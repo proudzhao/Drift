@@ -265,18 +265,18 @@ button {
   overflow: hidden;
 }
 
-.diagnostics-page {
+.diagnostics-settings {
   align-content: stretch;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-.display-page,
-.filter-page,
-.shortcut-page {
+.display-settings,
+.filter-settings,
+.shortcut-settings {
   align-content: start;
 }
 
-.room-page {
+.room-settings {
   align-content: stretch;
   grid-template-rows: auto auto auto minmax(0, 1fr);
 }
@@ -555,30 +555,30 @@ button {
   cursor: default;
 }
 
-.saved-room-list {
-  display: grid;
-  align-content: start;
-  gap: 8px;
+.settings-scroll-list {
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.saved-room-list::-webkit-scrollbar,
-.api-test-list::-webkit-scrollbar {
+.settings-scroll-list::-webkit-scrollbar {
   width: 10px;
 }
 
-.saved-room-list::-webkit-scrollbar-thumb,
-.api-test-list::-webkit-scrollbar-thumb {
+.settings-scroll-list::-webkit-scrollbar-thumb {
   border: 2px solid #e4e4e4;
   border-radius: 999px;
   background: #a8a8a8;
 }
 
-.saved-room-list::-webkit-scrollbar-track,
-.api-test-list::-webkit-scrollbar-track {
+.settings-scroll-list::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.saved-room-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
 }
 
 .saved-room-list,
@@ -664,12 +664,9 @@ button {
   display: grid;
   align-content: start;
   gap: 8px;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
-.diagnostics-page .api-test-list {
+.diagnostics-settings .api-test-list {
   grid-row: 3;
 }
 

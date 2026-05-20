@@ -10,7 +10,7 @@ export function FilterSettings({
   onSaveBlockedWords,
 }: FilterSettingsProps) {
   return (
-    <div className="settings-page filter-page">
+    <div className="settings-page filter-settings">
       <label className="textarea-row">
         <span>屏蔽词</span>
         <textarea
