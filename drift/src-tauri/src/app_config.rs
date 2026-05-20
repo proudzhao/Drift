@@ -98,7 +98,12 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     }
 
     let content = fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    serde_json::from_str(&content).map_err(|error| error.to_string())
+    let mut config: AppConfig =
+        serde_json::from_str(&content).map_err(|error| error.to_string())?;
+    if config.shortcuts.toggle_edit_mode == legacy_shortcut_label() {
+        config.shortcuts.toggle_edit_mode = shortcut_label().to_string();
+    }
+    Ok(config)
 }
 
 fn write_app_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
@@ -119,6 +124,14 @@ fn app_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 fn shortcut_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command+Option+K"
+    } else {
+        "Control+Alt+K"
+    }
+}
+
+fn legacy_shortcut_label() -> &'static str {
     if cfg!(target_os = "macos") {
         "Command+Option+D"
     } else {

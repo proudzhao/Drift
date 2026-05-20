@@ -205,7 +205,7 @@ fn parse_shortcut_binding(label: &str) -> Result<ShortcutBinding, String> {
         .collect::<Vec<_>>();
 
     if parts.len() < 2 {
-        return Err("快捷键格式应类似 Command+Option+D 或 Control+Alt+D".to_string());
+        return Err("快捷键格式应类似 Command+Option+K 或 Control+Alt+K".to_string());
     }
 
     let mut modifiers = Modifiers::empty();
@@ -292,9 +292,9 @@ fn letter_to_code(character: char) -> Result<Code, String> {
 
 fn shortcut_label() -> &'static str {
     if cfg!(target_os = "macos") {
-        "Command+Option+D"
+        "Command+Option+K"
     } else {
-        "Control+Alt+D"
+        "Control+Alt+K"
     }
 }
 

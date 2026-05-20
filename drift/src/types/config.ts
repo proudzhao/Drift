@@ -24,8 +24,8 @@ export type ShortcutConfig = {
 
 export function defaultShortcutLabel() {
   return navigator.platform.toLowerCase().includes("mac")
-    ? "Command+Option+D"
-    : "Control+Alt+D";
+    ? "Command+Option+K"
+    : "Control+Alt+K";
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -47,6 +47,12 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 };
 
 export function mergeAppConfig(config: AppConfig): AppConfig {
+  const toggleEditMode =
+    config.shortcuts?.toggleEditMode === "Command+Option+D" ||
+    config.shortcuts?.toggleEditMode === "Control+Alt+D"
+      ? defaultShortcutLabel()
+      : config.shortcuts?.toggleEditMode;
+
   return {
     ...DEFAULT_APP_CONFIG,
     ...config,
@@ -61,6 +67,7 @@ export function mergeAppConfig(config: AppConfig): AppConfig {
     shortcuts: {
       ...DEFAULT_APP_CONFIG.shortcuts,
       ...config.shortcuts,
+      toggleEditMode: toggleEditMode ?? DEFAULT_APP_CONFIG.shortcuts.toggleEditMode,
     },
   };
 }
