@@ -9,9 +9,20 @@ const APP_CONFIG_FILE: &str = "app-config.json";
 #[serde(default, rename_all = "camelCase")]
 pub struct AppConfig {
     pub room_id: String,
+    pub saved_rooms: Vec<SavedRoom>,
     pub appearance: AppearanceConfig,
     pub filter: FilterConfig,
     pub shortcuts: ShortcutConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SavedRoom {
+    pub id: String,
+    pub room_id: String,
+    pub display_name: String,
+    pub anchor_name: Option<String>,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,10 +69,23 @@ impl Default for ShortcutConfig {
     }
 }
 
+impl Default for SavedRoom {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            room_id: String::new(),
+            display_name: String::new(),
+            anchor_name: None,
+            updated_at: String::new(),
+        }
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             room_id: String::new(),
+            saved_rooms: Vec::new(),
             appearance: AppearanceConfig::default(),
             filter: FilterConfig::default(),
             shortcuts: ShortcutConfig::default(),

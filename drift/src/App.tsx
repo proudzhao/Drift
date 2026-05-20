@@ -3,7 +3,7 @@ import type { CSSProperties, MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ControlPanel } from "./components/ControlPanel";
+import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
 import { EditModePanel } from "./components/EditModePanel";
 import { createMockDanmakuItems } from "./data/mockDanmaku";

@@ -184,13 +184,13 @@ button {
   display: grid;
   align-content: start;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 16px;
   height: 100vh;
   min-height: 100vh;
-  overflow-y: auto;
-  padding: 16px 28px 24px;
-  background: #eef1f3;
-  color: #192735;
+  overflow: hidden;
+  padding: 12px 28px 20px;
+  background: #ececec;
+  color: #202124;
 }
 
 .control-header {
@@ -201,7 +201,8 @@ button {
 
 .control-header strong {
   grid-column: 2;
-  font-size: 20px;
+  color: #4b4b4b;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
@@ -209,29 +210,33 @@ button {
 
 .control-header button {
   grid-column: 3;
+  min-height: 30px;
+  padding: 0 14px;
 }
 
 .settings-tabs {
   justify-self: center;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(76px, auto);
+  grid-auto-columns: minmax(78px, auto);
   overflow: hidden;
-  border: 1px solid rgba(25, 39, 53, 0.22);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 1px 3px rgba(25, 39, 53, 0.14);
+  border: 1px solid #c7c7c7;
+  border-radius: 7px;
+  background: #f8f8f8;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .settings-tabs button {
-  min-height: 38px;
-  padding: 0 20px;
+  min-height: 32px;
+  padding: 0 14px;
   border: 0;
-  border-right: 1px solid rgba(25, 39, 53, 0.16);
+  border-right: 1px solid #d5d5d5;
   background: transparent;
-  color: #192735;
-  font-size: 15px;
-  font-weight: 650;
+  color: #222222;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .settings-tabs button:last-child {
@@ -239,7 +244,7 @@ button {
 }
 
 .settings-tabs button.is-active {
-  background: #192735;
+  background: #0a84ff;
   color: #ffffff;
 }
 
@@ -247,9 +252,9 @@ button {
   display: grid;
   min-height: 0;
   overflow: hidden;
-  padding: 28px 48px;
-  border: 1px solid rgba(25, 39, 53, 0.08);
-  background: rgba(255, 255, 255, 0.28);
+  padding: 26px 48px;
+  border: 1px solid #d6d6d6;
+  background: #e4e4e4;
 }
 
 .settings-page {
@@ -261,22 +266,34 @@ button {
 }
 
 .diagnostics-page {
+  align-content: stretch;
   grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.display-page,
+.filter-page,
+.shortcut-page {
+  align-content: start;
+}
+
+.room-page {
+  align-content: stretch;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
 .settings-group {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   margin: 8px 0 0;
-  padding: 24px 26px 22px;
-  border: 1px solid rgba(25, 39, 53, 0.1);
+  padding: 20px 22px 18px;
+  border: 1px solid #d1d1d1;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.26);
+  background: #e7e7e7;
 }
 
 .settings-group legend {
   padding: 0 8px;
-  color: rgba(25, 39, 53, 0.78);
+  color: #333333;
   font-size: 13px;
   font-weight: 650;
 }
@@ -292,7 +309,7 @@ button {
 .control-slider span,
 .control-row > span:first-child,
 .toggle-row span {
-  color: #192735;
+  color: #1f1f1f;
   font-size: 15px;
   font-weight: 650;
 }
@@ -317,13 +334,15 @@ button {
 .textarea-row textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 38px;
-  border: 1px solid rgba(25, 39, 53, 0.22);
-  border-radius: 8px;
+  min-height: 34px;
+  border: 1px solid #c6c6c6;
+  border-radius: 7px;
   background: #ffffff;
-  color: #192735;
+  color: #202124;
   outline: none;
-  box-shadow: inset 0 1px 2px rgba(25, 39, 53, 0.08);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .room-form button,
@@ -331,12 +350,14 @@ button {
 .settings-actions button,
 .control-footer button,
 .segmented-control button {
-  min-height: 38px;
-  border: 1px solid rgba(25, 39, 53, 0.22);
-  border-radius: 8px;
-  background: #ffffff;
-  color: #192735;
-  box-shadow: 0 1px 2px rgba(25, 39, 53, 0.12);
+  min-height: 34px;
+  border: 1px solid #c6c6c6;
+  border-radius: 7px;
+  background: linear-gradient(#ffffff, #f7f7f7);
+  color: #202124;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .room-form input {
@@ -361,20 +382,20 @@ button {
 .control-footer button:hover,
 .segmented-control button:hover,
 .settings-tabs button:hover:not(.is-active) {
-  background: rgba(25, 39, 53, 0.08);
+  background: #eeeeee;
 }
 
 .room-form button:disabled,
 .settings-actions button:disabled,
 .room-form input:disabled {
-  color: rgba(25, 39, 53, 0.38);
+  color: #a8a8a8;
   cursor: default;
 }
 
 .control-status {
   margin: 0;
   overflow: hidden;
-  color: rgba(25, 39, 53, 0.62);
+  color: #6f7782;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -385,7 +406,7 @@ button {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  color: rgba(25, 39, 53, 0.76);
+  color: #555d66;
   font-size: 15px;
   font-weight: 550;
 }
@@ -399,33 +420,33 @@ button {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: rgba(25, 39, 53, 0.32);
+  background: #a8a8a8;
 }
 
 .status-dot[data-status="connected"] {
-  background: rgba(157, 226, 174, 0.95);
+  background: #34c759;
 }
 
 .status-dot[data-status="connecting"],
 .status-dot[data-status="reconnecting"] {
-  background: rgba(25, 39, 53, 0.88);
+  background: #0a84ff;
 }
 
 .status-dot[data-status="not_live"],
 .status-dot[data-status="invalid_room"],
 .status-dot[data-status="disconnected"] {
-  background: rgba(245, 169, 98, 0.95);
+  background: #ff9500;
 }
 
 .room-meta span[data-status="connected"] {
-  color: #267944;
+  color: #248a3d;
 }
 
 .room-meta span[data-status="reconnecting"],
 .room-meta span[data-status="not_live"],
 .room-meta span[data-status="invalid_room"],
 .room-meta span[data-status="disconnected"] {
-  color: #a75c19;
+  color: #b45f06;
 }
 
 .control-slider,
@@ -439,12 +460,12 @@ button {
 
 .control-slider input {
   width: 100%;
-  accent-color: #192735;
+  accent-color: #0a84ff;
 }
 
 .control-slider strong,
 .readonly-value {
-  color: rgba(25, 39, 53, 0.72);
+  color: #606873;
   font-size: 13px;
   font-weight: 550;
   text-align: right;
@@ -458,8 +479,8 @@ button {
 }
 
 .segmented-control button.is-active {
-  border-color: #192735;
-  background: #192735;
+  border-color: #0a84ff;
+  background: #0a84ff;
   color: #ffffff;
 }
 
@@ -471,7 +492,7 @@ button {
   justify-self: start;
   width: 42px;
   height: 22px;
-  accent-color: #192735;
+  accent-color: #0a84ff;
 }
 
 .settings-actions {
@@ -482,6 +503,161 @@ button {
 
 .settings-actions.single-action {
   grid-template-columns: minmax(120px, 180px);
+}
+
+.saved-room-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  padding-top: 4px;
+  overflow: hidden;
+}
+
+.saved-room-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+}
+
+.saved-room-header strong {
+  color: #1f1f1f;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.saved-room-header button,
+.saved-room-actions button {
+  min-height: 32px;
+  border: 1px solid #c6c6c6;
+  border-radius: 7px;
+  background: linear-gradient(#ffffff, #f7f7f7);
+  color: #202124;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.saved-room-header button {
+  padding: 0 12px;
+}
+
+.saved-room-header button:hover:not(:disabled),
+.saved-room-actions button:hover:not(:disabled) {
+  background: #eeeeee;
+}
+
+.saved-room-header button:disabled,
+.saved-room-actions button:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.saved-room-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.saved-room-list::-webkit-scrollbar,
+.api-test-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.saved-room-list::-webkit-scrollbar-thumb,
+.api-test-list::-webkit-scrollbar-thumb {
+  border: 2px solid #e4e4e4;
+  border-radius: 999px;
+  background: #a8a8a8;
+}
+
+.saved-room-list::-webkit-scrollbar-track,
+.api-test-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.saved-room-list,
+.saved-room-panel .empty-state {
+  grid-row: 3;
+}
+
+.saved-room-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  background: #f5f5f5;
+}
+
+.saved-room-item.is-editing {
+  grid-template-columns: minmax(0, 1fr) 96px max-content;
+}
+
+.saved-room-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.saved-room-info strong {
+  overflow: hidden;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-room-info span {
+  overflow: hidden;
+  color: #6f7782;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-room-actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.saved-room-actions button {
+  min-width: 44px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.saved-room-item input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid #c6c6c6;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #202124;
+  font: inherit;
+  outline: none;
+}
+
+.saved-room-item input:focus {
+  border-color: #0a84ff;
+}
+
+.empty-state {
+  margin: 0;
+  color: #6f7782;
+  font-size: 13px;
 }
 
 .api-test-list {
@@ -503,9 +679,9 @@ button {
   gap: 10px;
   width: 100%;
   padding: 10px;
-  border: 1px solid rgba(126, 168, 196, 0.2);
+  border: 1px solid #d5d5d5;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.62);
+  background: #f5f5f5;
   color: inherit;
   cursor: pointer;
   font: inherit;
@@ -513,12 +689,12 @@ button {
 }
 
 .api-test-item:hover {
-  border-color: rgba(25, 39, 53, 0.2);
-  background: rgba(255, 255, 255, 0.82);
+  border-color: #c4c4c4;
+  background: #ffffff;
 }
 
 .api-test-item:focus-visible {
-  outline: 2px solid rgba(25, 39, 53, 0.32);
+  outline: 2px solid rgba(10, 132, 255, 0.45);
   outline-offset: 2px;
 }
 
@@ -529,21 +705,21 @@ button {
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: rgba(25, 39, 53, 0.12);
-  color: rgba(25, 39, 53, 0.72);
+  background: #e6e6e6;
+  color: #555d66;
   font-size: 10px;
   font-weight: 700;
 }
 
 .api-test-item[data-status="success"] .api-test-mark {
-  background: rgba(157, 226, 174, 0.18);
-  color: rgba(157, 226, 174, 0.95);
+  background: rgba(52, 199, 89, 0.15);
+  color: #248a3d;
 }
 
 .api-test-item[data-status="warning"] .api-test-mark,
 .api-test-item[data-status="failed"] .api-test-mark {
-  background: rgba(245, 169, 98, 0.18);
-  color: rgba(245, 169, 98, 0.95);
+  background: rgba(255, 149, 0, 0.15);
+  color: #b45f06;
 }
 
 .api-test-title {
@@ -554,20 +730,20 @@ button {
 }
 
 .api-test-title strong {
-  color: #192735;
+  color: #202124;
   font-size: 13px;
   font-weight: 650;
 }
 
 .api-test-title span,
 .api-test-item small {
-  color: rgba(25, 39, 53, 0.52);
+  color: #7b8490;
   font-size: 11px;
 }
 
 .api-test-item p {
   margin: 4px 0 2px;
-  color: rgba(25, 39, 53, 0.68);
+  color: #606873;
   font-size: 12px;
 }
 
@@ -593,7 +769,7 @@ button {
 
 .shortcut-form label,
 .textarea-row span {
-  color: #192735;
+  color: #1f1f1f;
   font-size: 15px;
   font-weight: 650;
 }
@@ -605,20 +781,17 @@ button {
 
 .control-error {
   margin: 0;
-  color: rgba(245, 169, 98, 0.95);
+  color: #b45f06;
   font-size: 12px;
   line-height: 1.35;
 }
 
 .control-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: block;
 }
 
 .control-footer span {
-  color: rgba(25, 39, 53, 0.58);
+  color: #6f7782;
   font-size: 13px;
 }
 

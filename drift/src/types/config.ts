@@ -1,8 +1,17 @@
 export type AppConfig = {
   roomId: string;
+  savedRooms: SavedRoom[];
   appearance: AppearanceConfig;
   filter: FilterConfig;
   shortcuts: ShortcutConfig;
+};
+
+export type SavedRoom = {
+  id: string;
+  roomId: string;
+  displayName: string;
+  anchorName?: string;
+  updatedAt: string;
 };
 
 export type AppearanceConfig = {
@@ -30,6 +39,7 @@ export function defaultShortcutLabel() {
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   roomId: "",
+  savedRooms: [],
   appearance: {
     fontSize: 20,
     opacity: 0.94,
@@ -64,6 +74,7 @@ export function mergeAppConfig(config: AppConfig): AppConfig {
       ...DEFAULT_APP_CONFIG.filter,
       ...config.filter,
     },
+    savedRooms: Array.isArray(config.savedRooms) ? config.savedRooms : [],
     shortcuts: {
       ...DEFAULT_APP_CONFIG.shortcuts,
       ...config.shortcuts,
