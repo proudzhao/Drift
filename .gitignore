@@ -6,7 +6,6 @@ Thumbs.db
 .learnings/
 
 # Private project docs for the public source branch
-/README.md
 /docs/
 /drift/README.md
 
