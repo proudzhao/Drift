@@ -246,6 +246,7 @@ button {
 .settings-panel {
   display: grid;
   min-height: 0;
+  overflow: hidden;
   padding: 28px 48px;
   border: 1px solid rgba(25, 39, 53, 0.08);
   background: rgba(255, 255, 255, 0.28);
@@ -255,6 +256,12 @@ button {
   display: grid;
   align-content: start;
   gap: 18px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.diagnostics-page {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .settings-group {
@@ -479,17 +486,40 @@ button {
 
 .api-test-list {
   display: grid;
+  align-content: start;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.diagnostics-page .api-test-list {
+  grid-row: 3;
 }
 
 .api-test-item {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
   padding: 10px;
   border: 1px solid rgba(126, 168, 196, 0.2);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.62);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.api-test-item:hover {
+  border-color: rgba(25, 39, 53, 0.2);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.api-test-item:focus-visible {
+  outline: 2px solid rgba(25, 39, 53, 0.32);
+  outline-offset: 2px;
 }
 
 .api-test-mark {
@@ -546,6 +576,12 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.api-test-item[data-expanded="true"] small {
+  overflow: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .shortcut-form {

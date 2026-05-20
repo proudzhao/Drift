@@ -59,6 +59,9 @@ export function ControlPanel({
   const [apiTestSteps, setApiTestSteps] = useState<ApiTestStep[]>([]);
   const [apiTestError, setApiTestError] = useState("");
   const [isApiTesting, setIsApiTesting] = useState(false);
+  const [expandedApiStepKey, setExpandedApiStepKey] = useState<string | null>(
+    null,
+  );
   const [activeTab, setActiveTab] = useState<SettingsTab>("room");
 
   useEffect(() => {
@@ -148,6 +151,7 @@ export function ControlPanel({
 
     setApiTestError("");
     setApiTestSteps([]);
+    setExpandedApiStepKey(null);
     setIsApiTesting(true);
     try {
       const steps = await invoke<ApiTestStep[]>("test_bilibili_api", {
@@ -388,7 +392,7 @@ export function ControlPanel({
         ) : null}
 
         {activeTab === "diagnostics" ? (
-          <div className="settings-page">
+          <div className="settings-page diagnostics-page">
             <div className="settings-actions">
               <button
                 disabled={isApiTesting || !draftRoomId.trim()}
@@ -404,19 +408,32 @@ export function ControlPanel({
             {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
             {apiTestSteps.length > 0 ? (
               <div className="api-test-list">
-                {apiTestSteps.map((step) => (
-                  <div className="api-test-item" data-status={step.status} key={step.key}>
-                    <span className="api-test-mark">{apiTestMark(step.status)}</span>
-                    <div>
-                      <div className="api-test-title">
-                        <strong>{step.label}</strong>
-                        <span>{step.durationMs} ms</span>
+                {apiTestSteps.map((step) => {
+                  const isExpanded = expandedApiStepKey === step.key;
+
+                  return (
+                    <button
+                      className="api-test-item"
+                      data-expanded={isExpanded}
+                      data-status={step.status}
+                      key={step.key}
+                      onClick={() =>
+                        setExpandedApiStepKey(isExpanded ? null : step.key)
+                      }
+                      type="button"
+                    >
+                      <span className="api-test-mark">{apiTestMark(step.status)}</span>
+                      <div>
+                        <div className="api-test-title">
+                          <strong>{step.label}</strong>
+                          <span>{step.durationMs} ms</span>
+                        </div>
+                        <p>{step.message}</p>
+                        <small>{step.detail}</small>
                       </div>
-                      <p>{step.message}</p>
-                      <small>{step.detail}</small>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             ) : null}
           </div>
