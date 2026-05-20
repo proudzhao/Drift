@@ -1,0 +1,36 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local agent/workspace files
+.learnings/
+
+# Private project docs for the public source branch
+/README.md
+/docs/
+/drift/README.md
+
+# Node/Vite
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust/Tauri
+target/
+**/target/
+
+# Tauri build outputs and local generated files
+src-tauri/target/
+src-tauri/gen/
+
+# Editor and environment
+.idea/
+.vscode/
+*.swp
+*.swo
+.env
+.env.*
