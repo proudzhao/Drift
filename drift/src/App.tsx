@@ -59,11 +59,11 @@ function App() {
   const pendingMessagesRef = useRef<LiveDanmakuMessage[]>([]);
   const sequenceRef = useRef(0);
   const densityLimits = DENSITY_LIMITS[config.appearance.density];
-  const items = liveItems.length > 0 ? liveItems : mockItems;
   const isConnected =
     status.status === "connecting" ||
     status.status === "connected" ||
     status.status === "reconnecting";
+  const items = isConnected ? liveItems : mockItems;
 
   async function setEditMode(enabled: boolean) {
     const result = await invoke<EditModeChanged>("set_edit_mode", { enabled });
@@ -74,6 +74,10 @@ function App() {
 
   async function exitEditMode() {
     await setEditMode(false);
+  }
+
+  function removeDanmakuItem(itemId: string) {
+    setLiveItems((current) => current.filter((item) => item.id !== itemId));
   }
 
   async function startDragging(event: MouseEvent<HTMLElement>) {
@@ -187,19 +191,13 @@ function App() {
       const blockedWords = config.filter.blockedWords
         .map((word) => word.trim())
         .filter(Boolean);
-      const blockedUsers = config.filter.blockedUsers
-        .map((user) => user.trim())
-        .filter(Boolean);
       const nextItems: DanmakuItem[] = [];
 
       for (const message of pendingMessages) {
         const sequence = sequenceRef.current;
         sequenceRef.current += 1;
 
-        if (
-          blockedUsers.includes(message.user) ||
-          blockedWords.some((word) => message.text.includes(word))
-        ) {
+        if (blockedWords.some((word) => message.text.includes(word))) {
           continue;
         }
 
@@ -221,7 +219,6 @@ function App() {
     return () => window.clearInterval(interval);
   }, [
     config.appearance.scrollDuration,
-    config.filter.blockedUsers,
     config.filter.blockedWords,
     densityLimits.maxItems,
     densityLimits.perFlush,
@@ -261,6 +258,7 @@ function App() {
     >
       <DanmakuOverlay
         items={items}
+        onItemDone={isConnected ? removeDanmakuItem : undefined}
         showUsername={config.appearance.showUsername}
         trackCount={trackCount}
       />

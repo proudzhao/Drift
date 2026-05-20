@@ -16,7 +16,6 @@ export type AppearanceConfig = {
 
 export type FilterConfig = {
   blockedWords: string[];
-  blockedUsers: string[];
 };
 
 export type ShortcutConfig = {
@@ -41,7 +40,6 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   filter: {
     blockedWords: [],
-    blockedUsers: [],
   },
   shortcuts: {
     toggleEditMode: defaultShortcutLabel(),

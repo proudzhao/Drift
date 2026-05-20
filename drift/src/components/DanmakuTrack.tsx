@@ -2,12 +2,14 @@ import type { DanmakuItem } from "../types/danmaku";
 
 type DanmakuTrackProps = {
   item: DanmakuItem;
+  onDone?: (itemId: string) => void;
   showUsername: boolean;
   trackCount: number;
 };
 
 export function DanmakuTrack({
   item,
+  onDone,
   showUsername,
   trackCount,
 }: DanmakuTrackProps) {
@@ -18,6 +20,7 @@ export function DanmakuTrack({
   return (
     <div
       className="danmaku"
+      onAnimationEnd={() => onDone?.(item.id)}
       style={{
         top: `${track * 38 + 16}px`,
         animationDuration: `${item.duration}s`,

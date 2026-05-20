@@ -29,7 +29,6 @@ pub struct AppearanceConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct FilterConfig {
     pub blocked_words: Vec<String>,
-    pub blocked_users: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -25,11 +25,21 @@ type ApiTestStep = {
   detail: string;
 };
 
+type SettingsTab = "room" | "display" | "filter" | "control" | "diagnostics";
+
 const DENSITY_LABELS: Record<AppearanceConfig["density"], string> = {
   low: "低",
   medium: "中",
   high: "高",
 };
+
+const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: "room", label: "直播间" },
+  { id: "display", label: "显示" },
+  { id: "filter", label: "过滤" },
+  { id: "control", label: "控制" },
+  { id: "diagnostics", label: "诊断" },
+];
 
 export function ControlPanel({
   config,
@@ -42,10 +52,14 @@ export function ControlPanel({
   const [draftShortcut, setDraftShortcut] = useState(
     config.shortcuts.toggleEditMode,
   );
+  const [draftBlockedWords, setDraftBlockedWords] = useState(
+    config.filter.blockedWords.join("\n"),
+  );
   const [shortcutError, setShortcutError] = useState("");
   const [apiTestSteps, setApiTestSteps] = useState<ApiTestStep[]>([]);
   const [apiTestError, setApiTestError] = useState("");
   const [isApiTesting, setIsApiTesting] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("room");
 
   useEffect(() => {
     setDraftRoomId(config.roomId);
@@ -54,6 +68,10 @@ export function ControlPanel({
   useEffect(() => {
     setDraftShortcut(config.shortcuts.toggleEditMode);
   }, [config.shortcuts.toggleEditMode]);
+
+  useEffect(() => {
+    setDraftBlockedWords(config.filter.blockedWords.join("\n"));
+  }, [config.filter.blockedWords]);
 
   async function saveConfig(nextConfig: AppConfig) {
     const savedConfig = await invoke<AppConfig>("save_app_config", {
@@ -79,6 +97,15 @@ export function ControlPanel({
         ...config.filter,
         ...nextFilter,
       },
+    });
+  }
+
+  async function saveBlockedWords() {
+    await updateFilter({
+      blockedWords: draftBlockedWords
+        .split("\n")
+        .map((word) => word.trim())
+        .filter(Boolean),
     });
   }
 
@@ -188,10 +215,7 @@ export function ControlPanel({
   return (
     <main className="control-window">
       <header className="control-header">
-        <div>
-          <strong>Drift</strong>
-          <span>弹幕悬浮设置</span>
-        </div>
+        <strong>Drift 设置</strong>
         <button
           onClick={() => invoke("hide_window", { label: "control" })}
           type="button"
@@ -200,200 +224,203 @@ export function ControlPanel({
         </button>
       </header>
 
-      <section className="control-section">
-        <h2>直播间</h2>
-        <div className="room-form">
-          <label htmlFor="control-room-id">房间号</label>
-          <input
-            disabled={isConnected}
-            id="control-room-id"
-            inputMode="numeric"
-            onChange={(event) => setDraftRoomId(event.currentTarget.value)}
-            placeholder="输入房间号"
-            value={draftRoomId}
-          />
-          {isConnected ? (
-            <button onClick={disconnectRoom} type="button">
-              断开
-            </button>
-          ) : (
-            <button disabled={!draftRoomId.trim()} onClick={handleConnect} type="button">
-              连接
-            </button>
-          )}
-        </div>
-        <div className="room-meta">
-          <span className="status-dot" data-status={status.status} />
-          <span data-status={status.status}>状态：{roomStatusLabel}</span>
-          <span>主播：{anchorName}</span>
-        </div>
-        <p className="control-status">{status.message}</p>
-      </section>
-
-      <section className="control-section">
-        <h2>API 测试</h2>
-        <div className="control-actions">
+      <nav className="settings-tabs" aria-label="设置分类">
+        {SETTINGS_TABS.map((tab) => (
           <button
-            disabled={isApiTesting || !draftRoomId.trim()}
-            onClick={testApi}
+            aria-pressed={activeTab === tab.id}
+            className={activeTab === tab.id ? "is-active" : ""}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             type="button"
           >
-            {isApiTesting ? "测试中" : "测试 API"}
+            {tab.label}
           </button>
-          <button onClick={() => invoke("open_log_dir")} type="button">
-            打开日志目录
-          </button>
-        </div>
-        {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
-        {apiTestSteps.length > 0 ? (
-          <div className="api-test-list">
-            {apiTestSteps.map((step) => (
-              <div className="api-test-item" data-status={step.status} key={step.key}>
-                <span className="api-test-mark">{apiTestMark(step.status)}</span>
-                <div>
-                  <div className="api-test-title">
-                    <strong>{step.label}</strong>
-                    <span>{step.durationMs} ms</span>
-                  </div>
-                  <p>{step.message}</p>
-                  <small>{step.detail}</small>
-                </div>
+        ))}
+      </nav>
+
+      <section className="settings-panel">
+        {activeTab === "room" ? (
+          <div className="settings-page">
+            <div className="settings-row room-form">
+              <label htmlFor="control-room-id">房间号</label>
+              <input
+                disabled={isConnected}
+                id="control-room-id"
+                inputMode="numeric"
+                onChange={(event) => setDraftRoomId(event.currentTarget.value)}
+                placeholder="输入房间号"
+                value={draftRoomId}
+              />
+              {isConnected ? (
+                <button onClick={disconnectRoom} type="button">
+                  断开
+                </button>
+              ) : (
+                <button disabled={!draftRoomId.trim()} onClick={handleConnect} type="button">
+                  连接
+                </button>
+              )}
+            </div>
+            <div className="room-meta">
+              <span className="status-dot" data-status={status.status} />
+              <span data-status={status.status}>状态：{roomStatusLabel}</span>
+              <span>主播：{anchorName}</span>
+            </div>
+            <p className="control-status">{status.message}</p>
+            <fieldset className="settings-group">
+              <legend>弹幕窗口</legend>
+              <div className="settings-actions">
+                <button onClick={() => invoke("show_window", { label: "main" })} type="button">
+                  显示弹幕窗口
+                </button>
+                <button onClick={() => invoke("hide_window", { label: "main" })} type="button">
+                  隐藏弹幕窗口
+                </button>
               </div>
-            ))}
+            </fieldset>
           </div>
         ) : null}
-      </section>
 
-      <section className="control-section">
-        <h2>弹幕显示</h2>
-        <ControlSlider
-          label="字号"
-          max={32}
-          min={14}
-          onChange={(value) => updateAppearance({ fontSize: value })}
-          suffix="px"
-          value={config.appearance.fontSize}
-        />
-        <ControlSlider
-          label="透明度"
-          max={100}
-          min={30}
-          onChange={(value) => updateAppearance({ opacity: value / 100 })}
-          suffix="%"
-          value={Math.round(config.appearance.opacity * 100)}
-        />
-        <ControlSlider
-          label="滚动速度"
-          max={24}
-          min={6}
-          onChange={(value) => updateAppearance({ scrollDuration: value })}
-          suffix="秒"
-          value={config.appearance.scrollDuration}
-        />
-        <div className="control-row">
-          <span>显示密度</span>
-          <div className="segmented-control">
-            {(["low", "medium", "high"] as const).map((density) => (
-              <button
-                className={
-                  config.appearance.density === density ? "is-active" : ""
+        {activeTab === "display" ? (
+          <div className="settings-page">
+            <ControlSlider
+              label="字号"
+              max={32}
+              min={14}
+              onChange={(value) => updateAppearance({ fontSize: value })}
+              suffix="px"
+              value={config.appearance.fontSize}
+            />
+            <ControlSlider
+              label="透明度"
+              max={100}
+              min={30}
+              onChange={(value) => updateAppearance({ opacity: value / 100 })}
+              suffix="%"
+              value={Math.round(config.appearance.opacity * 100)}
+            />
+            <ControlSlider
+              label="滚动速度"
+              max={24}
+              min={6}
+              onChange={(value) => updateAppearance({ scrollDuration: value })}
+              suffix="秒"
+              value={config.appearance.scrollDuration}
+            />
+            <div className="settings-row control-row">
+              <span>显示密度</span>
+              <div className="segmented-control">
+                {(["low", "medium", "high"] as const).map((density) => (
+                  <button
+                    className={
+                      config.appearance.density === density ? "is-active" : ""
+                    }
+                    key={density}
+                    onClick={() => updateAppearance({ density })}
+                    type="button"
+                  >
+                    {DENSITY_LABELS[density]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="settings-row toggle-row">
+              <span>显示用户名</span>
+              <input
+                checked={config.appearance.showUsername}
+                onChange={(event) =>
+                  updateAppearance({ showUsername: event.currentTarget.checked })
                 }
-                key={density}
-                onClick={() => updateAppearance({ density })}
+                type="checkbox"
+              />
+            </label>
+            <div className="settings-row control-row">
+              <span>弹幕颜色</span>
+              <span className="readonly-value">统一白色</span>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "filter" ? (
+          <div className="settings-page">
+            <label className="textarea-row">
+              <span>屏蔽词</span>
+              <textarea
+                onBlur={saveBlockedWords}
+                onChange={(event) => setDraftBlockedWords(event.currentTarget.value)}
+                placeholder="每行一个词"
+                rows={12}
+                value={draftBlockedWords}
+              />
+            </label>
+            <div className="settings-actions single-action">
+              <button onClick={saveBlockedWords} type="button">
+                保存屏蔽词
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "control" ? (
+          <div className="settings-page">
+            <div className="settings-row shortcut-form">
+              <label htmlFor="shortcut-input">编辑模式</label>
+              <input
+                id="shortcut-input"
+                onChange={(event) => setDraftShortcut(event.currentTarget.value)}
+                placeholder={defaultShortcutLabel()}
+                value={draftShortcut}
+              />
+              <button onClick={saveShortcut} type="button">
+                保存
+              </button>
+            </div>
+            {shortcutError ? <p className="control-error">{shortcutError}</p> : null}
+            <div className="settings-actions">
+              <button onClick={resetShortcut} type="button">
+                恢复快捷键
+              </button>
+              <button onClick={() => invoke("open_log_dir")} type="button">
+                打开日志目录
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "diagnostics" ? (
+          <div className="settings-page">
+            <div className="settings-actions">
+              <button
+                disabled={isApiTesting || !draftRoomId.trim()}
+                onClick={testApi}
                 type="button"
               >
-                {DENSITY_LABELS[density]}
+                {isApiTesting ? "测试中" : "测试 API"}
               </button>
-            ))}
+              <button onClick={() => invoke("open_log_dir")} type="button">
+                打开日志目录
+              </button>
+            </div>
+            {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
+            {apiTestSteps.length > 0 ? (
+              <div className="api-test-list">
+                {apiTestSteps.map((step) => (
+                  <div className="api-test-item" data-status={step.status} key={step.key}>
+                    <span className="api-test-mark">{apiTestMark(step.status)}</span>
+                    <div>
+                      <div className="api-test-title">
+                        <strong>{step.label}</strong>
+                        <span>{step.durationMs} ms</span>
+                      </div>
+                      <p>{step.message}</p>
+                      <small>{step.detail}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-        <label className="toggle-row">
-          <span>显示用户名</span>
-          <input
-            checked={config.appearance.showUsername}
-            onChange={(event) =>
-              updateAppearance({ showUsername: event.currentTarget.checked })
-            }
-            type="checkbox"
-          />
-        </label>
-        <div className="control-row">
-          <span>弹幕颜色</span>
-          <span className="readonly-value">统一白色</span>
-        </div>
-      </section>
-
-      <section className="control-section">
-        <h2>过滤</h2>
-        <label className="textarea-row">
-          <span>屏蔽词</span>
-          <textarea
-            onChange={(event) =>
-              updateFilter({
-                blockedWords: event.currentTarget.value
-                  .split("\n")
-                  .map((word) => word.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="每行一个词"
-            rows={4}
-            value={config.filter.blockedWords.join("\n")}
-          />
-        </label>
-        <label className="textarea-row">
-          <span>屏蔽用户</span>
-          <textarea
-            onChange={(event) =>
-              updateFilter({
-                blockedUsers: event.currentTarget.value
-                  .split("\n")
-                  .map((user) => user.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="每行一个用户名"
-            rows={3}
-            value={config.filter.blockedUsers.join("\n")}
-          />
-        </label>
-      </section>
-
-      <section className="control-section">
-        <h2>窗口</h2>
-        <div className="control-actions">
-          <button onClick={() => invoke("show_window", { label: "main" })} type="button">
-            显示弹幕
-          </button>
-          <button onClick={() => invoke("hide_window", { label: "main" })} type="button">
-            隐藏弹幕
-          </button>
-        </div>
-      </section>
-
-      <section className="control-section">
-        <h2>快捷键与日志</h2>
-        <div className="shortcut-form">
-          <label htmlFor="shortcut-input">编辑模式</label>
-          <input
-            id="shortcut-input"
-            onChange={(event) => setDraftShortcut(event.currentTarget.value)}
-            placeholder={defaultShortcutLabel()}
-            value={draftShortcut}
-          />
-          <button onClick={saveShortcut} type="button">
-            保存
-          </button>
-        </div>
-        {shortcutError ? <p className="control-error">{shortcutError}</p> : null}
-        <div className="control-actions">
-          <button onClick={resetShortcut} type="button">
-            恢复快捷键
-          </button>
-          <button onClick={() => invoke("open_log_dir")} type="button">
-            打开日志目录
-          </button>
-        </div>
+        ) : null}
       </section>
 
       <footer className="control-footer">

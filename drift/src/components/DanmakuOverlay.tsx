@@ -3,12 +3,14 @@ import { DanmakuTrack } from "./DanmakuTrack";
 
 type DanmakuOverlayProps = {
   items: DanmakuItem[];
+  onItemDone?: (itemId: string) => void;
   trackCount: number;
   showUsername: boolean;
 };
 
 export function DanmakuOverlay({
   items,
+  onItemDone,
   showUsername,
   trackCount,
 }: DanmakuOverlayProps) {
@@ -18,6 +20,7 @@ export function DanmakuOverlay({
         <DanmakuTrack
           item={item}
           key={item.id}
+          onDone={onItemDone}
           showUsername={showUsername}
           trackCount={trackCount}
         />
