@@ -3,25 +3,25 @@
   display: grid;
   align-content: start;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: 12px;
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  padding: 12px 28px 20px;
+  padding: 10px 24px 16px;
   background: #ececec;
   color: #202124;
 }
 
 .control-header {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 80px;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
 }
 
 .control-header strong {
   grid-column: 2;
   color: #4b4b4b;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
@@ -29,15 +29,15 @@
 
 .control-header button {
   grid-column: 3;
-  min-height: 30px;
-  padding: 0 14px;
+  min-height: 28px;
+  padding: 0 12px;
 }
 
 .settings-tabs {
   justify-self: center;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(78px, auto);
+  grid-auto-columns: minmax(68px, auto);
   overflow: hidden;
   border: 1px solid #c7c7c7;
   border-radius: 7px;
@@ -48,13 +48,13 @@
 }
 
 .settings-tabs button {
-  min-height: 32px;
-  padding: 0 14px;
+  min-height: 28px;
+  padding: 0 12px;
   border: 0;
   border-right: 1px solid #d5d5d5;
   background: transparent;
   color: #222222;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -71,7 +71,7 @@
   display: grid;
   min-height: 0;
   overflow: hidden;
-  padding: 26px 48px;
+  padding: 20px 40px;
   border: 1px solid #d6d6d6;
   background: #e4e4e4;
 }
@@ -79,7 +79,7 @@
 .settings-page {
   display: grid;
   align-content: start;
-  gap: 18px;
+  gap: 14px;
   min-height: 0;
   overflow: hidden;
 }
@@ -102,9 +102,9 @@
 
 .settings-group {
   display: grid;
-  gap: 12px;
-  margin: 8px 0 0;
-  padding: 20px 22px 18px;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 16px 18px 14px;
   border: 1px solid #d1d1d1;
   border-radius: 2px;
   background: #e7e7e7;
@@ -113,15 +113,15 @@
 .settings-group legend {
   padding: 0 8px;
   color: #333333;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 650;
 }
 
 .room-form {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) 72px;
+  grid-template-columns: max-content minmax(0, 1fr) 64px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .room-form label,
@@ -129,7 +129,7 @@
 .control-row > span:first-child,
 .toggle-row span {
   color: #1f1f1f;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -153,7 +153,7 @@
 .textarea-row textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 34px;
+  min-height: 30px;
   border: 1px solid #c6c6c6;
   border-radius: 7px;
   background: #ffffff;
@@ -169,11 +169,12 @@
 .settings-actions button,
 .control-footer button,
 .segmented-control button {
-  min-height: 34px;
+  min-height: 30px;
   border: 1px solid #c6c6c6;
   border-radius: 7px;
   background: linear-gradient(#ffffff, #f7f7f7);
   color: #202124;
+  font-size: 12px;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -190,7 +191,7 @@
 }
 
 .textarea-row textarea {
-  min-height: 110px;
+  min-height: 90px;
   padding: 8px 10px;
   resize: vertical;
 }
@@ -215,7 +216,7 @@
   margin: 0;
   overflow: hidden;
   color: #6f7782;
-  font-size: 13px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -226,7 +227,7 @@
   gap: 10px;
   min-width: 0;
   color: #555d66;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 550;
 }
 
@@ -272,9 +273,9 @@
 .control-row,
 .toggle-row {
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) 56px;
+  grid-template-columns: 72px minmax(0, 1fr) 48px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .control-slider input {
@@ -285,7 +286,7 @@
 .control-slider strong,
 .readonly-value {
   color: #606873;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 550;
   text-align: right;
 }
@@ -304,7 +305,7 @@
 }
 
 .toggle-row {
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .toggle-row input {
@@ -317,18 +318,18 @@
 .settings-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .settings-actions.single-action {
-  grid-template-columns: minmax(120px, 180px);
+  grid-template-columns: minmax(110px, 160px);
   justify-self: start;
 }
 
 .saved-room-panel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   padding-top: 4px;
   overflow: hidden;
@@ -338,22 +339,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .saved-room-header strong {
   color: #1f1f1f;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .saved-room-header button,
 .saved-room-actions button {
-  min-height: 32px;
+  min-height: 28px;
   border: 1px solid #c6c6c6;
   border-radius: 7px;
   background: linear-gradient(#ffffff, #f7f7f7);
   color: #202124;
+  font-size: 11px;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -382,7 +384,7 @@
 }
 
 .settings-scroll-list::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .settings-scroll-list::-webkit-scrollbar-thumb {
@@ -398,7 +400,7 @@
 .saved-room-list {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .saved-room-list,
@@ -410,15 +412,15 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid #d5d5d5;
   border-radius: 6px;
   background: #f5f5f5;
 }
 
 .saved-room-item.is-editing {
-  grid-template-columns: minmax(0, 1fr) 96px max-content;
+  grid-template-columns: minmax(0, 1fr) 88px max-content;
 }
 
 .saved-room-info {
@@ -430,7 +432,7 @@
 .saved-room-info strong {
   overflow: hidden;
   color: #202124;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -439,7 +441,7 @@
 .saved-room-info span {
   overflow: hidden;
   color: #6f7782;
-  font-size: 12px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -451,17 +453,17 @@
 }
 
 .saved-room-actions button {
-  min-width: 44px;
+  min-width: 40px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .saved-room-item input {
   box-sizing: border-box;
   width: 100%;
-  min-height: 32px;
+  min-height: 28px;
   min-width: 0;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid #c6c6c6;
   border-radius: 7px;
   background: #ffffff;
@@ -477,7 +479,7 @@
 .empty-state {
   margin: 0;
   color: #6f7782;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .api-test-list {
@@ -492,10 +494,10 @@
 
 .api-test-item {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid #d5d5d5;
   border-radius: 6px;
   background: #f5f5f5;
@@ -519,12 +521,12 @@
   display: grid;
   align-items: center;
   justify-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
   background: #e6e6e6;
   color: #555d66;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
 }
 
@@ -548,20 +550,20 @@
 
 .api-test-title strong {
   color: #202124;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 650;
 }
 
 .api-test-title span,
 .api-test-item small {
   color: #7b8490;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .api-test-item p {
   margin: 4px 0 2px;
   color: #606873;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .api-test-item small {
@@ -579,27 +581,27 @@
 
 .shortcut-form {
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) 72px;
+  grid-template-columns: 72px minmax(0, 1fr) 64px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .shortcut-form label,
 .textarea-row span {
   color: #1f1f1f;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .textarea-row {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .control-error {
   margin: 0;
   color: #b45f06;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -609,6 +611,6 @@
 
 .control-footer span {
   color: #6f7782;
-  font-size: 13px;
+  font-size: 11px;
 }
 

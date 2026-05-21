@@ -3,9 +3,9 @@
   left: 12px;
   bottom: 56px;
   display: grid;
-  gap: 10px;
-  min-width: 240px;
-  padding: 12px 14px;
+  gap: 8px;
+  min-width: 220px;
+  padding: 10px 12px;
   border: 1px solid rgba(126, 168, 196, 0.45);
   border-radius: 8px;
   background: rgba(15, 17, 21, 0.78);
@@ -18,23 +18,23 @@
 }
 
 .mock-panel header strong {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 650;
 }
 
 .mock-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 .mock-buttons button {
-  min-height: 30px;
+  min-height: 26px;
   border: 1px solid rgba(126, 168, 196, 0.58);
   border-radius: 6px;
   background: rgba(126, 168, 196, 0.2);
   color: #ffffff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -45,14 +45,14 @@
 
 .mock-slider {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 54px;
+  grid-template-columns: 36px minmax(0, 1fr) 48px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .mock-slider span {
   color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .mock-slider input {
@@ -62,7 +62,7 @@
 
 .mock-slider strong {
   color: rgba(255, 255, 255, 0.64);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 550;
   text-align: right;
 }
@@ -75,8 +75,8 @@
 
 .mock-dot {
   flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.3);
 }
@@ -88,12 +88,12 @@
 
 .mock-status span:nth-child(2) {
   color: rgba(255, 255, 255, 0.64);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .mock-count {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.48);
-  font-size: 11px;
+  font-size: 10px;
 }
 

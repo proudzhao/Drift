@@ -5,9 +5,9 @@
   bottom: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 10px;
-  width: 320px;
-  padding: 12px 14px;
+  gap: 8px;
+  width: 280px;
+  padding: 10px 12px;
   border-left: 1px solid rgba(126, 168, 196, 0.35);
   background: rgba(15, 17, 21, 0.82);
   color: rgba(255, 255, 255, 0.92);
@@ -25,18 +25,18 @@
 }
 
 .history-header strong {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 650;
 }
 
 .history-header button {
-  min-height: 26px;
-  padding: 0 10px;
+  min-height: 24px;
+  padding: 0 8px;
   border: 1px solid rgba(126, 168, 196, 0.48);
   border-radius: 5px;
   background: rgba(126, 168, 196, 0.2);
   color: rgba(255, 255, 255, 0.84);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -44,14 +44,14 @@
 .history-search {
   box-sizing: border-box;
   width: 100%;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 8px;
   border: 1px solid rgba(126, 168, 196, 0.3);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   outline: none;
 }
 
@@ -87,9 +87,9 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 4px 6px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -106,7 +106,7 @@
 .history-user {
   flex-shrink: 0;
   color: rgba(126, 168, 196, 0.88);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -114,19 +114,19 @@
 .history-text {
   overflow: hidden;
   color: rgba(255, 255, 255, 0.84);
-  font-size: 12px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .history-copied {
   color: #34c759;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
 }
 
 .history-footer {
   color: rgba(255, 255, 255, 0.38);
-  font-size: 11px;
+  font-size: 10px;
 }
 
