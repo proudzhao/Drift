@@ -88,7 +88,14 @@
 
 .diagnostics-settings {
   align-content: stretch;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.diagnostics-settings .settings-group:last-child {
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .display-settings,
@@ -496,10 +503,8 @@
   display: grid;
   align-content: start;
   gap: 8px;
-}
-
-.diagnostics-settings .api-test-list {
-  grid-row: 3;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .api-test-item {
