@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { AppConfig, SavedRoom } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
@@ -54,6 +55,13 @@ export function RoomSettings({
           placeholder="输入房间号"
           value={draftRoomId}
         />
+        <span
+          className="help-link"
+          onClick={() => invoke("open_help_window")}
+          title="如何获取房间号"
+        >
+          ?
+        </span>
         {isConnected ? (
           <button onClick={onDisconnect} type="button">
             断开

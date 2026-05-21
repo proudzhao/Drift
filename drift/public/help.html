@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>如何获取房间号</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #202124;
+      background: #f5f5f5;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    h1 { font-size: 16px; margin: 0 0 16px; }
+    h2 { font-size: 14px; margin: 18px 0 6px; }
+    p, li { font-size: 13px; line-height: 1.6; color: #444; margin: 0 0 4px; }
+    ol { margin: 0; padding-left: 20px; }
+    pre {
+      margin: 8px 0;
+      padding: 10px 12px;
+      border: 1px solid #d5d5d5;
+      border-radius: 6px;
+      background: #fff;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #333;
+      white-space: pre;
+    }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #e8e8e8;
+      font-size: 12px;
+      color: #c7254e;
+    }
+    img {
+      display: block;
+      max-width: 240px;
+      margin: 10px auto 0;
+      border-radius: 8px;
+      border: 1px solid #d5d5d5;
+    }
+    .hint {
+      margin-top: 14px;
+      color: #8e949a;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>如何获取房间号</h1>
+  <h2>PC 端（浏览器）</h2>
+  <p>打开任意直播间，浏览器地址栏中的数字即为房间号：</p>
+  <pre>https://live.bilibili.com/1234
+                          ^^^^
+                          房间号</pre>
+  <p>复制这串数字，填入 Drift 设置页即可。</p>
+
+  <h2>手机端（B 站 App）</h2>
+  <ol>
+    <li>进入任意直播间</li>
+    <li>点击直播间左上角的<strong>主播头像</strong>会弹出主播主页</li>
+    <li>在主播主页（头像下方），可看到<strong>房间号</strong>，通常为一串数字</li>
+  </ol>
+  <img src="/phone.png" alt="手机端查看房间号示意" />
+
+  <p class="hint">房间号是纯数字，如 <code>1234</code>，不是主播名或房间标题。</p>
+</body>
+</html>

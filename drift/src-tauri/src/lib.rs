@@ -5,9 +5,28 @@ mod tray;
 mod update_check;
 mod window_control;
 
+use tauri::Manager;
+
 #[tauri::command]
 fn set_click_through(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     window_control::set_click_through(&app, enabled)
+}
+
+#[tauri::command]
+fn open_help_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("help") {
+        let _ = window.close();
+    }
+    let _ = tauri::WebviewWindowBuilder::new(
+        &app,
+        "help",
+        tauri::WebviewUrl::App("help.html".into()),
+    )
+    .title("如何获取房间号")
+    .inner_size(420.0, 480.0)
+    .resizable(false)
+    .center()
+    .build();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -43,7 +62,8 @@ pub fn run() {
             bilibili::ws::stop_bilibili_danmaku,
             bilibili::diagnostics::test_bilibili_api,
             update_check::get_app_version,
-            update_check::check_update
+            update_check::check_update,
+            open_help_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
