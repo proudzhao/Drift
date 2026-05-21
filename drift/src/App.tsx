@@ -211,9 +211,31 @@ function App() {
         });
       }
 
-      setLiveItems((current) =>
-        [...current, ...nextItems].slice(-densityLimits.maxItems),
-      );
+      setLiveItems((current) => {
+        const combined = [...current, ...nextItems];
+        const excess = combined.length - densityLimits.maxItems;
+
+        if (excess <= 0) {
+          return combined;
+        }
+
+        let alreadyExiting = 0;
+        for (const item of combined) {
+          if (item.exiting) alreadyExiting++;
+        }
+
+        const toMark = Math.max(0, excess - alreadyExiting);
+        if (toMark <= 0) {
+          return combined;
+        }
+
+        let marked = 0;
+        return combined.map((item) => {
+          if (item.exiting || marked >= toMark) return item;
+          marked++;
+          return { ...item, exiting: true };
+        });
+      });
     }, DANMAKU_FLUSH_INTERVAL_MS);
 
     return () => window.clearInterval(interval);

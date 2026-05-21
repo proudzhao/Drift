@@ -65,6 +65,11 @@ button {
   animation-timing-function: linear;
   animation-fill-mode: forwards;
   will-change: transform;
+  transition: opacity 300ms ease-out;
+}
+
+.danmaku.is-exiting {
+  opacity: 0 !important;
 }
 
 .edit-drag-region {

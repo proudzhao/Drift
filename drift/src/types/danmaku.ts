@@ -5,6 +5,7 @@ export type DanmakuItem = {
   track: number;
   duration: number;
   delay: number;
+  exiting?: boolean;
 };
 
 export type LiveDanmakuMessage = {

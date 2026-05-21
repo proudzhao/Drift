@@ -16,11 +16,21 @@ export function DanmakuTrack({
   const track = item.track % trackCount;
   const text =
     showUsername && item.user ? `${item.user}: ${item.text}` : item.text;
+  const className = item.exiting ? "danmaku is-exiting" : "danmaku";
 
   return (
     <div
-      className="danmaku"
-      onAnimationEnd={() => onDone?.(item.id)}
+      className={className}
+      onAnimationEnd={(event) => {
+        if (event.animationName === "drift-across") {
+          onDone?.(item.id);
+        }
+      }}
+      onTransitionEnd={(event) => {
+        if (event.propertyName === "opacity" && item.exiting) {
+          onDone?.(item.id);
+        }
+      }}
       style={{
         top: `${track * 38 + 16}px`,
         animationDuration: `${item.duration}s`,
