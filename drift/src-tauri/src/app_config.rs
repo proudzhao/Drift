@@ -13,6 +13,7 @@ pub struct AppConfig {
     pub appearance: AppearanceConfig,
     pub filter: FilterConfig,
     pub shortcuts: ShortcutConfig,
+    pub mock_panel_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +90,7 @@ impl Default for AppConfig {
             appearance: AppearanceConfig::default(),
             filter: FilterConfig::default(),
             shortcuts: ShortcutConfig::default(),
+            mock_panel_enabled: false,
         }
     }
 }

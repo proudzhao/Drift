@@ -4,6 +4,7 @@ export type AppConfig = {
   appearance: AppearanceConfig;
   filter: FilterConfig;
   shortcuts: ShortcutConfig;
+  mockPanelEnabled: boolean;
 };
 
 export type SavedRoom = {
@@ -54,6 +55,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   shortcuts: {
     toggleEditMode: defaultShortcutLabel(),
   },
+  mockPanelEnabled: false,
 };
 
 export function mergeAppConfig(config: AppConfig): AppConfig {

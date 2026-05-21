@@ -407,15 +407,17 @@ function App() {
               onClose={() => setShowHistory(false)}
             />
           ) : null}
-          <MockDanmakuPanel
-            active={mock.active}
-            onBurst={triggerMockBurst}
-            onRateChange={handleMockRateChange}
-            onStart={startMockDanmaku}
-            onStop={stopMockDanmaku}
-            rate={mock.rate}
-            totalGenerated={mock.totalGenerated}
-          />
+          {config.mockPanelEnabled ? (
+            <MockDanmakuPanel
+              active={mock.active}
+              onBurst={triggerMockBurst}
+              onRateChange={handleMockRateChange}
+              onStart={startMockDanmaku}
+              onStop={stopMockDanmaku}
+              rate={mock.rate}
+              totalGenerated={mock.totalGenerated}
+            />
+          ) : null}
           {(
             [
               ["NorthWest", "nw"],

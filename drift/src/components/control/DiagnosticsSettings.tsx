@@ -16,7 +16,9 @@ type DiagnosticsSettingsProps = {
   draftRoomId: string;
   expandedApiStepKey: string | null;
   isApiTesting: boolean;
+  mockPanelEnabled: boolean;
   onExpandedApiStepChange: (stepKey: string | null) => void;
+  onMockPanelToggle: (enabled: boolean) => void;
   onTestApi: () => void;
 };
 
@@ -26,7 +28,9 @@ export function DiagnosticsSettings({
   draftRoomId,
   expandedApiStepKey,
   isApiTesting,
+  mockPanelEnabled,
   onExpandedApiStepChange,
+  onMockPanelToggle,
   onTestApi,
 }: DiagnosticsSettingsProps) {
   const [isExporting, setIsExporting] = useState(false);
@@ -76,6 +80,15 @@ export function DiagnosticsSettings({
           {exportMessage}
         </p>
       ) : null}
+
+      <div className="toggle-row">
+        <span>Mock 弹幕</span>
+        <input
+          checked={mockPanelEnabled}
+          onChange={(event) => onMockPanelToggle(event.target.checked)}
+          type="checkbox"
+        />
+      </div>
 
       {apiTestError ? <p className="control-error">{apiTestError}</p> : null}
       {apiTestSteps.length > 0 ? (

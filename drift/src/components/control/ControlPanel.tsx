@@ -372,7 +372,11 @@ export function ControlPanel({
             draftRoomId={draftRoomId}
             expandedApiStepKey={expandedApiStepKey}
             isApiTesting={isApiTesting}
+            mockPanelEnabled={config.mockPanelEnabled}
             onExpandedApiStepChange={setExpandedApiStepKey}
+            onMockPanelToggle={(enabled) =>
+              saveConfig({ ...config, mockPanelEnabled: enabled })
+            }
             onTestApi={testApi}
           />
         ) : null}
