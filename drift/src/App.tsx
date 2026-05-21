@@ -6,7 +6,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
 import { EditModePanel } from "./components/EditModePanel";
-import { createMockDanmakuItems } from "./data/mockDanmaku";
+import { MockDanmakuPanel } from "./components/MockDanmakuPanel";
+import {
+  createMockDanmakuItems,
+  generateMockBatch,
+  generateMockMessage,
+} from "./data/mockDanmaku";
 import {
   DEFAULT_APP_CONFIG,
   defaultShortcutLabel,
@@ -36,6 +41,12 @@ type EditModeChanged = {
 type ResizeDirection = "NorthWest" | "NorthEast" | "SouthEast" | "SouthWest";
 type Density = AppConfig["appearance"]["density"];
 
+type MockState = {
+  active: boolean;
+  rate: number;
+  totalGenerated: number;
+};
+
 const DENSITY_LIMITS: Record<Density, { maxItems: number; perFlush: number }> =
   {
     low: { maxItems: 40, perFlush: 6 },
@@ -58,12 +69,17 @@ function App() {
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<LiveDanmakuMessage[]>([]);
   const sequenceRef = useRef(0);
+  const [mock, setMock] = useState<MockState>({
+    active: false,
+    rate: 50,
+    totalGenerated: 0,
+  });
   const densityLimits = DENSITY_LIMITS[config.appearance.density];
   const isConnected =
     status.status === "connecting" ||
     status.status === "connected" ||
     status.status === "reconnecting";
-  const items = isConnected ? liveItems : mockItems;
+  const items = isConnected || mock.active ? liveItems : mockItems;
 
   async function setEditMode(enabled: boolean) {
     const result = await invoke<EditModeChanged>("set_edit_mode", { enabled });
@@ -78,6 +94,27 @@ function App() {
 
   function removeDanmakuItem(itemId: string) {
     setLiveItems((current) => current.filter((item) => item.id !== itemId));
+  }
+
+  function startMockDanmaku() {
+    setMock((prev) => ({ ...prev, active: true }));
+  }
+
+  function stopMockDanmaku() {
+    setMock((prev) => ({ ...prev, active: false }));
+  }
+
+  function handleMockRateChange(rate: number) {
+    setMock((prev) => ({ ...prev, rate }));
+  }
+
+  function triggerMockBurst() {
+    const batch = generateMockBatch(80);
+    pendingMessagesRef.current.push(...batch);
+    setMock((prev) => ({
+      ...prev,
+      totalGenerated: prev.totalGenerated + batch.length,
+    }));
   }
 
   async function startDragging(event: MouseEvent<HTMLElement>) {
@@ -248,6 +285,30 @@ function App() {
     windowLabel,
   ]);
 
+  useEffect(() => {
+    if (isConnected && mock.active) {
+      setMock((prev) => ({ ...prev, active: false }));
+    }
+  }, [isConnected, mock.active]);
+
+  useEffect(() => {
+    if (windowLabel !== "main" || !mock.active) {
+      return;
+    }
+
+    const intervalMs = Math.max(5, Math.floor(1000 / mock.rate));
+    const timer = window.setInterval(() => {
+      const message = generateMockMessage();
+      pendingMessagesRef.current.push(message);
+      setMock((prev) => ({
+        ...prev,
+        totalGenerated: prev.totalGenerated + 1,
+      }));
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [mock.active, mock.rate, windowLabel]);
+
   const overlayClassName = [
     "overlay",
     isClickThrough ? "is-click-through" : "",
@@ -280,7 +341,7 @@ function App() {
     >
       <DanmakuOverlay
         items={items}
-        onItemDone={isConnected ? removeDanmakuItem : undefined}
+        onItemDone={isConnected || mock.active ? removeDanmakuItem : undefined}
         showUsername={config.appearance.showUsername}
         trackCount={trackCount}
       />
@@ -294,6 +355,15 @@ function App() {
             <span>拖动调整弹幕区域位置</span>
           </section>
           <EditModePanel onExitEditMode={exitEditMode} shortcut={shortcut} />
+          <MockDanmakuPanel
+            active={mock.active}
+            onBurst={triggerMockBurst}
+            onRateChange={handleMockRateChange}
+            onStart={startMockDanmaku}
+            onStop={stopMockDanmaku}
+            rate={mock.rate}
+            totalGenerated={mock.totalGenerated}
+          />
           {(
             [
               ["NorthWest", "nw"],
