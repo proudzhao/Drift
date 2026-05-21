@@ -56,6 +56,7 @@
   color: #222222;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .settings-tabs button:last-child {
@@ -612,5 +613,36 @@
 .control-footer span {
   color: #6f7782;
   font-size: 11px;
+}
+
+.about-section {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 24px 0 16px;
+}
+
+.about-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  margin-bottom: 8px;
+}
+
+.about-app-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #202124;
+}
+
+.about-version {
+  font-size: 13px;
+  color: #6f7782;
+}
+
+.about-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #8e949a;
 }
 

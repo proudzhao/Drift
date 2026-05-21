@@ -1,4 +1,4 @@
-export type SettingsTab = "room" | "display" | "filter" | "shortcuts" | "diagnostics";
+export type SettingsTab = "room" | "display" | "filter" | "shortcuts" | "diagnostics" | "about";
 
 type SettingsTabsProps = {
   activeTab: SettingsTab;
@@ -11,6 +11,7 @@ const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: "filter", label: "过滤规则" },
   { id: "shortcuts", label: "快捷键" },
   { id: "diagnostics", label: "诊断" },
+  { id: "about", label: "关于" },
 ];
 
 export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {

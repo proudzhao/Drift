@@ -9,6 +9,7 @@ import {
 } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
 import { DiagnosticsSettings, type ApiTestStep } from "./DiagnosticsSettings";
+import { AboutSettings } from "./AboutSettings";
 import { DisplaySettings } from "./DisplaySettings";
 import { FilterSettings } from "./FilterSettings";
 import { RoomSettings } from "./RoomSettings";
@@ -375,6 +376,8 @@ export function ControlPanel({
             onTestApi={testApi}
           />
         ) : null}
+
+        {activeTab === "about" ? <AboutSettings /> : null}
       </section>
 
       <footer className="control-footer">

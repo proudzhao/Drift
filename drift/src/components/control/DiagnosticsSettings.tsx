@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 
 export type ApiTestStep = {
   key: string;
@@ -9,14 +8,6 @@ export type ApiTestStep = {
   durationMs: number;
   message: string;
   detail: string;
-};
-
-type CheckUpdateResult = {
-  hasUpdate: boolean;
-  currentVersion: string;
-  latestVersion: string;
-  releaseUrl: string;
-  error: string | null;
 };
 
 type DiagnosticsSettingsProps = {
@@ -38,10 +29,6 @@ export function DiagnosticsSettings({
   onExpandedApiStepChange,
   onTestApi,
 }: DiagnosticsSettingsProps) {
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [updateResult, setUpdateResult] = useState<CheckUpdateResult | null>(
-    null,
-  );
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
 
@@ -56,26 +43,6 @@ export function DiagnosticsSettings({
       setExportMessage(`导出失败：${String(error)}`);
     } finally {
       setIsExporting(false);
-    }
-  }
-
-  async function checkUpdate() {
-    setIsCheckingUpdate(true);
-    setUpdateResult(null);
-
-    try {
-      const result = await invoke<CheckUpdateResult>("check_update");
-      setUpdateResult(result);
-    } catch (error) {
-      setUpdateResult({
-        hasUpdate: false,
-        currentVersion: "",
-        latestVersion: "",
-        releaseUrl: "",
-        error: String(error),
-      });
-    } finally {
-      setIsCheckingUpdate(false);
     }
   }
 
@@ -108,39 +75,6 @@ export function DiagnosticsSettings({
         <p className="control-status" style={{ margin: 0 }}>
           {exportMessage}
         </p>
-      ) : null}
-
-      <div className="settings-actions single-action">
-        <button
-          disabled={isCheckingUpdate}
-          onClick={checkUpdate}
-          type="button"
-        >
-          {isCheckingUpdate ? "检查中" : "检查更新"}
-        </button>
-      </div>
-
-      {updateResult ? (
-        <p
-          className={`control-status${updateResult.hasUpdate ? " has-update" : ""}`}
-          style={{ margin: 0 }}
-        >
-          {updateResult.error
-            ? `检查更新失败：${updateResult.error}`
-            : updateResult.hasUpdate
-              ? `发现新版本 ${updateResult.latestVersion}（当前 ${updateResult.currentVersion}）`
-              : `已是最新版本 ${updateResult.currentVersion}`}
-        </p>
-      ) : null}
-      {updateResult?.hasUpdate && updateResult.releaseUrl ? (
-        <div className="settings-actions single-action">
-          <button
-            onClick={() => openUrl(updateResult.releaseUrl)}
-            type="button"
-          >
-            前往下载
-          </button>
-        </div>
       ) : null}
 
       {apiTestError ? <p className="control-error">{apiTestError}</p> : null}

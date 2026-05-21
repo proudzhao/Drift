@@ -28,7 +28,7 @@
       {
         "label": "control",
         "title": "Drift 设置",
-        "width": 460,
+        "width": 500,
         "height": 600,
         "center": true,
         "transparent": false,

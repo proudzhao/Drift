@@ -42,6 +42,7 @@ pub fn run() {
             bilibili::ws::start_bilibili_danmaku,
             bilibili::ws::stop_bilibili_danmaku,
             bilibili::diagnostics::test_bilibili_api,
+            update_check::get_app_version,
             update_check::check_update
         ])
         .run(tauri::generate_context!())
