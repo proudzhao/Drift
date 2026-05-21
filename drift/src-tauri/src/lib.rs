@@ -13,9 +13,11 @@ fn set_click_through(app: tauri::AppHandle, enabled: bool) -> Result<(), String>
 }
 
 #[tauri::command]
-fn open_help_window(app: tauri::AppHandle) {
+async fn open_help_window(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("help") {
         let _ = window.close();
+        // Wait for the window to fully close on all platforms
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
     let _ = tauri::WebviewWindowBuilder::new(
         &app,
