@@ -646,3 +646,20 @@
   color: #8e949a;
 }
 
+.about-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.about-actions button {
+  min-height: 30px;
+  padding: 0 24px;
+  border: 1px solid #c6c6c6;
+  border-radius: 7px;
+  background: linear-gradient(#ffffff, #f7f7f7);
+  color: #202124;
+  font-size: 12px;
+  cursor: pointer;
+}
+

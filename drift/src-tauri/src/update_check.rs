@@ -56,6 +56,16 @@ pub async fn check_update() -> Result<CheckUpdateResult, String> {
 
     if !response.status().is_success() {
         let status = response.status();
+        if status.as_u16() == 404 {
+            debug!(target: "drift::update", "no github release found yet");
+            return Ok(CheckUpdateResult {
+                has_update: false,
+                current_version,
+                latest_version: String::new(),
+                release_url: String::new(),
+                error: Some("暂无已发布的版本".to_string()),
+            });
+        }
         warn!(target: "drift::update", status = %status, "github releases returned non-200");
         return Err(format!("GitHub API 返回 {}", status));
     }

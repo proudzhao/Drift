@@ -53,13 +53,11 @@ export function AboutSettings() {
       <div className="about-section">
         <img alt="Drift" className="about-icon" src={iconUrl} />
         <strong className="about-app-name">Drift</strong>
-        <span className="about-version">
-          版本 {appVersion || ""}
-        </span>
+        <span className="about-version">版本 {appVersion}</span>
         <p className="about-desc">桌面弹幕悬浮工具</p>
       </div>
 
-      <div className="settings-actions">
+      <div className="about-actions">
         <button
           disabled={isCheckingUpdate}
           onClick={checkUpdate}
@@ -72,15 +70,15 @@ export function AboutSettings() {
       {updateResult ? (
         <p className="control-status" style={{ margin: 0, textAlign: "center" }}>
           {updateResult.error
-            ? `检查更新失败：${updateResult.error}`
+            ? updateResult.error
             : updateResult.hasUpdate
-              ? `发现新版本 ${updateResult.latestVersion}`
-              : `已是最新版本`}
+              ? "发现新版本 " + updateResult.latestVersion
+              : "已是最新版本"}
         </p>
       ) : null}
 
       {updateResult?.hasUpdate && updateResult.releaseUrl ? (
-        <div className="settings-actions">
+        <div className="about-actions">
           <button
             onClick={() => openUrl(updateResult.releaseUrl)}
             type="button"
