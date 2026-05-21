@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  defaultOverlayShortcutLabel,
   defaultShortcutLabel,
   type AppConfig,
   type AppearanceConfig,
@@ -36,6 +37,9 @@ export function ControlPanel({
   const [draftShortcut, setDraftShortcut] = useState(
     config.shortcuts.toggleEditMode,
   );
+  const [draftOverlayShortcut, setDraftOverlayShortcut] = useState(
+    config.shortcuts.toggleOverlayWindow,
+  );
   const [draftBlockedWords, setDraftBlockedWords] = useState(
     config.filter.blockedWords.join("\n"),
   );
@@ -58,6 +62,10 @@ export function ControlPanel({
   useEffect(() => {
     setDraftShortcut(config.shortcuts.toggleEditMode);
   }, [config.shortcuts.toggleEditMode]);
+
+  useEffect(() => {
+    setDraftOverlayShortcut(config.shortcuts.toggleOverlayWindow);
+  }, [config.shortcuts.toggleOverlayWindow]);
 
   useEffect(() => {
     setDraftBlockedWords(config.filter.blockedWords.join("\n"));
@@ -284,6 +292,27 @@ export function ControlPanel({
     }
   }
 
+  async function saveOverlayShortcut() {
+    setShortcutError("");
+    try {
+      const result = await invoke<{ shortcut: string }>(
+        "set_overlay_window_shortcut",
+        {
+          shortcut: draftOverlayShortcut,
+        },
+      );
+      await saveConfig({
+        ...config,
+        shortcuts: {
+          ...config.shortcuts,
+          toggleOverlayWindow: result.shortcut,
+        },
+      });
+    } catch (error) {
+      setShortcutError(String(error));
+    }
+  }
+
   async function resetShortcut() {
     setDraftShortcut(defaultShortcutLabel());
     setShortcutError("");
@@ -296,6 +325,28 @@ export function ControlPanel({
         shortcuts: {
           ...config.shortcuts,
           toggleEditMode: result.shortcut,
+        },
+      });
+    } catch (error) {
+      setShortcutError(String(error));
+    }
+  }
+
+  async function resetOverlayShortcut() {
+    setDraftOverlayShortcut(defaultOverlayShortcutLabel());
+    setShortcutError("");
+    try {
+      const result = await invoke<{ shortcut: string }>(
+        "set_overlay_window_shortcut",
+        {
+          shortcut: defaultOverlayShortcutLabel(),
+        },
+      );
+      await saveConfig({
+        ...config,
+        shortcuts: {
+          ...config.shortcuts,
+          toggleOverlayWindow: result.shortcut,
         },
       });
     } catch (error) {
@@ -358,8 +409,12 @@ export function ControlPanel({
         {activeTab === "shortcuts" ? (
           <ShortcutSettings
             draftShortcut={draftShortcut}
+            draftOverlayShortcut={draftOverlayShortcut}
+            onOverlayShortcutChange={setDraftOverlayShortcut}
             onResetShortcut={resetShortcut}
+            onResetOverlayShortcut={resetOverlayShortcut}
             onSaveShortcut={saveShortcut}
+            onSaveOverlayShortcut={saveOverlayShortcut}
             onShortcutChange={setDraftShortcut}
             shortcutError={shortcutError}
           />
@@ -385,7 +440,10 @@ export function ControlPanel({
       </section>
 
       <footer className="control-footer">
-        <span>{config.shortcuts.toggleEditMode} 切换编辑模式</span>
+        <span>
+          {config.shortcuts.toggleEditMode} 切换编辑模式 ·{" "}
+          {config.shortcuts.toggleOverlayWindow} 显示/隐藏弹幕窗口
+        </span>
       </footer>
     </main>
   );

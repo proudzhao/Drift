@@ -56,6 +56,7 @@ pub fn run() {
             tray::show_window,
             window_control::set_edit_mode,
             window_control::set_edit_mode_shortcut,
+            window_control::set_overlay_window_shortcut,
             window_control::save_window_layout,
             window_control::load_window_layout,
             bilibili::ws::start_bilibili_danmaku,

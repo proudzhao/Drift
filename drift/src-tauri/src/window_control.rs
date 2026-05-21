@@ -15,6 +15,7 @@ const MIN_WINDOW_HEIGHT: u32 = 160;
 pub struct EditModeState {
     enabled: Mutex<bool>,
     shortcut: Mutex<ShortcutBinding>,
+    overlay_shortcut: Mutex<ShortcutBinding>,
 }
 
 impl Default for EditModeState {
@@ -22,6 +23,7 @@ impl Default for EditModeState {
         Self {
             enabled: Mutex::new(false),
             shortcut: Mutex::new(default_shortcut_binding()),
+            overlay_shortcut: Mutex::new(default_overlay_shortcut_binding()),
         }
     }
 }
@@ -32,10 +34,21 @@ struct ShortcutBinding {
     shortcut: Shortcut,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum ShortcutKind {
+    EditMode,
+    OverlayWindow,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct EditModeChanged {
     pub is_edit_mode: bool,
     pub is_click_through: bool,
+    pub shortcut: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ShortcutChanged {
     pub shortcut: String,
 }
 
@@ -63,6 +76,7 @@ pub fn set_edit_mode_shortcut(
     shortcut: String,
 ) -> Result<EditModeChanged, String> {
     let next_binding = parse_shortcut_binding(&shortcut)?;
+    ensure_shortcut_available(&state, &next_binding, ShortcutKind::EditMode)?;
     let previous_binding = {
         let mut current = state.shortcut.lock().map_err(|error| error.to_string())?;
         let previous = current.clone();
@@ -91,6 +105,43 @@ pub fn set_edit_mode_shortcut(
 }
 
 #[tauri::command]
+pub fn set_overlay_window_shortcut(
+    app: AppHandle,
+    state: State<'_, EditModeState>,
+    shortcut: String,
+) -> Result<ShortcutChanged, String> {
+    let next_binding = parse_shortcut_binding(&shortcut)?;
+    ensure_shortcut_available(&state, &next_binding, ShortcutKind::OverlayWindow)?;
+    let previous_binding = {
+        let mut current = state
+            .overlay_shortcut
+            .lock()
+            .map_err(|error| error.to_string())?;
+        let previous = current.clone();
+        *current = next_binding.clone();
+        previous
+    };
+
+    app.global_shortcut()
+        .unregister(previous_binding.shortcut)
+        .map_err(|error| error.to_string())?;
+    app.global_shortcut()
+        .register(next_binding.shortcut)
+        .map_err(|error| error.to_string())?;
+
+    tracing::info!(
+        target: "drift::window",
+        previous_shortcut = %previous_binding.label,
+        shortcut = %next_binding.label,
+        "overlay window shortcut updated"
+    );
+
+    Ok(ShortcutChanged {
+        shortcut: next_binding.label,
+    })
+}
+
+#[tauri::command]
 pub fn save_window_layout(app: AppHandle) -> Result<WindowLayout, String> {
     let layout = current_window_layout(&app)?;
     write_window_layout(&app, &layout)?;
@@ -112,29 +163,43 @@ pub fn load_window_layout(app: AppHandle) -> Result<Option<WindowLayout>, String
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     restore_window_layout(app.handle());
-    let configured_shortcut = app_config::read_app_config(app.handle())
-        .map(|config| config.shortcuts.toggle_edit_mode)
+    let configured_shortcuts = app_config::read_app_config(app.handle())
+        .map(|config| config.shortcuts)
         .unwrap_or_else(|error| {
             tracing::warn!(
                 target: "drift::window",
                 error = %error,
-                "failed to read shortcut from app config; using default shortcut"
+                "failed to read shortcuts from app config; using default shortcuts"
             );
-            shortcut_label().to_string()
+            app_config::ShortcutConfig::default()
         });
-    register_edit_mode_shortcut(app, &configured_shortcut)?;
+    register_global_shortcuts(app, &configured_shortcuts)?;
     Ok(())
 }
 
-fn register_edit_mode_shortcut(
+fn register_global_shortcuts(
     app: &mut App,
-    shortcut_label: &str,
+    shortcuts: &app_config::ShortcutConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let binding = parse_shortcut_binding(shortcut_label)?;
+    let edit_binding = parse_shortcut_binding(&shortcuts.toggle_edit_mode)?;
+    let mut overlay_binding = parse_shortcut_binding(&shortcuts.toggle_overlay_window)?;
+    if edit_binding.shortcut == overlay_binding.shortcut {
+        tracing::warn!(
+            target: "drift::window",
+            shortcut = %overlay_binding.label,
+            "overlay shortcut conflicts with edit mode shortcut; using default overlay shortcut"
+        );
+        overlay_binding = default_overlay_shortcut_binding();
+    }
     {
         let state = app.state::<EditModeState>();
         let mut current = state.shortcut.lock().map_err(|error| error.to_string())?;
-        *current = binding.clone();
+        *current = edit_binding.clone();
+        let mut overlay_current = state
+            .overlay_shortcut
+            .lock()
+            .map_err(|error| error.to_string())?;
+        *overlay_current = overlay_binding.clone();
     }
 
     app.handle().plugin(
@@ -145,56 +210,76 @@ fn register_edit_mode_shortcut(
                 }
 
                 let state = app.state::<EditModeState>();
-                let is_current_shortcut = match state.shortcut.lock() {
-                    Ok(current) => triggered_shortcut == &current.shortcut,
+                let shortcut_kind = match current_shortcut_kind(&state, triggered_shortcut) {
+                    Ok(kind) => kind,
                     Err(error) => {
                         tracing::error!(
                             target: "drift::window",
                             error = %error,
-                            "failed to lock shortcut state"
-                        );
-                        false
-                    }
-                };
-
-                if !is_current_shortcut {
-                    return;
-                }
-
-                let next_enabled = match state.enabled.lock() {
-                    Ok(enabled) => !*enabled,
-                    Err(error) => {
-                        tracing::error!(
-                            target: "drift::window",
-                            error = %error,
-                            "failed to lock edit mode state"
+                            "failed to detect triggered shortcut"
                         );
                         return;
                     }
                 };
 
-                if let Err(error) = apply_edit_mode(app, &state, next_enabled) {
-                    tracing::error!(
-                        target: "drift::window",
-                        error = %error,
-                        "failed to toggle edit mode from shortcut"
-                    );
+                match shortcut_kind {
+                    Some(ShortcutKind::EditMode) => {
+                        let next_enabled = match state.enabled.lock() {
+                            Ok(enabled) => !*enabled,
+                            Err(error) => {
+                                tracing::error!(
+                                    target: "drift::window",
+                                    error = %error,
+                                    "failed to lock edit mode state"
+                                );
+                                return;
+                            }
+                        };
+
+                        if let Err(error) = apply_edit_mode(app, &state, next_enabled) {
+                            tracing::error!(
+                                target: "drift::window",
+                                error = %error,
+                                "failed to toggle edit mode from shortcut"
+                            );
+                        }
+                    }
+                    Some(ShortcutKind::OverlayWindow) => {
+                        if let Err(error) = toggle_overlay_window(app) {
+                            tracing::error!(
+                                target: "drift::window",
+                                error = %error,
+                                "failed to toggle overlay window from shortcut"
+                            );
+                        }
+                    }
+                    None => {}
                 }
             })
             .build(),
     )?;
 
-    app.global_shortcut().register(binding.shortcut)?;
+    app.global_shortcut().register(edit_binding.shortcut)?;
+    app.global_shortcut().register(overlay_binding.shortcut)?;
     tracing::info!(
         target: "drift::window",
-        shortcut = %binding.label,
+        shortcut = %edit_binding.label,
         "edit mode shortcut registered"
+    );
+    tracing::info!(
+        target: "drift::window",
+        shortcut = %overlay_binding.label,
+        "overlay window shortcut registered"
     );
     Ok(())
 }
 
 fn default_shortcut_binding() -> ShortcutBinding {
     parse_shortcut_binding(shortcut_label()).expect("default shortcut should be valid")
+}
+
+fn default_overlay_shortcut_binding() -> ShortcutBinding {
+    parse_shortcut_binding(overlay_shortcut_label()).expect("default shortcut should be valid")
 }
 
 fn parse_shortcut_binding(label: &str) -> Result<ShortcutBinding, String> {
@@ -258,6 +343,53 @@ fn parse_shortcut_binding(label: &str) -> Result<ShortcutBinding, String> {
     })
 }
 
+fn ensure_shortcut_available(
+    state: &State<'_, EditModeState>,
+    binding: &ShortcutBinding,
+    kind: ShortcutKind,
+) -> Result<(), String> {
+    let conflicts = match kind {
+        ShortcutKind::EditMode => {
+            let overlay = state
+                .overlay_shortcut
+                .lock()
+                .map_err(|error| error.to_string())?;
+            binding.shortcut == overlay.shortcut
+        }
+        ShortcutKind::OverlayWindow => {
+            let edit = state.shortcut.lock().map_err(|error| error.to_string())?;
+            binding.shortcut == edit.shortcut
+        }
+    };
+
+    if conflicts {
+        return Err("该快捷键已被 Drift 的其他功能使用".to_string());
+    }
+
+    Ok(())
+}
+
+fn current_shortcut_kind(
+    state: &State<'_, EditModeState>,
+    triggered_shortcut: &Shortcut,
+) -> Result<Option<ShortcutKind>, String> {
+    let edit = state.shortcut.lock().map_err(|error| error.to_string())?;
+    if triggered_shortcut == &edit.shortcut {
+        return Ok(Some(ShortcutKind::EditMode));
+    }
+    drop(edit);
+
+    let overlay = state
+        .overlay_shortcut
+        .lock()
+        .map_err(|error| error.to_string())?;
+    if triggered_shortcut == &overlay.shortcut {
+        return Ok(Some(ShortcutKind::OverlayWindow));
+    }
+
+    Ok(None)
+}
+
 fn letter_to_code(character: char) -> Result<Code, String> {
     match character.to_ascii_uppercase() {
         'A' => Ok(Code::KeyA),
@@ -298,6 +430,14 @@ fn shortcut_label() -> &'static str {
     }
 }
 
+fn overlay_shortcut_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command+Option+J"
+    } else {
+        "Control+Alt+J"
+    }
+}
+
 fn apply_edit_mode(
     app: &AppHandle,
     state: &State<'_, EditModeState>,
@@ -310,6 +450,9 @@ fn apply_edit_mode(
         was_enabled
     };
 
+    if enabled {
+        show_overlay_window(app)?;
+    }
     set_click_through(app, !enabled)?;
 
     if was_enabled && !enabled {
@@ -360,6 +503,34 @@ pub fn set_click_through(app: &AppHandle, enabled: bool) -> Result<(), String> {
     window
         .set_ignore_cursor_events(enabled)
         .map_err(|error| error.to_string())
+}
+
+fn toggle_overlay_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    let is_visible = window.is_visible().map_err(|error| error.to_string())?;
+
+    if is_visible {
+        window.hide().map_err(|error| error.to_string())?;
+        tracing::info!(target: "drift::window", "overlay window hidden from shortcut");
+    } else {
+        window.show().map_err(|error| error.to_string())?;
+        tracing::info!(target: "drift::window", "overlay window shown from shortcut");
+    }
+
+    Ok(())
+}
+
+fn show_overlay_window(app: &AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    if !window.is_visible().map_err(|error| error.to_string())? {
+        window.show().map_err(|error| error.to_string())?;
+        tracing::info!(target: "drift::window", "overlay window shown when entering edit mode");
+    }
+    Ok(())
 }
 
 fn current_window_layout(app: &AppHandle) -> Result<WindowLayout, String> {

@@ -30,12 +30,19 @@ export type FilterConfig = {
 
 export type ShortcutConfig = {
   toggleEditMode: string;
+  toggleOverlayWindow: string;
 };
 
 export function defaultShortcutLabel() {
   return navigator.platform.toLowerCase().includes("mac")
     ? "Command+Option+K"
     : "Control+Alt+K";
+}
+
+export function defaultOverlayShortcutLabel() {
+  return navigator.platform.toLowerCase().includes("mac")
+    ? "Command+Option+J"
+    : "Control+Alt+J";
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -54,6 +61,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   shortcuts: {
     toggleEditMode: defaultShortcutLabel(),
+    toggleOverlayWindow: defaultOverlayShortcutLabel(),
   },
   mockPanelEnabled: false,
 };
@@ -81,6 +89,9 @@ export function mergeAppConfig(config: AppConfig): AppConfig {
       ...DEFAULT_APP_CONFIG.shortcuts,
       ...config.shortcuts,
       toggleEditMode: toggleEditMode ?? DEFAULT_APP_CONFIG.shortcuts.toggleEditMode,
+      toggleOverlayWindow:
+        config.shortcuts?.toggleOverlayWindow ??
+        DEFAULT_APP_CONFIG.shortcuts.toggleOverlayWindow,
     },
   };
 }

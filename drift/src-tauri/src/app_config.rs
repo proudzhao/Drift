@@ -47,6 +47,7 @@ pub struct FilterConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct ShortcutConfig {
     pub toggle_edit_mode: String,
+    pub toggle_overlay_window: String,
 }
 
 impl Default for AppearanceConfig {
@@ -66,6 +67,7 @@ impl Default for ShortcutConfig {
     fn default() -> Self {
         Self {
             toggle_edit_mode: shortcut_label().to_string(),
+            toggle_overlay_window: overlay_shortcut_label().to_string(),
         }
     }
 }
@@ -129,6 +131,9 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     if config.shortcuts.toggle_edit_mode == legacy_shortcut_label() {
         config.shortcuts.toggle_edit_mode = shortcut_label().to_string();
     }
+    if config.shortcuts.toggle_overlay_window.is_empty() {
+        config.shortcuts.toggle_overlay_window = overlay_shortcut_label().to_string();
+    }
     Ok(config)
 }
 
@@ -154,6 +159,14 @@ fn shortcut_label() -> &'static str {
         "Command+Option+K"
     } else {
         "Control+Alt+K"
+    }
+}
+
+fn overlay_shortcut_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command+Option+J"
+    } else {
+        "Control+Alt+J"
     }
 }
 
