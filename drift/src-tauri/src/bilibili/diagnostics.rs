@@ -1,14 +1,14 @@
 use super::http;
 use super::protocol;
 use super::types::{
-    compact_token, elapsed_ms, param_value, ApiTestStep, DeviceCookie, DanmuInfo, DanmuHost,
+    compact_token, elapsed_ms, param_value, ApiTestStep, DanmuInfo, DeviceCookie,
 };
 use std::future::Future;
 use std::time::{Duration, Instant};
 use serde_json::json;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use tracing::debug;
 
 #[tauri::command]

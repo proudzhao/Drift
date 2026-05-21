@@ -2,8 +2,8 @@ use super::errors::classify_connection_error;
 use super::http;
 use super::protocol;
 use super::types::{
-    ConnectionResult, DanmakuMessage, DanmakuStatus, DanmakuTaskState, DanmuHost, DanmuInfo,
-    DeviceCookie, HEARTBEAT_INTERVAL, DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL,
+    ConnectionResult, DanmakuMessage, DanmakuStatus, DanmakuTaskState,
+    HEARTBEAT_INTERVAL, DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL,
     RECONNECT_DELAYS,
 };
 use futures_util::{SinkExt, StreamExt};

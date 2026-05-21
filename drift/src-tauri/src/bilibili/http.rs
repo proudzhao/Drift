@@ -1,6 +1,6 @@
 use super::types::{
-    cache_anchor_name, cached_anchor_name, compact_token, response_preview, ApiResponse,
-    BuvidData, DanmuInfo, DeviceCookie, NavData, RoomBaseInfo, RoomBaseInfoData, RoomInfoByRoom,
+    cache_anchor_name, cached_anchor_name, response_preview, ApiResponse,
+    BuvidData, DanmuInfo, DeviceCookie, NavData, RoomBaseInfoData, RoomInfoByRoom,
     RoomInitData, SpaceInfo, BROWSER_USER_AGENT, BUVID_URL, DANMU_INFO_URL, NAV_URL,
     ROOM_BASE_INFO_URL, ROOM_INFO_URL, ROOM_INIT_URL, SPACE_INFO_URL,
 };

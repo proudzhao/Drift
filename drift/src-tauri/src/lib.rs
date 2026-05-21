@@ -39,9 +39,9 @@ pub fn run() {
             window_control::set_edit_mode_shortcut,
             window_control::save_window_layout,
             window_control::load_window_layout,
-            bilibili::start_bilibili_danmaku,
-            bilibili::stop_bilibili_danmaku,
-            bilibili::test_bilibili_api,
+            bilibili::ws::start_bilibili_danmaku,
+            bilibili::ws::stop_bilibili_danmaku,
+            bilibili::diagnostics::test_bilibili_api,
             update_check::check_update
         ])
         .run(tauri::generate_context!())
