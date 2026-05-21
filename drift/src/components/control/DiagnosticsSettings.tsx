@@ -42,6 +42,22 @@ export function DiagnosticsSettings({
   const [updateResult, setUpdateResult] = useState<CheckUpdateResult | null>(
     null,
   );
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+
+  async function exportDiagnostics() {
+    setIsExporting(true);
+    setExportMessage("");
+
+    try {
+      const filename = await invoke<string>("export_diagnostics");
+      setExportMessage(`已导出：${filename}`);
+    } catch (error) {
+      setExportMessage(`导出失败：${String(error)}`);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   async function checkUpdate() {
     setIsCheckingUpdate(true);
@@ -76,7 +92,20 @@ export function DiagnosticsSettings({
         <button onClick={() => invoke("open_log_dir")} type="button">
           打开日志目录
         </button>
+        <button
+          disabled={isExporting}
+          onClick={exportDiagnostics}
+          type="button"
+        >
+          {isExporting ? "导出中" : "导出诊断包"}
+        </button>
       </div>
+
+      {exportMessage ? (
+        <p className="control-status" style={{ margin: 0 }}>
+          {exportMessage}
+        </p>
+      ) : null}
 
       <div className="settings-actions">
         <button

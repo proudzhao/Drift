@@ -31,6 +31,7 @@ pub fn run() {
             app_config::load_app_config,
             app_config::save_app_config,
             logging::open_log_dir,
+            logging::export_diagnostics,
             set_click_through,
             tray::hide_window,
             tray::show_window,
