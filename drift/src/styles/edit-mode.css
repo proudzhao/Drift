@@ -1,0 +1,112 @@
+.edit-drag-region {
+  position: absolute;
+  inset: 16px 18px 56px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(126, 168, 196, 0.35);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: auto;
+  user-select: none;
+  cursor: move;
+}
+
+.edit-drag-region span {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(15, 17, 21, 0.58);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.edit-panel {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid rgba(126, 168, 196, 0.45);
+  border-radius: 8px;
+  background: rgba(15, 17, 21, 0.78);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  color: rgba(255, 255, 255, 0.92);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.edit-panel div {
+  display: grid;
+  gap: 2px;
+}
+
+.edit-panel strong {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.edit-panel span {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.edit-panel button {
+  flex: 1;
+  min-height: 34px;
+  border: 1px solid rgba(126, 168, 196, 0.58);
+  border-radius: 6px;
+  background: rgba(126, 168, 196, 0.2);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.edit-panel button:hover {
+  background: rgba(126, 168, 196, 0.32);
+}
+
+.resize-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(126, 168, 196, 0.8);
+  border-radius: 4px;
+  background: rgba(126, 168, 196, 0.26);
+  pointer-events: auto;
+}
+
+.resize-handle:hover {
+  background: rgba(126, 168, 196, 0.42);
+}
+
+.resize-handle-nw {
+  top: 8px;
+  left: 8px;
+  cursor: nwse-resize;
+}
+
+.resize-handle-ne {
+  top: 8px;
+  right: 8px;
+  cursor: nesw-resize;
+}
+
+.resize-handle-se {
+  right: 8px;
+  bottom: 8px;
+  cursor: nwse-resize;
+}
+
+.resize-handle-sw {
+  bottom: 8px;
+  left: 8px;
+  cursor: nesw-resize;
+}
+

@@ -92,6 +92,9 @@ export function DiagnosticsSettings({
         <button onClick={() => invoke("open_log_dir")} type="button">
           打开日志目录
         </button>
+      </div>
+
+      <div className="settings-actions single-action">
         <button
           disabled={isExporting}
           onClick={exportDiagnostics}
@@ -107,7 +110,7 @@ export function DiagnosticsSettings({
         </p>
       ) : null}
 
-      <div className="settings-actions">
+      <div className="settings-actions single-action">
         <button
           disabled={isCheckingUpdate}
           onClick={checkUpdate}
