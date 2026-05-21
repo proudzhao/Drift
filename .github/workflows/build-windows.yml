@@ -1,8 +1,6 @@
 name: Build Windows Installer
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -14,18 +12,27 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: drift/package-lock.json
 
-      - name: Install Rust
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./drift/src-tauri -> target"
 
       - name: Install dependencies
         run: npm ci
         working-directory: drift
 
       - name: Build Tauri (Windows)
-        run: npm run tauri build
-        working-directory: drift
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: drift
+          args: --bundles nsis,msi
 
       - name: Upload MSI installer
         uses: actions/upload-artifact@v4
