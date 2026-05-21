@@ -106,14 +106,14 @@ function App() {
       setConfig(mergeAppConfig(loadedConfig));
     });
 
-    const unlistenMessage = listen<LiveDanmakuMessage>(
-      "danmaku-message",
+    const unlistenMessage = listen<LiveDanmakuMessage[]>(
+      "danmaku-messages",
       (event) => {
         if (windowLabel !== "main") {
           return;
         }
 
-        pendingMessagesRef.current.push(event.payload);
+        pendingMessagesRef.current.push(...event.payload);
       },
     );
     const unlistenStatus = listen<DanmakuStatus>("danmaku-status", (event) => {

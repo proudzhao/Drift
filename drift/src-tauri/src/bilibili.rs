@@ -65,6 +65,8 @@ const RECONNECT_DELAYS: [Duration; 5] = [
     Duration::from_secs(10),
     Duration::from_secs(20),
 ];
+const DANMAKU_FLUSH_INTERVAL: Duration = Duration::from_millis(150);
+const DANMAKU_BUFFER_MAX: usize = 100;
 static ANCHOR_NAME_CACHE: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -611,6 +613,8 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
         Some(room_init.live_status),
     );
     let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
+    let mut danmaku_buffer: Vec<DanmakuMessage> = Vec::new();
+    let mut danmaku_flush = tokio::time::interval(DANMAKU_FLUSH_INTERVAL);
 
     loop {
         tokio::select! {
@@ -621,9 +625,28 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
                     .await
                     .map_err(|error| format!("心跳发送失败：{}", error))?;
             }
+            _ = danmaku_flush.tick() => {
+                if !danmaku_buffer.is_empty() {
+                    let batch: Vec<DanmakuMessage> = danmaku_buffer.drain(..).collect();
+                    debug!(target: "drift::bilibili.ws", count = batch.len(), "flushing danmaku batch");
+                    if let Err(error) = app.emit("danmaku-messages", batch) {
+                        error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
+                    }
+                }
+            }
             message = reader.next() => {
                 match message {
-                    Some(Ok(Message::Binary(bytes))) => handle_packet(&app, &bytes)?,
+                    Some(Ok(Message::Binary(bytes))) => {
+                        let messages = handle_packet(&app, &bytes)?;
+                        danmaku_buffer.extend(messages);
+                        if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
+                            let batch: Vec<DanmakuMessage> = danmaku_buffer.drain(..).collect();
+                            warn!(target: "drift::bilibili.ws", count = batch.len(), "danmaku buffer overflow, emergency flush");
+                            if let Err(error) = app.emit("danmaku-messages", batch) {
+                                error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
+                            }
+                        }
+                    }
                     Some(Ok(Message::Close(_))) => return Err("服务器关闭连接".to_string()),
                     Some(Ok(_)) => {}
                     Some(Err(error)) => return Err(format!("WebSocket 读取失败：{}", error)),
@@ -1257,8 +1280,9 @@ fn build_packet(operation: u32, protocol: u16, payload: &[u8]) -> Vec<u8> {
     packet
 }
 
-fn handle_packet(app: &AppHandle, bytes: &[u8]) -> Result<(), String> {
+fn handle_packet(app: &AppHandle, bytes: &[u8]) -> Result<Vec<DanmakuMessage>, String> {
     let packets = unpack_packets(bytes)?;
+    let mut messages = Vec::new();
 
     for packet in packets {
         match packet.operation {
@@ -1268,7 +1292,11 @@ fn handle_packet(app: &AppHandle, bytes: &[u8]) -> Result<(), String> {
                     debug!(target: "drift::bilibili.ws", popularity, "received popularity update");
                 }
             }
-            5 => handle_command_payload(app, &packet.payload),
+            5 => {
+                if let Some(msg) = try_extract_danmaku_message(&packet.payload) {
+                    messages.push(msg);
+                }
+            }
             8 => emit_status(app, "connected", "认证成功"),
             _ => warn!(
                 target: "drift::bilibili.proto",
@@ -1278,32 +1306,19 @@ fn handle_packet(app: &AppHandle, bytes: &[u8]) -> Result<(), String> {
         }
     }
 
-    Ok(())
+    Ok(messages)
 }
 
-fn handle_command_payload(app: &AppHandle, payload: &[u8]) {
-    let Ok(value) = serde_json::from_slice::<Value>(payload) else {
-        warn!(target: "drift::bilibili.proto", "command payload JSON parse failed");
-        return;
-    };
-
-    let command = value.get("cmd").and_then(Value::as_str);
-    if command != Some("DANMU_MSG") {
-        if let Some(command) = command {
-            debug!(target: "drift::bilibili.proto", command, "ignored bilibili command");
-        }
-        return;
+fn try_extract_danmaku_message(payload: &[u8]) -> Option<DanmakuMessage> {
+    let value = serde_json::from_slice::<Value>(payload).ok()?;
+    let command = value.get("cmd").and_then(Value::as_str)?;
+    if command != "DANMU_MSG" {
+        return None;
     }
 
-    let Some(info) = value.get("info").and_then(Value::as_array) else {
-        return;
-    };
-    let Some(text) = info.get(1).and_then(Value::as_str) else {
-        return;
-    };
-    let Some(user_info) = info.get(2).and_then(Value::as_array) else {
-        return;
-    };
+    let info = value.get("info").and_then(Value::as_array)?;
+    let text = info.get(1).and_then(Value::as_str)?;
+    let user_info = info.get(2).and_then(Value::as_array)?;
 
     let uid = user_info.first().and_then(Value::as_u64).unwrap_or(0);
     let user = user_info
@@ -1318,15 +1333,11 @@ fn handle_command_payload(app: &AppHandle, payload: &[u8]) {
         .and_then(Value::as_u64)
         .unwrap_or(0);
 
-    let message = DanmakuMessage {
+    Some(DanmakuMessage {
         id: format!("{}-{}-{}", uid, timestamp, text.len()),
         user,
         text: text.to_string(),
-    };
-
-    if let Err(error) = app.emit("danmaku-message", message) {
-        error!(target: "drift::danmaku", error = %error, "danmaku-message emit failed");
-    }
+    })
 }
 
 struct Packet {
