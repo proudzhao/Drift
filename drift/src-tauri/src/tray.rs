@@ -1,7 +1,10 @@
 use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, App, AppHandle, Manager, Runtime, Window};
 
+use crate::window_control::{self, EditModeState};
+
 const MENU_SHOW_OVERLAY: &str = "show_overlay";
 const MENU_HIDE_OVERLAY: &str = "hide_overlay";
+const MENU_TOGGLE_EDIT_MODE: &str = "toggle_edit_mode";
 const MENU_SHOW_CONTROL: &str = "show_control";
 const MENU_EXIT: &str = "exit";
 
@@ -9,6 +12,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let menu = MenuBuilder::new(app)
         .text(MENU_SHOW_OVERLAY, "显示弹幕窗口")
         .text(MENU_HIDE_OVERLAY, "隐藏弹幕窗口")
+        .text(MENU_TOGGLE_EDIT_MODE, "切换模式")
         .text(MENU_SHOW_CONTROL, "显示设置")
         .separator()
         .text(MENU_EXIT, "退出 Drift")
@@ -24,6 +28,10 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             }
             MENU_HIDE_OVERLAY => {
                 let _ = hide_window_by_label(app, "main");
+            }
+            MENU_TOGGLE_EDIT_MODE => {
+                let state = app.state::<EditModeState>();
+                let _ = window_control::toggle_edit_mode(app, &state);
             }
             MENU_SHOW_CONTROL => {
                 let _ = show_window_by_label(app, "control");

@@ -69,6 +69,17 @@ pub fn set_edit_mode(
     apply_edit_mode(&app, &state, enabled)
 }
 
+pub fn toggle_edit_mode(
+    app: &AppHandle,
+    state: &State<'_, EditModeState>,
+) -> Result<EditModeChanged, String> {
+    let next_enabled = {
+        let enabled = state.enabled.lock().map_err(|error| error.to_string())?;
+        !*enabled
+    };
+    apply_edit_mode(app, state, next_enabled)
+}
+
 #[tauri::command]
 pub fn set_edit_mode_shortcut(
     app: AppHandle,
@@ -224,19 +235,7 @@ fn register_global_shortcuts(
 
                 match shortcut_kind {
                     Some(ShortcutKind::EditMode) => {
-                        let next_enabled = match state.enabled.lock() {
-                            Ok(enabled) => !*enabled,
-                            Err(error) => {
-                                tracing::error!(
-                                    target: "drift::window",
-                                    error = %error,
-                                    "failed to lock edit mode state"
-                                );
-                                return;
-                            }
-                        };
-
-                        if let Err(error) = apply_edit_mode(app, &state, next_enabled) {
+                        if let Err(error) = toggle_edit_mode(app, &state) {
                             tracing::error!(
                                 target: "drift::window",
                                 error = %error,
