@@ -2,6 +2,7 @@ mod app_config;
 mod bilibili;
 mod logging;
 mod tray;
+mod update_check;
 mod window_control;
 
 #[tauri::command]
@@ -39,7 +40,8 @@ pub fn run() {
             window_control::load_window_layout,
             bilibili::start_bilibili_danmaku,
             bilibili::stop_bilibili_danmaku,
-            bilibili::test_bilibili_api
+            bilibili::test_bilibili_api,
+            update_check::check_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

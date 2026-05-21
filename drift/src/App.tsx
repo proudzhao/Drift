@@ -5,6 +5,10 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
+import {
+  DanmakuHistoryDrawer,
+  type HistoryMessage,
+} from "./components/DanmakuHistoryDrawer";
 import { EditModePanel } from "./components/EditModePanel";
 import { MockDanmakuPanel } from "./components/MockDanmakuPanel";
 import {
@@ -69,6 +73,28 @@ function App() {
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<LiveDanmakuMessage[]>([]);
   const sequenceRef = useRef(0);
+  const historyRef = useRef<HistoryMessage[]>([]);
+  const [historySnapshot, setHistorySnapshot] = useState<HistoryMessage[]>([]);
+  const HISTORY_MAX = 300;
+
+  function pushToHistory(messages: LiveDanmakuMessage[]) {
+    for (const msg of messages) {
+      historyRef.current.push({
+        id: msg.id,
+        user: msg.user,
+        text: msg.text,
+        timestamp: Date.now(),
+      });
+    }
+    if (historyRef.current.length > HISTORY_MAX) {
+      historyRef.current.splice(
+        0,
+        historyRef.current.length - HISTORY_MAX,
+      );
+    }
+  }
+
+  const [showHistory, setShowHistory] = useState(false);
   const [mock, setMock] = useState<MockState>({
     active: false,
     rate: 50,
@@ -111,6 +137,7 @@ function App() {
   function triggerMockBurst() {
     const batch = generateMockBatch(80);
     pendingMessagesRef.current.push(...batch);
+    pushToHistory(batch);
     setMock((prev) => ({
       ...prev,
       totalGenerated: prev.totalGenerated + batch.length,
@@ -151,6 +178,7 @@ function App() {
         }
 
         pendingMessagesRef.current.push(...event.payload);
+        pushToHistory(event.payload);
       },
     );
     const unlistenStatus = listen<DanmakuStatus>("danmaku-status", (event) => {
@@ -273,6 +301,10 @@ function App() {
           return { ...item, exiting: true };
         });
       });
+
+      if (showHistory) {
+        setHistorySnapshot([...historyRef.current]);
+      }
     }, DANMAKU_FLUSH_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
@@ -281,6 +313,7 @@ function App() {
     config.filter.blockedWords,
     densityLimits.maxItems,
     densityLimits.perFlush,
+    showHistory,
     trackCount,
     windowLabel,
   ]);
@@ -292,6 +325,12 @@ function App() {
   }, [isConnected, mock.active]);
 
   useEffect(() => {
+    if (showHistory) {
+      setHistorySnapshot([...historyRef.current]);
+    }
+  }, [showHistory]);
+
+  useEffect(() => {
     if (windowLabel !== "main" || !mock.active) {
       return;
     }
@@ -300,6 +339,7 @@ function App() {
     const timer = window.setInterval(() => {
       const message = generateMockMessage();
       pendingMessagesRef.current.push(message);
+      pushToHistory([message]);
       setMock((prev) => ({
         ...prev,
         totalGenerated: prev.totalGenerated + 1,
@@ -354,7 +394,19 @@ function App() {
           >
             <span>拖动调整弹幕区域位置</span>
           </section>
-          <EditModePanel onExitEditMode={exitEditMode} shortcut={shortcut} />
+          <EditModePanel
+            onExitEditMode={exitEditMode}
+            onToggleHistory={() =>
+              setShowHistory((prev) => !prev)
+            }
+            shortcut={shortcut}
+          />
+          {showHistory ? (
+            <DanmakuHistoryDrawer
+              messages={historySnapshot}
+              onClose={() => setShowHistory(false)}
+            />
+          ) : null}
           <MockDanmakuPanel
             active={mock.active}
             onBurst={triggerMockBurst}
