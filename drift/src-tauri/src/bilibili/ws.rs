@@ -2,7 +2,7 @@ use super::errors::classify_connection_error;
 use super::http;
 use super::protocol;
 use super::types::{
-    ConnectionResult, DanmakuMessage, DanmakuStatus, DanmakuTaskState,
+    ConnectionResult, DanmakuStatus, DanmakuTaskState, LiveMessage,
     HEARTBEAT_INTERVAL, DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL,
     RECONNECT_DELAYS,
 };
@@ -162,7 +162,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
         Some(room_init.live_status),
     );
     let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
-    let mut danmaku_buffer: Vec<DanmakuMessage> = Vec::new();
+    let mut danmaku_buffer: Vec<LiveMessage> = Vec::new();
     let mut danmaku_flush = tokio::time::interval(DANMAKU_FLUSH_INTERVAL);
 
     let status_emitter = |app: &AppHandle, s: &str, m: &str| {
@@ -182,7 +182,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
             }
             _ = danmaku_flush.tick() => {
                 if !danmaku_buffer.is_empty() {
-                    let batch: Vec<DanmakuMessage> = danmaku_buffer.drain(..).collect();
+                    let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();
                     debug!(target: "drift::bilibili.ws", count = batch.len(), "flushing danmaku batch");
                     if let Err(error) = app.emit("danmaku-messages", batch) {
                         error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
@@ -195,7 +195,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
                         let messages = protocol::handle_packet(&app, &status_emitter, &bytes)?;
                         danmaku_buffer.extend(messages);
                         if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
-                            let batch: Vec<DanmakuMessage> = danmaku_buffer.drain(..).collect();
+                            let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();
                             warn!(target: "drift::bilibili.ws", count = batch.len(), "danmaku buffer overflow, emergency flush");
                             if let Err(error) = app.emit("danmaku-messages", batch) {
                                 error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");

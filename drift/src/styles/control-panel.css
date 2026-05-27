@@ -99,9 +99,18 @@
 }
 
 .display-settings,
-.filter-settings,
 .shortcut-settings {
   align-content: start;
+}
+
+.display-settings {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.filter-settings {
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .room-settings {
@@ -152,6 +161,8 @@
 
 .room-form input,
 .shortcut-form input,
+.filter-rule-grid input,
+.filter-rule-grid select,
 .textarea-row textarea {
   cursor: text;
 }
@@ -160,6 +171,8 @@
 .control-header button,
 .settings-actions button,
 .control-footer button,
+.filter-rule-grid button,
+.filter-rule-item button,
 .segmented-control button,
 .settings-tabs button {
   cursor: pointer;
@@ -167,6 +180,8 @@
 
 .room-form input,
 .shortcut-form input,
+.filter-rule-grid input,
+.filter-rule-grid select,
 .textarea-row textarea {
   box-sizing: border-box;
   width: 100%;
@@ -185,6 +200,8 @@
 .control-header button,
 .settings-actions button,
 .control-footer button,
+.filter-rule-grid button,
+.filter-rule-item button,
 .segmented-control button {
   min-height: 30px;
   border: 1px solid #c6c6c6;
@@ -203,6 +220,8 @@
 
 .room-form input,
 .shortcut-form input,
+.filter-rule-grid input,
+.filter-rule-grid select,
 .textarea-row textarea {
   padding: 0 10px;
 }
@@ -217,6 +236,8 @@
 .control-header button:hover,
 .settings-actions button:hover:not(:disabled),
 .control-footer button:hover,
+.filter-rule-grid button:hover,
+.filter-rule-item button:hover,
 .segmented-control button:hover,
 .settings-tabs button:hover:not(.is-active) {
   background: #eeeeee;
@@ -620,6 +641,84 @@
   line-height: 1.35;
 }
 
+.filter-rule-builder {
+  margin-top: 0;
+  padding: 12px 14px;
+}
+
+.filter-rule-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.95fr) minmax(0, 0.9fr);
+  gap: 8px;
+}
+
+.filter-rule-grid input,
+.filter-rule-grid select {
+  min-height: 30px;
+  min-width: 0;
+  font: inherit;
+}
+
+.filter-rule-grid button {
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.filter-rule-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.filter-rule-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  background: #f5f5f5;
+}
+
+.filter-rule-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filter-rule-toggle input {
+  flex: 0 0 auto;
+  accent-color: #0a84ff;
+}
+
+.filter-rule-toggle span {
+  overflow: hidden;
+  color: #202124;
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-rule-item small {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #6f7782;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-rule-item button {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
 .control-footer {
   display: block;
 }
@@ -807,4 +906,3 @@
   color: #8e949a !important;
   font-size: 11px !important;
 }
-

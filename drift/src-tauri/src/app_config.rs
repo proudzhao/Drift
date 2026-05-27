@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub room_id: String,
     pub saved_rooms: Vec<SavedRoom>,
     pub appearance: AppearanceConfig,
+    pub message_display: MessageDisplayConfig,
     pub filter: FilterConfig,
     pub shortcuts: ShortcutConfig,
     pub mock_panel_enabled: bool,
@@ -37,10 +38,45 @@ pub struct AppearanceConfig {
     pub color: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MessageDisplayConfig {
+    pub show_danmaku: bool,
+    pub show_gift: bool,
+    pub show_guard: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 pub struct FilterConfig {
     pub blocked_words: Vec<String>,
+    pub rules: Vec<FilterRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FilterRule {
+    pub id: String,
+    pub enabled: bool,
+    pub name: String,
+    pub target: String,
+    pub operator: String,
+    pub value: String,
+    pub action: String,
+}
+
+impl Default for FilterRule {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            enabled: true,
+            name: String::new(),
+            target: "text".to_string(),
+            operator: "contains".to_string(),
+            value: String::new(),
+            action: "hide".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +95,16 @@ impl Default for AppearanceConfig {
             density: "medium".to_string(),
             show_username: false,
             color: "white".to_string(),
+        }
+    }
+}
+
+impl Default for MessageDisplayConfig {
+    fn default() -> Self {
+        Self {
+            show_danmaku: true,
+            show_gift: true,
+            show_guard: true,
         }
     }
 }
@@ -90,6 +136,7 @@ impl Default for AppConfig {
             room_id: String::new(),
             saved_rooms: Vec::new(),
             appearance: AppearanceConfig::default(),
+            message_display: MessageDisplayConfig::default(),
             filter: FilterConfig::default(),
             shortcuts: ShortcutConfig::default(),
             mock_panel_enabled: false,

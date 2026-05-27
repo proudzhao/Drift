@@ -1,4 +1,4 @@
-use super::types::{DanmakuMessage, Packet, HEADER_SIZE};
+use super::types::{LiveMessage, LiveMessageKind, Packet, HEADER_SIZE};
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use std::io::Read;
@@ -88,7 +88,7 @@ pub(crate) fn handle_packet(
     app: &tauri::AppHandle,
     status_emitter: impl Fn(&tauri::AppHandle, &str, &str),
     bytes: &[u8],
-) -> Result<Vec<DanmakuMessage>, String> {
+) -> Result<Vec<LiveMessage>, String> {
     let packets = unpack_packets(bytes)?;
     let mut messages = Vec::new();
 
@@ -106,7 +106,7 @@ pub(crate) fn handle_packet(
                 }
             }
             5 => {
-                if let Some(msg) = try_extract_danmaku_message(&packet.payload) {
+                if let Some(msg) = try_extract_live_message(&packet.payload) {
                     messages.push(msg);
                 }
             }
@@ -122,13 +122,38 @@ pub(crate) fn handle_packet(
     Ok(messages)
 }
 
-fn try_extract_danmaku_message(payload: &[u8]) -> Option<DanmakuMessage> {
+fn try_extract_live_message(payload: &[u8]) -> Option<LiveMessage> {
     let value = serde_json::from_slice::<Value>(payload).ok()?;
     let command = value.get("cmd").and_then(Value::as_str)?;
-    if command != "DANMU_MSG" {
-        return None;
+    match command {
+        "DANMU_MSG" => try_extract_danmaku_message(&value),
+        "SEND_GIFT" => try_extract_gift_message(&value),
+        "GUARD_BUY" => try_extract_guard_message(&value),
+        _ => None,
     }
+}
 
+fn empty_live_message(
+    id: String,
+    kind: LiveMessageKind,
+    user: String,
+    text: String,
+    timestamp: Option<u64>,
+) -> LiveMessage {
+    LiveMessage {
+        id,
+        kind,
+        user,
+        text,
+        timestamp,
+        gift_name: None,
+        gift_count: None,
+        guard_level: None,
+        guard_name: None,
+    }
+}
+
+fn try_extract_danmaku_message(value: &Value) -> Option<LiveMessage> {
     let info = value.get("info").and_then(Value::as_array)?;
     let text = info.get(1).and_then(Value::as_str)?;
     let user_info = info.get(2).and_then(Value::as_array)?;
@@ -146,9 +171,142 @@ fn try_extract_danmaku_message(payload: &[u8]) -> Option<DanmakuMessage> {
         .and_then(Value::as_u64)
         .unwrap_or(0);
 
-    Some(DanmakuMessage {
-        id: format!("{}-{}-{}", uid, timestamp, text.len()),
+    Some(empty_live_message(
+        format!("{}-{}-{}", uid, timestamp, text.len()),
+        LiveMessageKind::Danmaku,
         user,
-        text: text.to_string(),
+        text.to_string(),
+        Some(timestamp),
+    ))
+}
+
+fn try_extract_gift_message(value: &Value) -> Option<LiveMessage> {
+    let data = value.get("data")?;
+    let user = string_field(data, &["uname", "username"]).unwrap_or("匿名用户");
+    let gift_name = string_field(data, &["giftName", "gift_name"]).unwrap_or("礼物");
+    let count = u64_field(data, &["num", "gift_num", "count"]).unwrap_or(1);
+    let uid = u64_field(data, &["uid"]).unwrap_or(0);
+    let timestamp = u64_field(data, &["timestamp", "ts"]);
+    let text = format!("{} 送出 {} x{}", user, gift_name, count);
+    let mut message = empty_live_message(
+        format!(
+            "gift-{}-{}-{}-{}",
+            uid,
+            timestamp.unwrap_or(0),
+            gift_name,
+            count
+        ),
+        LiveMessageKind::Gift,
+        user.to_string(),
+        text,
+        timestamp,
+    );
+    message.gift_name = Some(gift_name.to_string());
+    message.gift_count = Some(count);
+    Some(message)
+}
+
+fn try_extract_guard_message(value: &Value) -> Option<LiveMessage> {
+    let data = value.get("data")?;
+    let user = string_field(data, &["username", "uname"]).unwrap_or("匿名用户");
+    let guard_level = u64_field(data, &["guard_level"])
+        .and_then(|level| u8::try_from(level).ok())
+        .unwrap_or(3);
+    let guard_name = guard_name(guard_level);
+    let count = u64_field(data, &["num", "gift_num", "count"]).unwrap_or(1);
+    let uid = u64_field(data, &["uid"]).unwrap_or(0);
+    let timestamp = u64_field(data, &["timestamp", "start_time"]);
+    let text = if count > 1 {
+        format!("{} 开通 {} x{}", user, guard_name, count)
+    } else {
+        format!("{} 开通 {}", user, guard_name)
+    };
+    let mut message = empty_live_message(
+        format!(
+            "guard-{}-{}-{}-{}",
+            uid,
+            timestamp.unwrap_or(0),
+            guard_level,
+            count
+        ),
+        LiveMessageKind::Guard,
+        user.to_string(),
+        text,
+        timestamp,
+    );
+    message.guard_level = Some(guard_level);
+    message.guard_name = Some(guard_name.to_string());
+    Some(message)
+}
+
+fn string_field<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn u64_field(value: &Value, keys: &[&str]) -> Option<u64> {
+    keys.iter().find_map(|key| {
+        let value = value.get(*key)?;
+        value
+            .as_u64()
+            .or_else(|| value.as_str()?.parse::<u64>().ok())
     })
+}
+
+fn guard_name(level: u8) -> &'static str {
+    match level {
+        1 => "总督",
+        2 => "提督",
+        _ => "舰长",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extracts_gift_message() {
+        let payload = r#"{
+            "cmd": "SEND_GIFT",
+            "data": {
+                "uid": 42,
+                "uname": "送礼用户",
+                "giftName": "小花花",
+                "num": 3,
+                "timestamp": 1710000000
+            }
+        }"#;
+
+        let message = try_extract_live_message(payload.as_bytes()).expect("gift should parse");
+
+        assert!(matches!(message.kind, LiveMessageKind::Gift));
+        assert_eq!(message.user, "送礼用户");
+        assert_eq!(message.text, "送礼用户 送出 小花花 x3");
+        assert_eq!(message.gift_name.as_deref(), Some("小花花"));
+        assert_eq!(message.gift_count, Some(3));
+    }
+
+    #[test]
+    fn extracts_guard_message() {
+        let payload = r#"{
+            "cmd": "GUARD_BUY",
+            "data": {
+                "uid": 7,
+                "username": "上舰用户",
+                "guard_level": 3,
+                "num": 1,
+                "start_time": 1710000001
+            }
+        }"#;
+
+        let message = try_extract_live_message(payload.as_bytes()).expect("guard should parse");
+
+        assert!(matches!(message.kind, LiveMessageKind::Guard));
+        assert_eq!(message.user, "上舰用户");
+        assert_eq!(message.text, "上舰用户 开通 舰长");
+        assert_eq!(message.guard_level, Some(3));
+        assert_eq!(message.guard_name.as_deref(), Some("舰长"));
+    }
 }

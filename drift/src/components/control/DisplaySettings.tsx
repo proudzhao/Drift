@@ -1,11 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppearanceConfig } from "../../types/config";
+import type { AppearanceConfig, MessageDisplayConfig } from "../../types/config";
 import { ControlSlider } from "./ControlSlider";
 
 type DisplaySettingsProps = {
   appearance: AppearanceConfig;
+  messageDisplay: MessageDisplayConfig;
   onResetAppearance: () => void;
   onUpdateAppearance: (appearance: Partial<AppearanceConfig>) => void;
+  onUpdateMessageDisplay: (messageDisplay: Partial<MessageDisplayConfig>) => void;
 };
 
 const DENSITY_LABELS: Record<AppearanceConfig["density"], string> = {
@@ -16,8 +18,10 @@ const DENSITY_LABELS: Record<AppearanceConfig["density"], string> = {
 
 export function DisplaySettings({
   appearance,
+  messageDisplay,
   onResetAppearance,
   onUpdateAppearance,
+  onUpdateMessageDisplay,
 }: DisplaySettingsProps) {
   return (
     <div className="settings-page display-settings">
@@ -74,6 +78,39 @@ export function DisplaySettings({
         <span>弹幕颜色</span>
         <span className="readonly-value">统一白色</span>
       </div>
+      <fieldset className="settings-group">
+        <legend>消息类型</legend>
+        <label className="settings-row toggle-row">
+          <span>普通弹幕</span>
+          <input
+            checked={messageDisplay.showDanmaku}
+            onChange={(event) =>
+              onUpdateMessageDisplay({ showDanmaku: event.currentTarget.checked })
+            }
+            type="checkbox"
+          />
+        </label>
+        <label className="settings-row toggle-row">
+          <span>礼物消息</span>
+          <input
+            checked={messageDisplay.showGift}
+            onChange={(event) =>
+              onUpdateMessageDisplay({ showGift: event.currentTarget.checked })
+            }
+            type="checkbox"
+          />
+        </label>
+        <label className="settings-row toggle-row">
+          <span>上舰消息</span>
+          <input
+            checked={messageDisplay.showGuard}
+            onChange={(event) =>
+              onUpdateMessageDisplay({ showGuard: event.currentTarget.checked })
+            }
+            type="checkbox"
+          />
+        </label>
+      </fieldset>
       <fieldset className="settings-group">
         <legend>弹幕窗口</legend>
         <div className="settings-actions">

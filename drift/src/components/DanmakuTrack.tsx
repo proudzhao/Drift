@@ -16,7 +16,14 @@ export function DanmakuTrack({
   const track = item.track % trackCount;
   const text =
     showUsername && item.user ? `${item.user}: ${item.text}` : item.text;
-  const className = item.exiting ? "danmaku is-exiting" : "danmaku";
+  const className = [
+    "danmaku",
+    `danmaku-${item.kind}`,
+    item.highlighted ? "is-highlighted" : "",
+    item.exiting ? "is-exiting" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div

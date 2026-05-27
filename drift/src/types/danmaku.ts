@@ -1,17 +1,29 @@
+export type LiveMessageKind = "danmaku" | "gift" | "guard";
+
 export type DanmakuItem = {
   id: string;
+  kind: LiveMessageKind;
   user?: string;
   text: string;
   track: number;
   duration: number;
   delay: number;
+  createdAt: number;
+  highlighted?: boolean;
+  elder?: boolean;
   exiting?: boolean;
 };
 
-export type LiveDanmakuMessage = {
+export type LiveMessage = {
   id: string;
+  kind: LiveMessageKind;
   user: string;
   text: string;
+  timestamp?: number;
+  giftName?: string;
+  giftCount?: number;
+  guardLevel?: 1 | 2 | 3;
+  guardName?: "总督" | "提督" | "舰长";
 };
 
 export type DanmakuStatus = {

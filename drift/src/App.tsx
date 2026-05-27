@@ -22,10 +22,11 @@ import {
   mergeAppConfig,
   type AppConfig,
 } from "./types/config";
+import { applyFilterConfig } from "./utils/filterRules";
 import type {
   DanmakuItem,
   DanmakuStatus,
-  LiveDanmakuMessage,
+  LiveMessage,
 } from "./types/danmaku";
 import "./App.css";
 
@@ -35,6 +36,12 @@ const MIN_TRACK_COUNT = 3;
 const MIN_WINDOW_WIDTH = 720;
 const MIN_WINDOW_HEIGHT = 160;
 const DEFAULT_SHORTCUT = defaultShortcutLabel();
+const MIN_ALIVE_MS = 4000;
+const MAX_PENDING_QUEUE = 200;
+const ELDER_RATIO = 0.15;
+const MIN_LANE_GAP_PX = 120;
+const MAX_REQUEUE_ROUNDS = 6;
+const MAX_REQUEUE_LATENCY_MS = 3000;
 
 type EditModeChanged = {
   is_edit_mode: boolean;
@@ -45,18 +52,100 @@ type EditModeChanged = {
 type ResizeDirection = "NorthWest" | "NorthEast" | "SouthEast" | "SouthWest";
 type Density = AppConfig["appearance"]["density"];
 
+type QueuedLiveMessage = LiveMessage & {
+  attempts: number;
+  highlighted?: boolean;
+  queuedAt: number;
+};
+
 type MockState = {
   active: boolean;
   rate: number;
   totalGenerated: number;
 };
 
-const DENSITY_LIMITS: Record<Density, { maxItems: number; perFlush: number }> =
-  {
-    low: { maxItems: 40, perFlush: 6 },
-    medium: { maxItems: 80, perFlush: 15 },
-    high: { maxItems: 140, perFlush: 28 },
+const DENSITY_PER_TRACK: Record<
+  Density,
+  { itemsPerTrack: number; perFlushPerTrack: number }
+> = {
+  low: { itemsPerTrack: 1.5, perFlushPerTrack: 0.2 },
+  medium: { itemsPerTrack: 3.0, perFlushPerTrack: 0.5 },
+  high: { itemsPerTrack: 5.0, perFlushPerTrack: 1.0 },
+};
+
+function calcDensityLimits(
+  density: Density,
+  trackCount: number,
+): { maxItems: number; perFlush: number } {
+  const cfg = DENSITY_PER_TRACK[density];
+  return {
+    maxItems: Math.max(
+      MIN_TRACK_COUNT,
+      Math.ceil(cfg.itemsPerTrack * trackCount),
+    ),
+    perFlush: Math.max(1, Math.ceil(cfg.perFlushPerTrack * trackCount)),
   };
+}
+
+function estimateTextWidth(text: string, fontSize: number) {
+  return Array.from(text).reduce((width, character) => {
+    return width + (character.charCodeAt(0) <= 0x7f ? fontSize * 0.56 : fontSize);
+  }, 0);
+}
+
+function estimateMessageWidth(
+  message: LiveMessage,
+  fontSize: number,
+  showUsername: boolean,
+) {
+  const displayText =
+    showUsername && message.user ? `${message.user}: ${message.text}` : message.text;
+  return Math.max(80, estimateTextWidth(displayText, fontSize));
+}
+
+function laneCooldownMs(width: number, durationSeconds: number) {
+  const viewportWidth =
+    typeof window === "undefined" ? 1280 : Math.max(1, window.innerWidth);
+  const travelDistance = viewportWidth + width + 64;
+  const pixelsPerMs = travelDistance / (durationSeconds * 1000);
+  return Math.ceil((width + MIN_LANE_GAP_PX) / pixelsPerMs);
+}
+
+function ensureLaneAvailability(lanes: number[], trackCount: number) {
+  if (lanes.length > trackCount) {
+    lanes.length = trackCount;
+  }
+
+  while (lanes.length < trackCount) {
+    lanes.push(0);
+  }
+}
+
+function findAvailableTrack(lanes: number[], now: number) {
+  let selectedTrack: number | null = null;
+  let oldestAvailability = Number.POSITIVE_INFINITY;
+
+  lanes.forEach((availableAt, track) => {
+    if (availableAt <= now && availableAt < oldestAvailability) {
+      selectedTrack = track;
+      oldestAvailability = availableAt;
+    }
+  });
+
+  return selectedTrack;
+}
+
+function isMessageTypeVisible(message: LiveMessage, config: AppConfig) {
+  switch (message.kind) {
+    case "gift":
+      return config.messageDisplay.showGift;
+    case "guard":
+      return config.messageDisplay.showGuard;
+    case "danmaku":
+    default:
+      return config.messageDisplay.showDanmaku;
+  }
+}
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -65,22 +154,51 @@ function App() {
   const [shortcut, setShortcut] = useState(DEFAULT_SHORTCUT);
   const [trackCount, setTrackCount] = useState(MIN_TRACK_COUNT);
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
+  const configRef = useRef<AppConfig>(DEFAULT_APP_CONFIG);
   const [status, setStatus] = useState<DanmakuStatus>({
     status: "idle",
     message: "尚未连接直播间",
   });
   const mockItems = useMemo(() => createMockDanmakuItems(), []);
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
-  const pendingMessagesRef = useRef<LiveDanmakuMessage[]>([]);
+  const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
+  const laneAvailableAtRef = useRef<number[]>([]);
   const sequenceRef = useRef(0);
   const historyRef = useRef<HistoryMessage[]>([]);
   const [historySnapshot, setHistorySnapshot] = useState<HistoryMessage[]>([]);
   const HISTORY_MAX = 300;
 
-  function pushToHistory(messages: LiveDanmakuMessage[]) {
+  function filterMessages(messages: LiveMessage[]) {
+    const accepted: QueuedLiveMessage[] = [];
+    const now = Date.now();
+
+    for (const message of messages) {
+      const currentConfig = configRef.current;
+      if (!isMessageTypeVisible(message, currentConfig)) {
+        continue;
+      }
+
+      const decision = applyFilterConfig(message, currentConfig.filter);
+      if (!decision.visible) {
+        continue;
+      }
+
+      accepted.push({
+        ...message,
+        attempts: 0,
+        highlighted: decision.highlighted,
+        queuedAt: now,
+      });
+    }
+
+    return accepted;
+  }
+
+  function pushToHistory(messages: QueuedLiveMessage[]) {
     for (const msg of messages) {
       historyRef.current.push({
         id: msg.id,
+        kind: msg.kind,
         user: msg.user,
         text: msg.text,
         timestamp: Date.now(),
@@ -94,13 +212,24 @@ function App() {
     }
   }
 
+  function enqueueMessages(messages: QueuedLiveMessage[]) {
+    pendingMessagesRef.current.push(...messages);
+    const excess = pendingMessagesRef.current.length - MAX_PENDING_QUEUE;
+    if (excess > 0) {
+      pendingMessagesRef.current.splice(0, excess);
+    }
+  }
+
   const [showHistory, setShowHistory] = useState(false);
   const [mock, setMock] = useState<MockState>({
     active: false,
     rate: 50,
     totalGenerated: 0,
   });
-  const densityLimits = DENSITY_LIMITS[config.appearance.density];
+  const densityLimits = useMemo(
+    () => calcDensityLimits(config.appearance.density, trackCount),
+    [config.appearance.density, trackCount],
+  );
   const isConnected =
     status.status === "connecting" ||
     status.status === "connected" ||
@@ -136,8 +265,9 @@ function App() {
 
   function triggerMockBurst() {
     const batch = generateMockBatch(80);
-    pendingMessagesRef.current.push(...batch);
-    pushToHistory(batch);
+    const acceptedMessages = filterMessages(batch);
+    enqueueMessages(acceptedMessages);
+    pushToHistory(acceptedMessages);
     setMock((prev) => ({
       ...prev,
       totalGenerated: prev.totalGenerated + batch.length,
@@ -170,15 +300,16 @@ function App() {
       setConfig(mergeAppConfig(loadedConfig));
     });
 
-    const unlistenMessage = listen<LiveDanmakuMessage[]>(
+    const unlistenMessage = listen<LiveMessage[]>(
       "danmaku-messages",
       (event) => {
         if (windowLabel !== "main") {
           return;
         }
 
-        pendingMessagesRef.current.push(...event.payload);
-        pushToHistory(event.payload);
+        const acceptedMessages = filterMessages(event.payload);
+        enqueueMessages(acceptedMessages);
+        pushToHistory(acceptedMessages);
       },
     );
     const unlistenStatus = listen<DanmakuStatus>("danmaku-status", (event) => {
@@ -209,6 +340,10 @@ function App() {
       void unlistenConfig.then((unlisten) => unlisten());
     };
   }, [windowLabel]);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   useEffect(() => {
     if (windowLabel !== "main") {
@@ -243,7 +378,10 @@ function App() {
       return;
     }
 
+    ensureLaneAvailability(laneAvailableAtRef.current, trackCount);
+
     const interval = window.setInterval(() => {
+      ensureLaneAvailability(laneAvailableAtRef.current, trackCount);
       const pendingMessages = pendingMessagesRef.current.splice(
         0,
         densityLimits.perFlush,
@@ -253,50 +391,107 @@ function App() {
         return;
       }
 
-      const blockedWords = config.filter.blockedWords
-        .map((word) => word.trim())
-        .filter(Boolean);
       const nextItems: DanmakuItem[] = [];
+      const delayedMessages: QueuedLiveMessage[] = [];
 
       for (const message of pendingMessages) {
         const sequence = sequenceRef.current;
-        sequenceRef.current += 1;
 
-        if (blockedWords.some((word) => message.text.includes(word))) {
+        const duration = config.appearance.scrollDuration + (sequence % 3);
+        const now = Date.now();
+        const track = findAvailableTrack(laneAvailableAtRef.current, now);
+        if (track === null) {
+          if (
+            message.attempts < MAX_REQUEUE_ROUNDS &&
+            now - message.queuedAt < MAX_REQUEUE_LATENCY_MS
+          ) {
+            delayedMessages.push({
+              ...message,
+              attempts: message.attempts + 1,
+            });
+          }
           continue;
         }
 
+        sequenceRef.current += 1;
+        const width = estimateMessageWidth(
+          message,
+          config.appearance.fontSize,
+          config.appearance.showUsername,
+        );
+        laneAvailableAtRef.current[track] =
+          now + laneCooldownMs(width, duration);
+
         nextItems.push({
           id: `${message.id}-${sequence}`,
+          kind: message.kind,
           user: message.user,
           text: message.text,
-          track: sequence % trackCount,
-          duration: config.appearance.scrollDuration + (sequence % 3),
+          track,
+          duration,
           delay: 0,
+          createdAt: now,
+          highlighted: message.highlighted,
         });
       }
 
-      setLiveItems((current) => {
-        const combined = [...current, ...nextItems];
-        const excess = combined.length - densityLimits.maxItems;
+      if (delayedMessages.length > 0) {
+        pendingMessagesRef.current.unshift(...delayedMessages);
+      }
 
+      if (nextItems.length === 0) {
+        if (showHistory) {
+          setHistorySnapshot([...historyRef.current]);
+        }
+        return;
+      }
+
+      setLiveItems((current) => {
+        let combined = [...current, ...nextItems];
+
+        // —— Elder promotion ——
+        const elderPoolSize = Math.max(
+          1,
+          Math.ceil(densityLimits.maxItems * ELDER_RATIO),
+        );
+        const elderCount = combined.reduce(
+          (count, item) => count + (item.elder ? 1 : 0),
+          0,
+        );
+        const openElderSlots = elderPoolSize - elderCount;
+
+        if (openElderSlots > 0) {
+          const promoteNow = Date.now();
+          let promoted = 0;
+          combined = combined.map((item) => {
+            if (promoted >= openElderSlots) return item;
+            if (item.elder || item.exiting) return item;
+            if (promoteNow - item.createdAt < MIN_ALIVE_MS) return item;
+            promoted++;
+            return { ...item, elder: true };
+          });
+        }
+
+        // —— Exit marking ——
+        const excess = combined.length - densityLimits.maxItems;
         if (excess <= 0) {
           return combined;
         }
 
-        let alreadyExiting = 0;
-        for (const item of combined) {
-          if (item.exiting) alreadyExiting++;
-        }
-
+        const alreadyExiting = combined.reduce(
+          (count, item) => count + (item.exiting ? 1 : 0),
+          0,
+        );
         const toMark = Math.max(0, excess - alreadyExiting);
-        if (toMark <= 0) {
-          return combined;
-        }
 
+        if (toMark <= 0) return combined;
+
+        const markNow = Date.now();
         let marked = 0;
         return combined.map((item) => {
           if (item.exiting || marked >= toMark) return item;
+          if (item.elder) return item;
+          if (markNow - item.createdAt < MIN_ALIVE_MS) return item;
           marked++;
           return { ...item, exiting: true };
         });
@@ -309,8 +504,9 @@ function App() {
 
     return () => window.clearInterval(interval);
   }, [
+    config.appearance.fontSize,
     config.appearance.scrollDuration,
-    config.filter.blockedWords,
+    config.appearance.showUsername,
     densityLimits.maxItems,
     densityLimits.perFlush,
     showHistory,
@@ -338,8 +534,9 @@ function App() {
     const intervalMs = Math.max(5, Math.floor(1000 / mock.rate));
     const timer = window.setInterval(() => {
       const message = generateMockMessage();
-      pendingMessagesRef.current.push(message);
-      pushToHistory([message]);
+      const acceptedMessages = filterMessages([message]);
+      enqueueMessages(acceptedMessages);
+      pushToHistory(acceptedMessages);
       setMock((prev) => ({
         ...prev,
         totalGenerated: prev.totalGenerated + 1,

@@ -72,10 +72,33 @@ pub struct DanmakuTaskState {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct DanmakuMessage {
+#[serde(rename_all = "camelCase")]
+pub struct LiveMessage {
     pub id: String,
+    pub kind: LiveMessageKind,
     pub user: String,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gift_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gift_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guard_level: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guard_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LiveMessageKind {
+    #[serde(rename = "danmaku")]
+    Danmaku,
+    #[serde(rename = "gift")]
+    Gift,
+    #[serde(rename = "guard")]
+    Guard,
 }
 
 #[derive(Debug, Clone, Serialize)]

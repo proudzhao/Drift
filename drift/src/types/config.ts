@@ -2,6 +2,7 @@ export type AppConfig = {
   roomId: string;
   savedRooms: SavedRoom[];
   appearance: AppearanceConfig;
+  messageDisplay: MessageDisplayConfig;
   filter: FilterConfig;
   shortcuts: ShortcutConfig;
   mockPanelEnabled: boolean;
@@ -24,8 +25,41 @@ export type AppearanceConfig = {
   color: "white";
 };
 
+export type MessageDisplayConfig = {
+  showDanmaku: boolean;
+  showGift: boolean;
+  showGuard: boolean;
+};
+
 export type FilterConfig = {
   blockedWords: string[];
+  rules: FilterRule[];
+};
+
+export type FilterTarget =
+  | "text"
+  | "user"
+  | "messageType"
+  | "giftName"
+  | "guardLevel";
+
+export type FilterOperator =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "regex";
+
+export type FilterAction = "hide" | "highlight";
+
+export type FilterRule = {
+  id: string;
+  enabled: boolean;
+  name: string;
+  target: FilterTarget;
+  operator: FilterOperator;
+  value: string;
+  action: FilterAction;
 };
 
 export type ShortcutConfig = {
@@ -56,8 +90,14 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     showUsername: false,
     color: "white",
   },
+  messageDisplay: {
+    showDanmaku: true,
+    showGift: true,
+    showGuard: true,
+  },
   filter: {
     blockedWords: [],
+    rules: [],
   },
   shortcuts: {
     toggleEditMode: defaultShortcutLabel(),
@@ -66,7 +106,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   mockPanelEnabled: false,
 };
 
-export function mergeAppConfig(config: AppConfig): AppConfig {
+export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
   const toggleEditMode =
     config.shortcuts?.toggleEditMode === "Command+Option+D" ||
     config.shortcuts?.toggleEditMode === "Control+Alt+D"
@@ -80,9 +120,17 @@ export function mergeAppConfig(config: AppConfig): AppConfig {
       ...DEFAULT_APP_CONFIG.appearance,
       ...config.appearance,
     },
+    messageDisplay: {
+      ...DEFAULT_APP_CONFIG.messageDisplay,
+      ...config.messageDisplay,
+    },
     filter: {
       ...DEFAULT_APP_CONFIG.filter,
       ...config.filter,
+      blockedWords: Array.isArray(config.filter?.blockedWords)
+        ? config.filter.blockedWords
+        : [],
+      rules: Array.isArray(config.filter?.rules) ? config.filter.rules : [],
     },
     savedRooms: Array.isArray(config.savedRooms) ? config.savedRooms : [],
     shortcuts: {

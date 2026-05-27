@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import type { LiveMessageKind } from "../types/danmaku";
 
 export type HistoryMessage = {
   id: string;
+  kind: LiveMessageKind;
   user: string;
   text: string;
   timestamp: number;

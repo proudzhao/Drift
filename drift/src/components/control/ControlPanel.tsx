@@ -6,6 +6,7 @@ import {
   type AppConfig,
   type AppearanceConfig,
   type FilterConfig,
+  type MessageDisplayConfig,
   type SavedRoom,
 } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
@@ -40,9 +41,6 @@ export function ControlPanel({
   const [draftOverlayShortcut, setDraftOverlayShortcut] = useState(
     config.shortcuts.toggleOverlayWindow,
   );
-  const [draftBlockedWords, setDraftBlockedWords] = useState(
-    config.filter.blockedWords.join("\n"),
-  );
   const [shortcutError, setShortcutError] = useState("");
   const [apiTestSteps, setApiTestSteps] = useState<ApiTestStep[]>([]);
   const [apiTestError, setApiTestError] = useState("");
@@ -67,10 +65,6 @@ export function ControlPanel({
     setDraftOverlayShortcut(config.shortcuts.toggleOverlayWindow);
   }, [config.shortcuts.toggleOverlayWindow]);
 
-  useEffect(() => {
-    setDraftBlockedWords(config.filter.blockedWords.join("\n"));
-  }, [config.filter.blockedWords]);
-
   async function saveConfig(nextConfig: AppConfig) {
     const savedConfig = await invoke<AppConfig>("save_app_config", {
       config: nextConfig,
@@ -88,6 +82,18 @@ export function ControlPanel({
     });
   }
 
+  async function updateMessageDisplay(
+    nextMessageDisplay: Partial<MessageDisplayConfig>,
+  ) {
+    await saveConfig({
+      ...config,
+      messageDisplay: {
+        ...config.messageDisplay,
+        ...nextMessageDisplay,
+      },
+    });
+  }
+
   async function updateFilter(nextFilter: Partial<FilterConfig>) {
     await saveConfig({
       ...config,
@@ -98,13 +104,8 @@ export function ControlPanel({
     });
   }
 
-  async function saveBlockedWords() {
-    await updateFilter({
-      blockedWords: draftBlockedWords
-        .split("\n")
-        .map((word) => word.trim())
-        .filter(Boolean),
-    });
+  async function saveFilterRules(rules: FilterConfig["rules"]) {
+    await updateFilter({ rules });
   }
 
   async function saveRooms(savedRooms: SavedRoom[]) {
@@ -393,16 +394,17 @@ export function ControlPanel({
         {activeTab === "display" ? (
           <DisplaySettings
             appearance={config.appearance}
+            messageDisplay={config.messageDisplay}
             onResetAppearance={resetAppearance}
             onUpdateAppearance={updateAppearance}
+            onUpdateMessageDisplay={updateMessageDisplay}
           />
         ) : null}
 
         {activeTab === "filter" ? (
           <FilterSettings
-            draftBlockedWords={draftBlockedWords}
-            onBlockedWordsChange={setDraftBlockedWords}
-            onSaveBlockedWords={saveBlockedWords}
+            onRulesChange={saveFilterRules}
+            rules={config.filter.rules}
           />
         ) : null}
 

@@ -1,4 +1,4 @@
-import type { DanmakuItem, LiveDanmakuMessage } from "../types/danmaku";
+import type { DanmakuItem, LiveMessage } from "../types/danmaku";
 
 const sampleTexts = [
   "主播刚才那句可以截图当壁纸",
@@ -79,18 +79,50 @@ const longTexts = [
   "做菜的教程看再多也不如自己动手试试，主播真的适合当老师好好好",
 ];
 
+const mockGifts = ["小花花", "打call", "这个好诶", "牛哇牛哇"];
+const mockGuards = [
+  { level: 3, name: "舰长" },
+  { level: 2, name: "提督" },
+  { level: 1, name: "总督" },
+] as const;
+
 let mockSeq = 0;
 
-function pick<T>(list: T[]): T {
+function pick<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)];
 }
 
 /** 生成一条可注入 pendingMessagesRef 的 mock 消息 */
-export function generateMockMessage(): LiveDanmakuMessage {
+export function generateMockMessage(): LiveMessage {
   mockSeq += 1;
 
   const user = pick(mockUsers);
   const roll = Math.random();
+
+  if (roll >= 0.93) {
+    const guard = pick(mockGuards);
+    return {
+      id: `mock-guard-${Date.now()}-${mockSeq}`,
+      kind: "guard",
+      user,
+      text: `${user} 开通 ${guard.name}`,
+      guardLevel: guard.level,
+      guardName: guard.name,
+    };
+  }
+
+  if (roll >= 0.82) {
+    const giftName = pick(mockGifts);
+    const giftCount = 1 + Math.floor(Math.random() * 5);
+    return {
+      id: `mock-gift-${Date.now()}-${mockSeq}`,
+      kind: "gift",
+      user,
+      text: `${user} 送出 ${giftName} x${giftCount}`,
+      giftName,
+      giftCount,
+    };
+  }
 
   let text: string;
   if (roll < 0.35) {
@@ -103,22 +135,48 @@ export function generateMockMessage(): LiveDanmakuMessage {
 
   return {
     id: `mock-${Date.now()}-${mockSeq}`,
+    kind: "danmaku",
     user,
     text,
   };
 }
 
 /** 一次生成指定数量的 mock 消息（用于爆发测试） */
-export function generateMockBatch(count: number): LiveDanmakuMessage[] {
+export function generateMockBatch(count: number): LiveMessage[] {
   return Array.from({ length: count }, () => generateMockMessage());
 }
 
 export function createMockDanmakuItems(): DanmakuItem[] {
-  return sampleTexts.map((text, index) => ({
+  const items: DanmakuItem[] = sampleTexts.map((text, index) => ({
     id: `mock-${index}`,
+    kind: "danmaku",
     text,
     track: index % 5,
     duration: 12 + (index % 3) * 2,
     delay: index * 1.3,
+    createdAt: Date.now(),
   }));
+  return [
+    ...items,
+    {
+      id: "mock-gift-preview",
+      kind: "gift",
+      user: "送礼用户",
+      text: "送礼用户 送出 小花花 x3",
+      track: 1,
+      duration: 14,
+      delay: 2.4,
+      createdAt: Date.now(),
+    },
+    {
+      id: "mock-guard-preview",
+      kind: "guard",
+      user: "上舰用户",
+      text: "上舰用户 开通 舰长",
+      track: 2,
+      duration: 15,
+      delay: 4.2,
+      createdAt: Date.now(),
+    },
+  ];
 }
