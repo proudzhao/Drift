@@ -33,11 +33,13 @@ pub fn run() {
     tauri::Builder::default()
         .manage(bilibili::DanmakuTaskState::default())
         .manage(window_control::EditModeState::default())
+        .manage(update_check::UpdateCheckState::default())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             logging::init(app.handle())?;
             window_control::setup(app)?;
             tray::setup(app)?;
+            update_check::start_auto_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -68,6 +70,7 @@ pub fn run() {
             bilibili::auth::auth_logout,
             update_check::get_app_version,
             update_check::check_update,
+            update_check::get_cached_update_result,
             open_help_window
         ])
         .run(tauri::generate_context!())

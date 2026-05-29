@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import iconUrl from "/icon.png";
+import type { UpdateConfig } from "../../types/config";
 
 type AppVersion = {
   version: string;
 };
 
-type CheckUpdateResult = {
+export type CheckUpdateResult = {
   hasUpdate: boolean;
   currentVersion: string;
   latestVersion: string;
@@ -15,7 +16,23 @@ type CheckUpdateResult = {
   error: string | null;
 };
 
-export function AboutSettings() {
+export type CachedUpdateResult = {
+  result: CheckUpdateResult | null;
+  checkedAt?: number;
+  isChecking: boolean;
+};
+
+type AboutSettingsProps = {
+  cachedUpdate: CachedUpdateResult | null;
+  onUpdateConfigChange: (update: Partial<UpdateConfig>) => void;
+  updateConfig: UpdateConfig;
+};
+
+export function AboutSettings({
+  cachedUpdate,
+  onUpdateConfigChange,
+  updateConfig,
+}: AboutSettingsProps) {
   const [appVersion, setAppVersion] = useState("");
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateResult, setUpdateResult] = useState<CheckUpdateResult | null>(
@@ -27,6 +44,12 @@ export function AboutSettings() {
       .then((result) => setAppVersion(result.version))
       .catch(() => setAppVersion(""));
   }, []);
+
+  useEffect(() => {
+    if (cachedUpdate?.result) {
+      setUpdateResult(cachedUpdate.result);
+    }
+  }, [cachedUpdate?.result]);
 
   async function checkUpdate() {
     setIsCheckingUpdate(true);
@@ -59,13 +82,24 @@ export function AboutSettings() {
 
       <div className="about-actions">
         <button
-          disabled={isCheckingUpdate}
+          disabled={isCheckingUpdate || Boolean(cachedUpdate?.isChecking)}
           onClick={checkUpdate}
           type="button"
         >
-          {isCheckingUpdate ? "检查中" : "检查更新"}
+          {isCheckingUpdate || cachedUpdate?.isChecking ? "检查中" : "检查更新"}
         </button>
       </div>
+
+      <label className="about-toggle">
+        <span>启动时自动检查更新</span>
+        <input
+          checked={updateConfig.checkOnStartup}
+          onChange={(event) =>
+            onUpdateConfigChange({ checkOnStartup: event.currentTarget.checked })
+          }
+          type="checkbox"
+        />
+      </label>
 
       {updateResult ? (
         <p className="control-status" style={{ margin: 0, textAlign: "center" }}>
@@ -74,6 +108,12 @@ export function AboutSettings() {
             : updateResult.hasUpdate
               ? "发现新版本 " + updateResult.latestVersion
               : "已是最新版本"}
+        </p>
+      ) : null}
+
+      {cachedUpdate?.checkedAt ? (
+        <p className="control-status" style={{ margin: 0, textAlign: "center" }}>
+          最近检查：{formatUnixTime(cachedUpdate.checkedAt)}
         </p>
       ) : null}
 
@@ -89,4 +129,9 @@ export function AboutSettings() {
       ) : null}
     </div>
   );
+}
+
+function formatUnixTime(value?: number) {
+  if (!value) return "尚未检查";
+  return new Date(value * 1000).toLocaleString();
 }

@@ -70,6 +70,8 @@
 
 .settings-panel {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
   position: relative;
   min-height: 0;
   overflow: hidden;
@@ -78,12 +80,77 @@
   background: #e4e4e4;
 }
 
+.settings-panel.has-update-notice {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .settings-page {
   display: grid;
   align-content: start;
   gap: 14px;
   min-height: 0;
   overflow: hidden;
+}
+
+.update-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(10, 132, 255, 0.42);
+  border-radius: 7px;
+  background: #eef6ff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.update-notice div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.update-notice strong {
+  overflow: hidden;
+  color: #145da0;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-notice span {
+  overflow: hidden;
+  color: #4f657a;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-notice-actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.update-notice-actions button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #b9cce0;
+  border-radius: 7px;
+  background: linear-gradient(#ffffff, #f5faff);
+  color: #1f4f7a;
+  cursor: pointer;
+  font-size: 11px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.update-notice-actions button:hover {
+  background: #ffffff;
 }
 
 .diagnostics-settings {
@@ -914,6 +981,20 @@
   color: #202124;
   font-size: 12px;
   cursor: pointer;
+}
+
+.about-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 30px;
+  color: #555d66;
+  font-size: 12px;
+}
+
+.about-toggle input {
+  accent-color: #0a84ff;
 }
 
 .help-link {

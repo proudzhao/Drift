@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub room_id: String,
     pub saved_rooms: Vec<SavedRoom>,
     pub auth: AuthConfig,
+    pub update: UpdateConfig,
     pub appearance: AppearanceConfig,
     pub message_display: MessageDisplayConfig,
     pub filter: FilterConfig,
@@ -35,6 +36,12 @@ pub struct AuthConfig {
     pub last_login_uid: Option<u64>,
     pub last_login_name: Option<String>,
     pub last_validated_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct UpdateConfig {
+    pub check_on_startup: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,6 +126,14 @@ impl Default for MessageDisplayConfig {
     }
 }
 
+impl Default for UpdateConfig {
+    fn default() -> Self {
+        Self {
+            check_on_startup: true,
+        }
+    }
+}
+
 impl Default for ShortcutConfig {
     fn default() -> Self {
         Self {
@@ -146,6 +161,7 @@ impl Default for AppConfig {
             room_id: String::new(),
             saved_rooms: Vec::new(),
             auth: AuthConfig::default(),
+            update: UpdateConfig::default(),
             appearance: AppearanceConfig::default(),
             message_display: MessageDisplayConfig::default(),
             filter: FilterConfig::default(),

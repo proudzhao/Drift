@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   defaultOverlayShortcutLabel,
   defaultShortcutLabel,
@@ -17,7 +19,11 @@ import type {
 import type { DanmakuStatus } from "../../types/danmaku";
 import { AccountSettings } from "./AccountSettings";
 import { DiagnosticsSettings, type ApiTestStep } from "./DiagnosticsSettings";
-import { AboutSettings } from "./AboutSettings";
+import {
+  AboutSettings,
+  type CachedUpdateResult,
+  type CheckUpdateResult,
+} from "./AboutSettings";
 import { DisplaySettings } from "./DisplaySettings";
 import { FilterSettings } from "./FilterSettings";
 import { RoomSettings } from "./RoomSettings";
@@ -66,6 +72,17 @@ export function ControlPanel({
     useState<EditingSavedRoom | null>(null);
   const [savedRoomError, setSavedRoomError] = useState("");
   const [activeTab, setActiveTab] = useState<SettingsTab>("room");
+  const [cachedUpdate, setCachedUpdate] =
+    useState<CachedUpdateResult | null>(null);
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<
+    string | null
+  >(null);
+  const updateNotice = cachedUpdate?.result?.hasUpdate
+    ? cachedUpdate.result
+    : null;
+  const shouldShowUpdateNotice =
+    updateNotice !== null &&
+    updateNotice.latestVersion !== dismissedUpdateVersion;
 
   useEffect(() => {
     setDraftRoomId(config.roomId);
@@ -81,6 +98,27 @@ export function ControlPanel({
 
   useEffect(() => {
     void refreshAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    invoke<CachedUpdateResult>("get_cached_update_result")
+      .then(setCachedUpdate)
+      .catch(() => setCachedUpdate(null));
+
+    const unlistenUpdate = listen<CheckUpdateResult>(
+      "update-available",
+      (event) => {
+        setCachedUpdate({
+          result: event.payload,
+          checkedAt: Math.floor(Date.now() / 1000),
+          isChecking: false,
+        });
+      },
+    );
+
+    return () => {
+      void unlistenUpdate.then((unlisten) => unlisten());
+    };
   }, []);
 
   useEffect(() => {
@@ -166,6 +204,16 @@ export function ControlPanel({
       filter: {
         ...config.filter,
         ...nextFilter,
+      },
+    });
+  }
+
+  async function updateUpdateConfig(nextUpdate: Partial<AppConfig["update"]>) {
+    await saveConfig({
+      ...config,
+      update: {
+        ...config.update,
+        ...nextUpdate,
       },
     });
   }
@@ -494,7 +542,51 @@ export function ControlPanel({
 
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <section className="settings-panel">
+      <section
+        className={
+          shouldShowUpdateNotice
+            ? "settings-panel has-update-notice"
+            : "settings-panel"
+        }
+      >
+        {shouldShowUpdateNotice && updateNotice ? (
+          <div className="update-notice" role="status">
+            <div>
+              <strong>发现新版本 {updateNotice.latestVersion}</strong>
+              <span>
+                当前版本 {updateNotice.currentVersion}，可前往 GitHub Releases
+                下载。
+              </span>
+            </div>
+            <div className="update-notice-actions">
+              <button
+                onClick={() => openUrl(updateNotice.releaseUrl)}
+                type="button"
+              >
+                前往下载
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("about");
+                  setDismissedUpdateVersion(updateNotice.latestVersion);
+                }}
+                type="button"
+              >
+                查看详情
+              </button>
+              <button
+                aria-label="稍后提醒"
+                onClick={() =>
+                  setDismissedUpdateVersion(updateNotice.latestVersion)
+                }
+                type="button"
+              >
+                稍后
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {activeTab === "room" ? (
           <RoomSettings
             config={config}
@@ -577,7 +669,13 @@ export function ControlPanel({
           />
         ) : null}
 
-        {activeTab === "about" ? <AboutSettings /> : null}
+        {activeTab === "about" ? (
+          <AboutSettings
+            cachedUpdate={cachedUpdate}
+            onUpdateConfigChange={updateUpdateConfig}
+            updateConfig={config.update}
+          />
+        ) : null}
       </section>
 
       <footer className="control-footer">

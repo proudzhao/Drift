@@ -2,6 +2,7 @@ export type AppConfig = {
   roomId: string;
   savedRooms: SavedRoom[];
   auth: AuthConfig;
+  update: UpdateConfig;
   appearance: AppearanceConfig;
   messageDisplay: MessageDisplayConfig;
   filter: FilterConfig;
@@ -14,6 +15,10 @@ export type AuthConfig = {
   lastLoginUid?: number;
   lastLoginName?: string;
   lastValidatedAt?: number;
+};
+
+export type UpdateConfig = {
+  checkOnStartup: boolean;
 };
 
 export type SavedRoom = {
@@ -93,6 +98,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   auth: {
     enabled: false,
   },
+  update: {
+    checkOnStartup: true,
+  },
   appearance: {
     fontSize: 20,
     opacity: 0.94,
@@ -138,6 +146,10 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     auth: {
       ...DEFAULT_APP_CONFIG.auth,
       ...config.auth,
+    },
+    update: {
+      ...DEFAULT_APP_CONFIG.update,
+      ...config.update,
     },
     filter: {
       ...DEFAULT_APP_CONFIG.filter,

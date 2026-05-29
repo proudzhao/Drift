@@ -1,7 +1,24 @@
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tracing::{debug, info, warn};
 
 const RELEASES_URL: &str = "https://api.github.com/repos/proudzhao/Drift/releases/latest";
+const AUTO_CHECK_DELAY_SECONDS: u64 = 4;
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CachedUpdateResult {
+    pub result: Option<CheckUpdateResult>,
+    pub checked_at: Option<i64>,
+    pub is_checking: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct UpdateCheckState {
+    cached: Mutex<CachedUpdateResult>,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,7 +50,70 @@ pub fn get_app_version() -> AppVersion {
 }
 
 #[tauri::command]
-pub async fn check_update() -> Result<CheckUpdateResult, String> {
+pub async fn check_update(state: State<'_, UpdateCheckState>) -> Result<CheckUpdateResult, String> {
+    begin_check(&state)?;
+    match check_update_inner().await {
+        Ok(result) => {
+            finish_check(&state, Some(result.clone()))?;
+            Ok(result)
+        }
+        Err(error) => {
+            finish_check(&state, None)?;
+            Err(error)
+        }
+    }
+}
+
+#[tauri::command]
+pub fn get_cached_update_result(
+    state: State<'_, UpdateCheckState>,
+) -> Result<CachedUpdateResult, String> {
+    state
+        .cached
+        .lock()
+        .map(|cached| cached.clone())
+        .map_err(|error| format!("更新检查状态读取失败：{}", error))
+}
+
+pub fn start_auto_check(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(AUTO_CHECK_DELAY_SECONDS)).await;
+
+        let Ok(config) = crate::app_config::read_app_config(&app) else {
+            warn!(target: "drift::update", "failed to read config before auto update check");
+            return;
+        };
+        if !config.update.check_on_startup {
+            debug!(target: "drift::update", "startup update check disabled");
+            return;
+        }
+
+        let state = app.state::<UpdateCheckState>();
+        if let Err(error) = begin_check(&state) {
+            warn!(target: "drift::update", error = %error, "failed to mark update check started");
+            return;
+        }
+
+        match check_update_inner().await {
+            Ok(result) => {
+                if let Err(error) = finish_check(&state, Some(result.clone())) {
+                    warn!(target: "drift::update", error = %error, "failed to cache update result");
+                }
+                if result.has_update {
+                    if let Err(error) = app.emit("update-available", result) {
+                        warn!(target: "drift::update", error = %error, "failed to emit update-available");
+                    }
+                }
+            }
+            Err(error) => {
+                let _ = finish_check(&state, None);
+                info!(target: "drift::update", error = %error, "startup update check failed silently");
+            }
+        }
+    });
+}
+
+async fn check_update_inner() -> Result<CheckUpdateResult, String> {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
 
     debug!(target: "drift::update", current_version, "checking for updates");
@@ -98,33 +178,76 @@ pub async fn check_update() -> Result<CheckUpdateResult, String> {
     })
 }
 
+fn begin_check(state: &UpdateCheckState) -> Result<(), String> {
+    let mut cached = state
+        .cached
+        .lock()
+        .map_err(|error| format!("更新检查状态更新失败：{}", error))?;
+    cached.is_checking = true;
+    Ok(())
+}
+
+fn finish_check(state: &UpdateCheckState, result: Option<CheckUpdateResult>) -> Result<(), String> {
+    let mut cached = state
+        .cached
+        .lock()
+        .map_err(|error| format!("更新检查状态更新失败：{}", error))?;
+    cached.result = result;
+    cached.checked_at = Some(now_unix());
+    cached.is_checking = false;
+    Ok(())
+}
+
+fn now_unix() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or_default()
+}
+
 /// Returns Greater if `a > b`, i.e. if an update is available.
 fn compare_versions(latest: &str, current: &str) -> std::cmp::Ordering {
-    let parse = |version: &str| -> Vec<u32> {
-        version
-            .split(|character: char| !character.is_ascii_digit())
+    #[derive(Debug)]
+    struct VersionParts {
+        numbers: Vec<u32>,
+        is_prerelease: bool,
+    }
+
+    let parse = |version: &str| -> VersionParts {
+        let normalized = version.trim().strip_prefix('v').unwrap_or(version.trim());
+        let (base, prerelease) = normalized
+            .split_once('-')
+            .map_or((normalized, None), |(base, prerelease)| {
+                (base, Some(prerelease))
+            });
+        let numbers = base
+            .split('.')
             .filter(|segment| !segment.is_empty())
             .filter_map(|segment| segment.parse::<u32>().ok())
-            .collect()
+            .collect();
+        VersionParts {
+            numbers,
+            is_prerelease: prerelease.is_some_and(|value| !value.trim().is_empty()),
+        }
     };
 
     let latest_parts = parse(latest);
     let current_parts = parse(current);
 
-    for (index, latest_part) in latest_parts.iter().enumerate() {
-        match current_parts.get(index) {
-            Some(current_part) => match latest_part.cmp(current_part) {
-                std::cmp::Ordering::Equal => continue,
-                ordering => return ordering,
-            },
-            None => return std::cmp::Ordering::Greater,
+    let max_len = latest_parts.numbers.len().max(current_parts.numbers.len());
+    for index in 0..max_len {
+        let latest_part = latest_parts.numbers.get(index).copied().unwrap_or(0);
+        let current_part = current_parts.numbers.get(index).copied().unwrap_or(0);
+        match latest_part.cmp(&current_part) {
+            std::cmp::Ordering::Equal => continue,
+            ordering => return ordering,
         }
     }
 
-    if latest_parts.len() < current_parts.len() {
-        std::cmp::Ordering::Less
-    } else {
-        std::cmp::Ordering::Equal
+    match (latest_parts.is_prerelease, current_parts.is_prerelease) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
     }
 }
 
@@ -140,6 +263,9 @@ mod tests {
         assert!(compare_versions("0.2.0", "0.2.0").is_eq());
         assert!(compare_versions("0.1.9", "0.2.0").is_lt());
         assert!(compare_versions("0.2.0-beta", "0.2.0").is_lt());
+        assert!(compare_versions("0.2.0", "0.2.0-beta").is_gt());
         assert!(compare_versions("v0.3.0", "0.2.0").is_gt());
+        assert!(compare_versions("v0.4.0", "0.4.0").is_eq());
+        assert!(compare_versions("0.4", "0.4.0").is_eq());
     }
 }
