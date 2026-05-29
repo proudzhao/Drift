@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) const DANMU_INFO_URL: &str =
     "https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo";
-pub(crate) const ROOM_INIT_URL: &str =
-    "https://api.live.bilibili.com/room/v1/Room/room_init";
+pub(crate) const ROOM_INIT_URL: &str = "https://api.live.bilibili.com/room/v1/Room/room_init";
 pub(crate) const ROOM_BASE_INFO_URL: &str =
     "https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomBaseInfo";
 pub(crate) const ROOM_INFO_URL: &str =
@@ -75,6 +74,8 @@ pub struct DanmakuTaskState {
 #[serde(rename_all = "camelCase")]
 pub struct LiveMessage {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub room_id: Option<u64>,
     pub kind: LiveMessageKind,
     pub user: String,
     pub text: String,

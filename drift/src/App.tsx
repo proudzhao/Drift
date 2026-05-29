@@ -42,6 +42,11 @@ const ELDER_RATIO = 0.15;
 const MIN_LANE_GAP_PX = 120;
 const MAX_REQUEUE_ROUNDS = 6;
 const MAX_REQUEUE_LATENCY_MS = 3000;
+const TERMINAL_DANMAKU_STATUSES: DanmakuStatus["status"][] = [
+  "disconnected",
+  "not_live",
+  "invalid_room",
+];
 
 type EditModeChanged = {
   is_edit_mode: boolean;
@@ -163,10 +168,25 @@ function App() {
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
+  const activeRoomIdRef = useRef<number | null>(null);
   const sequenceRef = useRef(0);
   const historyRef = useRef<HistoryMessage[]>([]);
   const [historySnapshot, setHistorySnapshot] = useState<HistoryMessage[]>([]);
   const HISTORY_MAX = 300;
+
+  function clearLiveMessageState() {
+    pendingMessagesRef.current = [];
+    laneAvailableAtRef.current = [];
+    sequenceRef.current = 0;
+    historyRef.current = [];
+    setHistorySnapshot([]);
+    setLiveItems([]);
+  }
+
+  function acceptsCurrentRoomMessage(message: LiveMessage) {
+    const activeRoomId = activeRoomIdRef.current;
+    return activeRoomId !== null && message.roomId === activeRoomId;
+  }
 
   function filterMessages(messages: LiveMessage[]) {
     const accepted: QueuedLiveMessage[] = [];
@@ -308,11 +328,39 @@ function App() {
         }
 
         const acceptedMessages = filterMessages(event.payload);
-        enqueueMessages(acceptedMessages);
-        pushToHistory(acceptedMessages);
+        const currentRoomMessages = acceptedMessages.filter(
+          acceptsCurrentRoomMessage,
+        );
+        if (currentRoomMessages.length === 0) {
+          return;
+        }
+
+        enqueueMessages(currentRoomMessages);
+        pushToHistory(currentRoomMessages);
       },
     );
     const unlistenStatus = listen<DanmakuStatus>("danmaku-status", (event) => {
+      if (windowLabel === "main") {
+        const nextRoomId = event.payload.roomId ?? null;
+        const isNewConnectionStart =
+          event.payload.status === "connecting" && nextRoomId === null;
+        const isRoomChanged =
+          nextRoomId !== null && nextRoomId !== activeRoomIdRef.current;
+        const isTerminalStatus = TERMINAL_DANMAKU_STATUSES.includes(
+          event.payload.status,
+        );
+
+        if (isNewConnectionStart || isRoomChanged || isTerminalStatus) {
+          clearLiveMessageState();
+        }
+
+        if (isTerminalStatus || isNewConnectionStart) {
+          activeRoomIdRef.current = null;
+        } else if (nextRoomId !== null) {
+          activeRoomIdRef.current = nextRoomId;
+        }
+      }
+
       setStatus((current) => ({
         ...current,
         ...event.payload,

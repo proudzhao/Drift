@@ -2,9 +2,8 @@ use super::errors::classify_connection_error;
 use super::http;
 use super::protocol;
 use super::types::{
-    ConnectionResult, DanmakuStatus, DanmakuTaskState, LiveMessage,
-    HEARTBEAT_INTERVAL, DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL,
-    RECONNECT_DELAYS,
+    ConnectionResult, DanmakuStatus, DanmakuTaskState, LiveMessage, DANMAKU_BUFFER_MAX,
+    DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
@@ -192,7 +191,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
             message = reader.next() => {
                 match message {
                     Some(Ok(Message::Binary(bytes))) => {
-                        let messages = protocol::handle_packet(&app, &status_emitter, &bytes)?;
+                        let messages = protocol::handle_packet(&app, &status_emitter, room_id, &bytes)?;
                         danmaku_buffer.extend(messages);
                         if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
                             let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();

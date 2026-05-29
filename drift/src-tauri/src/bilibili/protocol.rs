@@ -87,6 +87,7 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32, String> {
 pub(crate) fn handle_packet(
     app: &tauri::AppHandle,
     status_emitter: impl Fn(&tauri::AppHandle, &str, &str),
+    room_id: u64,
     bytes: &[u8],
 ) -> Result<Vec<LiveMessage>, String> {
     let packets = unpack_packets(bytes)?;
@@ -96,8 +97,7 @@ pub(crate) fn handle_packet(
         match packet.operation {
             3 => {
                 if packet.payload.len() >= 4 {
-                    let popularity =
-                        u32::from_be_bytes(packet.payload[..4].try_into().unwrap());
+                    let popularity = u32::from_be_bytes(packet.payload[..4].try_into().unwrap());
                     tracing::debug!(
                         target: "drift::bilibili.ws",
                         popularity,
@@ -106,7 +106,8 @@ pub(crate) fn handle_packet(
                 }
             }
             5 => {
-                if let Some(msg) = try_extract_live_message(&packet.payload) {
+                if let Some(mut msg) = try_extract_live_message(&packet.payload) {
+                    msg.room_id = Some(room_id);
                     messages.push(msg);
                 }
             }
@@ -142,6 +143,7 @@ fn empty_live_message(
 ) -> LiveMessage {
     LiveMessage {
         id,
+        room_id: None,
         kind,
         user,
         text,

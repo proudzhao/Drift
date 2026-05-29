@@ -16,6 +16,7 @@ export type DanmakuItem = {
 
 export type LiveMessage = {
   id: string;
+  roomId?: number;
   kind: LiveMessageKind;
   user: string;
   text: string;
