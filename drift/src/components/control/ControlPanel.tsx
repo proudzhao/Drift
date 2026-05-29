@@ -9,7 +9,13 @@ import {
   type MessageDisplayConfig,
   type SavedRoom,
 } from "../../types/config";
+import type {
+  AuthStatus,
+  QrLoginPollResult,
+  QrLoginSession,
+} from "../../types/auth";
 import type { DanmakuStatus } from "../../types/danmaku";
+import { AccountSettings } from "./AccountSettings";
 import { DiagnosticsSettings, type ApiTestStep } from "./DiagnosticsSettings";
 import { AboutSettings } from "./AboutSettings";
 import { DisplaySettings } from "./DisplaySettings";
@@ -48,6 +54,14 @@ export function ControlPanel({
   const [expandedApiStepKey, setExpandedApiStepKey] = useState<string | null>(
     null,
   );
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [authError, setAuthError] = useState("");
+  const [qrSession, setQrSession] = useState<QrLoginSession | null>(null);
+  const [qrPollResult, setQrPollResult] = useState<QrLoginPollResult | null>(
+    null,
+  );
+  const [isAuthBusy, setIsAuthBusy] = useState(false);
+  const [isQrPolling, setIsQrPolling] = useState(false);
   const [editingSavedRoom, setEditingSavedRoom] =
     useState<EditingSavedRoom | null>(null);
   const [savedRoomError, setSavedRoomError] = useState("");
@@ -64,6 +78,58 @@ export function ControlPanel({
   useEffect(() => {
     setDraftOverlayShortcut(config.shortcuts.toggleOverlayWindow);
   }, [config.shortcuts.toggleOverlayWindow]);
+
+  useEffect(() => {
+    void refreshAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    if (!qrSession || authStatus?.isLoggedIn) {
+      return;
+    }
+
+    let cancelled = false;
+    let interval: number | undefined;
+    const stopPolling = () => {
+      setIsQrPolling(false);
+      if (interval !== undefined) {
+        window.clearInterval(interval);
+      }
+    };
+    const poll = async () => {
+      setIsQrPolling(true);
+      try {
+        const result = await invoke<QrLoginPollResult>("auth_poll_qr_login", {
+          qrcodeKey: qrSession.qrcodeKey,
+        });
+        if (cancelled) return;
+        setQrPollResult(result);
+        if (result.authStatus) {
+          setAuthStatus(result.authStatus);
+          setQrSession(null);
+          stopPolling();
+        }
+        if (result.status === "expired" || result.status === "error") {
+          stopPolling();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAuthError(String(error));
+          stopPolling();
+        }
+      }
+    };
+
+    void poll();
+    interval = window.setInterval(() => {
+      void poll();
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [authStatus?.isLoggedIn, qrSession]);
 
   async function saveConfig(nextConfig: AppConfig) {
     const savedConfig = await invoke<AppConfig>("save_app_config", {
@@ -264,6 +330,65 @@ export function ControlPanel({
     }
   }
 
+  async function refreshAuthStatus() {
+    setAuthError("");
+    try {
+      const status = await invoke<AuthStatus>("auth_get_status");
+      setAuthStatus(status);
+    } catch (error) {
+      setAuthError(String(error));
+    }
+  }
+
+  async function startQrLogin() {
+    setAuthError("");
+    setQrPollResult(null);
+    setIsAuthBusy(true);
+    try {
+      const session = await invoke<QrLoginSession>("auth_start_qr_login");
+      setQrSession(session);
+      setAuthStatus((current) =>
+        current?.isLoggedIn ? { ...current, isLoggedIn: false } : current,
+      );
+    } catch (error) {
+      setAuthError(String(error));
+    } finally {
+      setIsAuthBusy(false);
+    }
+  }
+
+  async function validateAuthSession() {
+    setAuthError("");
+    setIsAuthBusy(true);
+    try {
+      const status = await invoke<AuthStatus>("auth_validate_session");
+      setAuthStatus(status);
+      if (status.isLoggedIn) {
+        setQrSession(null);
+        setQrPollResult(null);
+      }
+    } catch (error) {
+      setAuthError(String(error));
+    } finally {
+      setIsAuthBusy(false);
+    }
+  }
+
+  async function logoutAuth() {
+    setAuthError("");
+    setIsAuthBusy(true);
+    try {
+      const status = await invoke<AuthStatus>("auth_logout");
+      setAuthStatus(status);
+      setQrSession(null);
+      setQrPollResult(null);
+    } catch (error) {
+      setAuthError(String(error));
+    } finally {
+      setIsAuthBusy(false);
+    }
+  }
+
   async function resetAppearance() {
     await updateAppearance({
       fontSize: 20,
@@ -398,6 +523,20 @@ export function ControlPanel({
             onResetAppearance={resetAppearance}
             onUpdateAppearance={updateAppearance}
             onUpdateMessageDisplay={updateMessageDisplay}
+          />
+        ) : null}
+
+        {activeTab === "account" ? (
+          <AccountSettings
+            authError={authError}
+            authStatus={authStatus}
+            isAuthBusy={isAuthBusy}
+            isPolling={isQrPolling}
+            onLogout={logoutAuth}
+            onStartLogin={startQrLogin}
+            onValidateSession={validateAuthSession}
+            pollResult={qrPollResult}
+            qrSession={qrSession}
           />
         ) : null}
 

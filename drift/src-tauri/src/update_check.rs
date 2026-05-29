@@ -70,13 +70,10 @@ pub async fn check_update() -> Result<CheckUpdateResult, String> {
         return Err(format!("GitHub API 返回 {}", status));
     }
 
-    let release = response
-        .json::<GitHubRelease>()
-        .await
-        .map_err(|error| {
-            warn!(target: "drift::update", error = %error, "github releases json parse failed");
-            format!("{}", error)
-        })?;
+    let release = response.json::<GitHubRelease>().await.map_err(|error| {
+        warn!(target: "drift::update", error = %error, "github releases json parse failed");
+        format!("{}", error)
+    })?;
 
     let latest = release
         .tag_name

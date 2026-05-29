@@ -1,11 +1,19 @@
 export type AppConfig = {
   roomId: string;
   savedRooms: SavedRoom[];
+  auth: AuthConfig;
   appearance: AppearanceConfig;
   messageDisplay: MessageDisplayConfig;
   filter: FilterConfig;
   shortcuts: ShortcutConfig;
   mockPanelEnabled: boolean;
+};
+
+export type AuthConfig = {
+  enabled: boolean;
+  lastLoginUid?: number;
+  lastLoginName?: string;
+  lastValidatedAt?: number;
 };
 
 export type SavedRoom = {
@@ -82,6 +90,9 @@ export function defaultOverlayShortcutLabel() {
 export const DEFAULT_APP_CONFIG: AppConfig = {
   roomId: "",
   savedRooms: [],
+  auth: {
+    enabled: false,
+  },
   appearance: {
     fontSize: 20,
     opacity: 0.94,
@@ -123,6 +134,10 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     messageDisplay: {
       ...DEFAULT_APP_CONFIG.messageDisplay,
       ...config.messageDisplay,
+    },
+    auth: {
+      ...DEFAULT_APP_CONFIG.auth,
+      ...config.auth,
     },
     filter: {
       ...DEFAULT_APP_CONFIG.filter,

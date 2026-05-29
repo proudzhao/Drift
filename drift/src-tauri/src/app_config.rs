@@ -10,6 +10,7 @@ const APP_CONFIG_FILE: &str = "app-config.json";
 pub struct AppConfig {
     pub room_id: String,
     pub saved_rooms: Vec<SavedRoom>,
+    pub auth: AuthConfig,
     pub appearance: AppearanceConfig,
     pub message_display: MessageDisplayConfig,
     pub filter: FilterConfig,
@@ -25,6 +26,15 @@ pub struct SavedRoom {
     pub display_name: String,
     pub anchor_name: Option<String>,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AuthConfig {
+    pub enabled: bool,
+    pub last_login_uid: Option<u64>,
+    pub last_login_name: Option<String>,
+    pub last_validated_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -135,6 +145,7 @@ impl Default for AppConfig {
         Self {
             room_id: String::new(),
             saved_rooms: Vec::new(),
+            auth: AuthConfig::default(),
             appearance: AppearanceConfig::default(),
             message_display: MessageDisplayConfig::default(),
             filter: FilterConfig::default(),
@@ -181,6 +192,15 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     if config.shortcuts.toggle_overlay_window.is_empty() {
         config.shortcuts.toggle_overlay_window = overlay_shortcut_label().to_string();
     }
+    Ok(config)
+}
+
+pub fn update_auth_config(app: &AppHandle, auth: AuthConfig) -> Result<AppConfig, String> {
+    let mut config = read_app_config(app)?;
+    config.auth = auth;
+    write_app_config(app, &config)?;
+    app.emit("app-config-changed", &config)
+        .map_err(|error| error.to_string())?;
     Ok(config)
 }
 

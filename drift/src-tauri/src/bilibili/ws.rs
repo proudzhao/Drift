@@ -1,9 +1,11 @@
+use super::auth;
+use super::cookies::merge_cookie_headers;
 use super::errors::classify_connection_error;
 use super::http;
 use super::protocol;
 use super::types::{
-    ConnectionResult, DanmakuStatus, DanmakuTaskState, LiveMessage, DANMAKU_BUFFER_MAX,
-    DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
+    ConnectionResult, DanmakuStatus, DanmakuTaskState, DeviceCookie, LiveMessage,
+    DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
@@ -46,6 +48,13 @@ fn stop_existing_task(state: &tauri::State<'_, DanmakuTaskState>) {
             task.abort();
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct RequestIdentity {
+    uid: u64,
+    cookie: String,
+    is_authenticated: bool,
 }
 
 // ── Connection loop ──
@@ -100,7 +109,17 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
         "resolved room init info"
     );
     let device = http::fetch_buvid().await?;
-    let anchor_name = http::resolve_anchor_name(room_id, room_init.uid, &device.cookie).await;
+    let mut request_identity = build_request_identity(&device);
+    let mut anchor_name =
+        http::resolve_anchor_name(room_id, room_init.uid, &request_identity.cookie).await;
+    if anchor_name.is_none() && request_identity.is_authenticated {
+        warn!(
+            target: "drift::bilibili.http",
+            room_id,
+            "authenticated anchor metadata requests failed; retrying anonymously"
+        );
+        anchor_name = http::resolve_anchor_name(room_id, room_init.uid, &device.cookie).await;
+    }
 
     if room_init.live_status != 1 {
         emit_room_status(
@@ -114,7 +133,20 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
         return Ok(ConnectionResult::NotLive);
     }
 
-    let danmu_info = http::fetch_danmu_info(room_id, &device.cookie).await?;
+    let danmu_info = match http::fetch_danmu_info(room_id, &request_identity.cookie).await {
+        Ok(danmu_info) => danmu_info,
+        Err(error) if request_identity.is_authenticated => {
+            warn!(
+                target: "drift::bilibili.http",
+                room_id,
+                error = %error,
+                "authenticated getDanmuInfo failed; retrying anonymously"
+            );
+            request_identity = anonymous_request_identity(&device);
+            http::fetch_danmu_info(room_id, &request_identity.cookie).await?
+        }
+        Err(error) => return Err(error),
+    };
     let host = danmu_info
         .host_list
         .first()
@@ -136,7 +168,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
     let (mut writer, mut reader) = socket.split();
 
     let auth_body = json!({
-        "uid": 0,
+        "uid": request_identity.uid,
         "roomid": room_id,
         "protover": 2,
         "buvid": device.buvid3,
@@ -211,6 +243,40 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
     }
 }
 
+fn build_request_identity(device: &DeviceCookie) -> RequestIdentity {
+    match auth::load_auth_request_context() {
+        Ok(Some(context)) => {
+            info!(
+                target: "drift::bilibili.auth",
+                uid = context.uid,
+                "using authenticated bilibili request context"
+            );
+            RequestIdentity {
+                uid: context.uid,
+                cookie: merge_cookie_headers(&context.cookie_header, &device.cookie),
+                is_authenticated: true,
+            }
+        }
+        Ok(None) => anonymous_request_identity(device),
+        Err(error) => {
+            warn!(
+                target: "drift::bilibili.auth",
+                error = %error,
+                "failed to load bilibili auth context; using anonymous request context"
+            );
+            anonymous_request_identity(device)
+        }
+    }
+}
+
+fn anonymous_request_identity(device: &DeviceCookie) -> RequestIdentity {
+    RequestIdentity {
+        uid: 0,
+        cookie: device.cookie.clone(),
+        is_authenticated: false,
+    }
+}
+
 // ── Status emitters ──
 
 pub(crate) fn emit_status(app: &AppHandle, status: &str, message: impl Into<String>) {
@@ -245,5 +311,24 @@ pub(crate) fn emit_room_status(
 fn emit_status_event(app: &AppHandle, event: DanmakuStatus) {
     if let Err(error) = app.emit("danmaku-status", event) {
         error!(target: "drift::danmaku", error = %error, "danmaku-status emit failed");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn anonymous_identity_uses_uid_zero_and_device_cookie() {
+        let device = DeviceCookie {
+            buvid3: "device3".to_string(),
+            cookie: "buvid3=device3; buvid4=device4;".to_string(),
+        };
+
+        let identity = anonymous_request_identity(&device);
+
+        assert_eq!(identity.uid, 0);
+        assert_eq!(identity.cookie, device.cookie);
+        assert!(!identity.is_authenticated);
     }
 }

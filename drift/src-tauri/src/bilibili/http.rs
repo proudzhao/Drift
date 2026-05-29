@@ -1,8 +1,8 @@
 use super::types::{
-    cache_anchor_name, cached_anchor_name, response_preview, ApiResponse,
-    BuvidData, DanmuInfo, DeviceCookie, NavData, RoomBaseInfoData, RoomInfoByRoom,
-    RoomInitData, SpaceInfo, BROWSER_USER_AGENT, BUVID_URL, DANMU_INFO_URL, NAV_URL,
-    ROOM_BASE_INFO_URL, ROOM_INFO_URL, ROOM_INIT_URL, SPACE_INFO_URL,
+    cache_anchor_name, cached_anchor_name, response_preview, ApiResponse, BuvidData, DanmuInfo,
+    DeviceCookie, NavData, RoomBaseInfoData, RoomInfoByRoom, RoomInitData, SpaceInfo,
+    BROWSER_USER_AGENT, BUVID_URL, DANMU_INFO_URL, NAV_URL, ROOM_BASE_INFO_URL, ROOM_INFO_URL,
+    ROOM_INIT_URL, SPACE_INFO_URL,
 };
 use super::types::{encode_wbi_component, extract_url_file_stem, filter_wbi_value, mixin_key};
 use reqwest::header::{ACCEPT, REFERER, USER_AGENT};
@@ -57,11 +57,7 @@ pub(crate) async fn fetch_room_info(room_id: u64, cookie: &str) -> Result<RoomIn
         .ok_or_else(|| "直播间信息响应缺少 data 字段".to_string())
 }
 
-pub(crate) async fn resolve_anchor_name(
-    room_id: u64,
-    uid: u64,
-    cookie: &str,
-) -> Option<String> {
+pub(crate) async fn resolve_anchor_name(room_id: u64, uid: u64, cookie: &str) -> Option<String> {
     if let Some(anchor_name) = cached_anchor_name(uid) {
         debug!(target: "drift::bilibili.http", room_id, anchor_uid = uid, "using cached anchor name");
         return Some(anchor_name);

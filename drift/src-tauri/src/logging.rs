@@ -115,8 +115,8 @@ pub fn export_diagnostics(app: AppHandle) -> Result<String, String> {
     output.push_str("=== 应用配置 ===\n");
     match crate::app_config::read_app_config(&app) {
         Ok(config) => {
-            let json = serde_json::to_string_pretty(&config)
-                .unwrap_or_else(|_| "序列化失败".to_string());
+            let json =
+                serde_json::to_string_pretty(&config).unwrap_or_else(|_| "序列化失败".to_string());
             output.push_str(&json);
         }
         Err(error) => {
@@ -125,6 +125,14 @@ pub fn export_diagnostics(app: AppHandle) -> Result<String, String> {
     }
     output.push_str("\n\n");
 
+    // Authentication state (sanitized)
+    output.push_str("=== B 站认证状态 ===\n");
+    for line in crate::bilibili::auth::diagnostic_lines(&app) {
+        output.push_str(&line);
+        output.push('\n');
+    }
+    output.push('\n');
+
     // Environment info
     output.push_str("=== 环境信息 ===\n");
     output.push_str(&format!("OS: {}\n", std::env::consts::OS));
@@ -132,8 +140,7 @@ pub fn export_diagnostics(app: AppHandle) -> Result<String, String> {
     output.push_str(&format!("Tauri version: {}\n", tauri::VERSION));
 
     // Write to file
-    fs::write(&export_path, &output)
-        .map_err(|error| format!("诊断文件写入失败：{}", error))?;
+    fs::write(&export_path, &output).map_err(|error| format!("诊断文件写入失败：{}", error))?;
 
     let path_str = export_path.to_string_lossy().to_string();
     tracing::info!(target: "drift::diagnostics", path = %path_str, "diagnostics exported");

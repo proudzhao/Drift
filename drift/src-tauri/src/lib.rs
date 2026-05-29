@@ -19,16 +19,13 @@ async fn open_help_window(app: tauri::AppHandle) {
         // Wait for the window to fully close on all platforms
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
-    let _ = tauri::WebviewWindowBuilder::new(
-        &app,
-        "help",
-        tauri::WebviewUrl::App("help.html".into()),
-    )
-    .title("如何获取房间号")
-    .inner_size(420.0, 480.0)
-    .resizable(false)
-    .center()
-    .build();
+    let _ =
+        tauri::WebviewWindowBuilder::new(&app, "help", tauri::WebviewUrl::App("help.html".into()))
+            .title("如何获取房间号")
+            .inner_size(420.0, 480.0)
+            .resizable(false)
+            .center()
+            .build();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -64,6 +61,11 @@ pub fn run() {
             bilibili::ws::start_bilibili_danmaku,
             bilibili::ws::stop_bilibili_danmaku,
             bilibili::diagnostics::test_bilibili_api,
+            bilibili::auth::auth_get_status,
+            bilibili::auth::auth_start_qr_login,
+            bilibili::auth::auth_poll_qr_login,
+            bilibili::auth::auth_validate_session,
+            bilibili::auth::auth_logout,
             update_check::get_app_version,
             update_check::check_update,
             open_help_window

@@ -1,15 +1,22 @@
+use super::auth;
+use super::cookies::merge_cookie_headers;
 use super::http;
 use super::protocol;
-use super::types::{
-    compact_token, elapsed_ms, param_value, ApiTestStep, DanmuInfo, DeviceCookie,
-};
+use super::types::{compact_token, elapsed_ms, param_value, ApiTestStep, DanmuInfo, DeviceCookie};
+use futures_util::{SinkExt, StreamExt};
+use serde_json::json;
 use std::future::Future;
 use std::time::{Duration, Instant};
-use serde_json::json;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use futures_util::{SinkExt, StreamExt};
 use tracing::debug;
+
+#[derive(Debug, Clone)]
+struct DiagnosticRequestIdentity {
+    uid: u64,
+    cookie: String,
+    is_authenticated: bool,
+}
 
 #[tauri::command]
 pub async fn test_bilibili_api(room_id: u64) -> Result<Vec<ApiTestStep>, String> {
@@ -42,12 +49,25 @@ pub async fn test_bilibili_api(room_id: u64) -> Result<Vec<ApiTestStep>, String>
         return Ok(steps);
     };
 
-    let Some(mixin_key) = run_api_test_step(&mut steps, "wbi_nav", "WBI key", true, async {
-        let data = http::fetch_wbi_mixin_key(&device.cookie).await?;
-        let detail = format!("mixin_key={} len={}", compact_token(&data), data.len());
-        Ok((data, "nav 正常".to_string(), detail))
-    })
-    .await
+    let mut request_identity = diagnostic_request_identity(&device);
+    steps.push(ApiTestStep {
+        key: "request_identity".to_string(),
+        label: "请求身份".to_string(),
+        status: "success".to_string(),
+        duration_ms: 0,
+        message: if request_identity.is_authenticated {
+            "使用登录态请求链路".to_string()
+        } else {
+            "使用匿名请求链路".to_string()
+        },
+        detail: if request_identity.is_authenticated {
+            format!("uid={} cookie=登录态+设备指纹", request_identity.uid)
+        } else {
+            "uid=0 cookie=设备指纹".to_string()
+        },
+    });
+
+    let Some(mixin_key) = run_wbi_nav_test_step(&mut steps, &device, &mut request_identity).await
     else {
         return Ok(steps);
     };
@@ -70,14 +90,38 @@ pub async fn test_bilibili_api(room_id: u64) -> Result<Vec<ApiTestStep>, String>
         "弹幕服务器信息",
         true,
         async {
-            let data = http::fetch_danmu_info_with_params(room_init.room_id, &device.cookie, &wbi_params)
-                .await?;
+            let data = match http::fetch_danmu_info_with_params(
+                room_init.room_id,
+                &request_identity.cookie,
+                &wbi_params,
+            )
+            .await
+            {
+                Ok(data) => data,
+                Err(error) if request_identity.is_authenticated => {
+                    request_identity = diagnostic_anonymous_identity(&device);
+                    http::fetch_danmu_info(room_init.room_id, &request_identity.cookie)
+                        .await
+                        .map_err(|anonymous_error| {
+                            format!(
+                                "登录态 getDanmuInfo 失败：{}；匿名重试失败：{}",
+                                error, anonymous_error
+                            )
+                        })?
+                }
+                Err(error) => return Err(error),
+            };
             let host = data
                 .host_list
                 .first()
                 .ok_or_else(|| "B 站没有返回弹幕服务器地址".to_string())?;
             let detail = format!(
-                "host={} wss_port={} token={}",
+                "identity={} host={} wss_port={} token={}",
+                if request_identity.is_authenticated {
+                    "authenticated"
+                } else {
+                    "anonymous"
+                },
                 host.host,
                 host.wss_port,
                 compact_token(&data.token)
@@ -90,7 +134,13 @@ pub async fn test_bilibili_api(room_id: u64) -> Result<Vec<ApiTestStep>, String>
         return Ok(steps);
     };
 
-    run_anchor_name_test_step(&mut steps, room_init.room_id, room_init.uid, &device.cookie).await;
+    run_anchor_name_test_step(
+        &mut steps,
+        room_init.room_id,
+        room_init.uid,
+        &request_identity.cookie,
+    )
+    .await;
 
     run_api_test_step(
         &mut steps,
@@ -98,13 +148,38 @@ pub async fn test_bilibili_api(room_id: u64) -> Result<Vec<ApiTestStep>, String>
         "WebSocket 鉴权",
         true,
         async {
-            let detail = test_websocket_auth(room_init.room_id, &device, &danmu_info).await?;
+            let detail = test_websocket_auth(
+                room_init.room_id,
+                &device,
+                &danmu_info,
+                request_identity.uid,
+            )
+            .await?;
             Ok(((), "WebSocket 认证成功".to_string(), detail))
         },
     )
     .await;
 
     Ok(steps)
+}
+
+fn diagnostic_request_identity(device: &DeviceCookie) -> DiagnosticRequestIdentity {
+    match auth::load_auth_request_context() {
+        Ok(Some(context)) => DiagnosticRequestIdentity {
+            uid: context.uid,
+            cookie: merge_cookie_headers(&context.cookie_header, &device.cookie),
+            is_authenticated: true,
+        },
+        Ok(None) | Err(_) => diagnostic_anonymous_identity(device),
+    }
+}
+
+fn diagnostic_anonymous_identity(device: &DeviceCookie) -> DiagnosticRequestIdentity {
+    DiagnosticRequestIdentity {
+        uid: 0,
+        cookie: device.cookie.clone(),
+        is_authenticated: false,
+    }
 }
 
 async fn run_api_test_step<T, Fut>(
@@ -141,6 +216,83 @@ where
                 } else {
                     "非关键步骤异常".to_string()
                 },
+                detail: error,
+            });
+            None
+        }
+    }
+}
+
+async fn run_wbi_nav_test_step(
+    steps: &mut Vec<ApiTestStep>,
+    device: &DeviceCookie,
+    request_identity: &mut DiagnosticRequestIdentity,
+) -> Option<String> {
+    let started_at = Instant::now();
+    match http::fetch_wbi_mixin_key(&request_identity.cookie).await {
+        Ok(mixin_key) => {
+            steps.push(ApiTestStep {
+                key: "wbi_nav".to_string(),
+                label: "WBI key".to_string(),
+                status: "success".to_string(),
+                duration_ms: elapsed_ms(started_at),
+                message: "nav 正常".to_string(),
+                detail: format!(
+                    "mixin_key={} len={}",
+                    compact_token(&mixin_key),
+                    mixin_key.len()
+                ),
+            });
+            return Some(mixin_key);
+        }
+        Err(error) if request_identity.is_authenticated => {
+            steps.push(ApiTestStep {
+                key: "wbi_nav_auth".to_string(),
+                label: "WBI key（登录态）".to_string(),
+                status: "warning".to_string(),
+                duration_ms: elapsed_ms(started_at),
+                message: "登录态 nav 异常，尝试匿名回退".to_string(),
+                detail: error,
+            });
+            *request_identity = diagnostic_anonymous_identity(device);
+        }
+        Err(error) => {
+            steps.push(ApiTestStep {
+                key: "wbi_nav".to_string(),
+                label: "WBI key".to_string(),
+                status: "failed".to_string(),
+                duration_ms: elapsed_ms(started_at),
+                message: "关键步骤失败".to_string(),
+                detail: error,
+            });
+            return None;
+        }
+    }
+
+    let started_at = Instant::now();
+    match http::fetch_wbi_mixin_key(&request_identity.cookie).await {
+        Ok(mixin_key) => {
+            steps.push(ApiTestStep {
+                key: "wbi_nav".to_string(),
+                label: "WBI key".to_string(),
+                status: "success".to_string(),
+                duration_ms: elapsed_ms(started_at),
+                message: "匿名 nav 回退正常".to_string(),
+                detail: format!(
+                    "mixin_key={} len={}",
+                    compact_token(&mixin_key),
+                    mixin_key.len()
+                ),
+            });
+            Some(mixin_key)
+        }
+        Err(error) => {
+            steps.push(ApiTestStep {
+                key: "wbi_nav".to_string(),
+                label: "WBI key".to_string(),
+                status: "failed".to_string(),
+                duration_ms: elapsed_ms(started_at),
+                message: "关键步骤失败".to_string(),
                 detail: error,
             });
             None
@@ -229,6 +381,7 @@ async fn test_websocket_auth(
     room_id: u64,
     device: &DeviceCookie,
     danmu_info: &DanmuInfo,
+    uid: u64,
 ) -> Result<String, String> {
     let host = danmu_info
         .host_list
@@ -241,7 +394,7 @@ async fn test_websocket_auth(
     let (mut writer, mut reader) = socket.split();
 
     let auth_body = json!({
-        "uid": 0,
+        "uid": uid,
         "roomid": room_id,
         "protover": 2,
         "buvid": device.buvid3,
@@ -282,7 +435,7 @@ async fn test_websocket_auth(
     }
 
     Ok(format!(
-        "host={} wss_port={} 认证成功",
-        host.host, host.wss_port
+        "uid={} host={} wss_port={} 认证成功",
+        uid, host.host, host.wss_port
     ))
 }
