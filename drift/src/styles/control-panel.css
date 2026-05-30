@@ -14,23 +14,16 @@
 
 .control-header {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
 }
 
 .control-header strong {
-  grid-column: 2;
   color: #4b4b4b;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
-}
-
-.control-header button {
-  grid-column: 3;
-  min-height: 28px;
-  padding: 0 12px;
 }
 
 .settings-tabs {

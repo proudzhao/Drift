@@ -23,9 +23,11 @@ pub fn start_bilibili_danmaku(
     room_id: u64,
 ) -> Result<(), String> {
     stop_existing_task(&state);
+    emit_status(&app, "connecting", format!("正在连接直播间 {}", room_id));
 
+    let task_app = app.clone();
     let task = tauri::async_runtime::spawn(async move {
-        run_with_reconnect(app, room_id).await;
+        run_with_reconnect(task_app, room_id).await;
     });
 
     *state.task.lock().map_err(|error| error.to_string())? = Some(task);
@@ -309,6 +311,7 @@ pub(crate) fn emit_room_status(
 }
 
 fn emit_status_event(app: &AppHandle, event: DanmakuStatus) {
+    super::send::sync_room_status(app, &event);
     if let Err(error) = app.emit("danmaku-status", event) {
         error!(target: "drift::danmaku", error = %error, "danmaku-status emit failed");
     }

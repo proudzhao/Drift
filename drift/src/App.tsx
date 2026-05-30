@@ -11,8 +11,8 @@ import {
 } from "./components/DanmakuHistoryDrawer";
 import { EditModePanel } from "./components/EditModePanel";
 import { MockDanmakuPanel } from "./components/MockDanmakuPanel";
+import { SendDanmakuWindow } from "./components/SendDanmakuWindow";
 import {
-  createMockDanmakuItems,
   generateMockBatch,
   generateMockMessage,
 } from "./data/mockDanmaku";
@@ -29,6 +29,7 @@ import type {
   LiveMessage,
 } from "./types/danmaku";
 import "./App.css";
+import "./styles/send-window.css";
 
 const DANMAKU_FLUSH_INTERVAL_MS = 500;
 const TRACK_HEIGHT = 38;
@@ -164,7 +165,6 @@ function App() {
     status: "idle",
     message: "尚未连接直播间",
   });
-  const mockItems = useMemo(() => createMockDanmakuItems(), []);
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
@@ -254,7 +254,7 @@ function App() {
     status.status === "connecting" ||
     status.status === "connected" ||
     status.status === "reconnecting";
-  const items = isConnected || mock.active ? liveItems : mockItems;
+  const items = isConnected || mock.active ? liveItems : [];
 
   async function setEditMode(enabled: boolean) {
     const result = await invoke<EditModeChanged>("set_edit_mode", { enabled });
@@ -277,6 +277,7 @@ function App() {
 
   function stopMockDanmaku() {
     setMock((prev) => ({ ...prev, active: false }));
+    clearLiveMessageState();
   }
 
   function handleMockRateChange(rate: number) {
@@ -398,7 +399,7 @@ function App() {
       return;
     }
 
-    void setEditMode(false);
+    void setEditMode(true);
     void getCurrentWindow().setSizeConstraints({
       minWidth: MIN_WINDOW_WIDTH,
       minHeight: MIN_WINDOW_HEIGHT,
@@ -565,6 +566,7 @@ function App() {
   useEffect(() => {
     if (isConnected && mock.active) {
       setMock((prev) => ({ ...prev, active: false }));
+      clearLiveMessageState();
     }
   }, [isConnected, mock.active]);
 
@@ -612,6 +614,10 @@ function App() {
         status={status}
       />
     );
+  }
+
+  if (windowLabel === "send") {
+    return <SendDanmakuWindow />;
   }
 
   return (

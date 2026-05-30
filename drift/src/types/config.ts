@@ -78,6 +78,7 @@ export type FilterRule = {
 export type ShortcutConfig = {
   toggleEditMode: string;
   toggleOverlayWindow: string;
+  openSendDanmaku: string;
 };
 
 export function defaultShortcutLabel() {
@@ -90,6 +91,12 @@ export function defaultOverlayShortcutLabel() {
   return navigator.platform.toLowerCase().includes("mac")
     ? "Command+Option+J"
     : "Control+Alt+J";
+}
+
+export function defaultSendDanmakuShortcutLabel() {
+  return navigator.platform.toLowerCase().includes("mac")
+    ? "Command+Option+Enter"
+    : "Control+Alt+Enter";
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -105,7 +112,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     fontSize: 20,
     opacity: 0.94,
     scrollDuration: 12,
-    density: "medium",
+    density: "high",
     showUsername: false,
     color: "white",
   },
@@ -121,6 +128,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   shortcuts: {
     toggleEditMode: defaultShortcutLabel(),
     toggleOverlayWindow: defaultOverlayShortcutLabel(),
+    openSendDanmaku: defaultSendDanmakuShortcutLabel(),
   },
   mockPanelEnabled: false,
 };
@@ -167,6 +175,9 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
       toggleOverlayWindow:
         config.shortcuts?.toggleOverlayWindow ??
         DEFAULT_APP_CONFIG.shortcuts.toggleOverlayWindow,
+      openSendDanmaku:
+        config.shortcuts?.openSendDanmaku ??
+        DEFAULT_APP_CONFIG.shortcuts.openSendDanmaku,
     },
   };
 }

@@ -101,6 +101,7 @@ impl Default for FilterRule {
 pub struct ShortcutConfig {
     pub toggle_edit_mode: String,
     pub toggle_overlay_window: String,
+    pub open_send_danmaku: String,
 }
 
 impl Default for AppearanceConfig {
@@ -109,7 +110,7 @@ impl Default for AppearanceConfig {
             font_size: 20,
             opacity: 0.94,
             scroll_duration: 12.0,
-            density: "medium".to_string(),
+            density: "high".to_string(),
             show_username: false,
             color: "white".to_string(),
         }
@@ -139,6 +140,7 @@ impl Default for ShortcutConfig {
         Self {
             toggle_edit_mode: shortcut_label().to_string(),
             toggle_overlay_window: overlay_shortcut_label().to_string(),
+            open_send_danmaku: send_danmaku_shortcut_label().to_string(),
         }
     }
 }
@@ -208,6 +210,9 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     if config.shortcuts.toggle_overlay_window.is_empty() {
         config.shortcuts.toggle_overlay_window = overlay_shortcut_label().to_string();
     }
+    if config.shortcuts.open_send_danmaku.is_empty() {
+        config.shortcuts.open_send_danmaku = send_danmaku_shortcut_label().to_string();
+    }
     Ok(config)
 }
 
@@ -250,6 +255,14 @@ fn overlay_shortcut_label() -> &'static str {
         "Command+Option+J"
     } else {
         "Control+Alt+J"
+    }
+}
+
+fn send_danmaku_shortcut_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command+Option+Enter"
+    } else {
+        "Control+Alt+Enter"
     }
 }
 

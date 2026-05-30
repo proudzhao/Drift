@@ -1,4 +1,13 @@
-use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, App, AppHandle, Manager, Runtime, Window};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
+
+use tauri::{
+    menu::MenuBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    App, AppHandle, Manager, Runtime, Window,
+};
 
 use crate::window_control::{self, EditModeState};
 
@@ -7,6 +16,7 @@ const MENU_HIDE_OVERLAY: &str = "hide_overlay";
 const MENU_TOGGLE_EDIT_MODE: &str = "toggle_edit_mode";
 const MENU_SHOW_CONTROL: &str = "show_control";
 const MENU_EXIT: &str = "exit";
+const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(500);
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let menu = MenuBuilder::new(app)
@@ -18,10 +28,41 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         .text(MENU_EXIT, "退出 Drift")
         .build()?;
 
+    let last_left_click = Arc::new(Mutex::new(None::<Instant>));
+    let tray_click_state = Arc::clone(&last_left_click);
+
     let mut builder = TrayIconBuilder::with_id("drift")
         .menu(&menu)
         .tooltip("Drift")
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(move |tray, event| match event {
+            TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } => {
+                let _ = show_window_by_label(tray.app_handle(), "control");
+            }
+            TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } => {
+                let now = Instant::now();
+                let Ok(mut last_click) = tray_click_state.lock() else {
+                    return;
+                };
+                let is_double_click = last_click
+                    .map(|last| now.duration_since(last) <= DOUBLE_CLICK_INTERVAL)
+                    .unwrap_or(false);
+                if is_double_click {
+                    *last_click = None;
+                    let _ = show_window_by_label(tray.app_handle(), "control");
+                } else {
+                    *last_click = Some(now);
+                }
+            }
+            _ => {}
+        })
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_SHOW_OVERLAY => {
                 let _ = show_window_by_label(app, "main");

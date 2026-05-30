@@ -32,6 +32,7 @@ async fn open_help_window(app: tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(bilibili::DanmakuTaskState::default())
+        .manage(bilibili::send::SendDanmakuState::default())
         .manage(window_control::EditModeState::default())
         .manage(update_check::UpdateCheckState::default())
         .plugin(tauri_plugin_opener::init())
@@ -58,10 +59,18 @@ pub fn run() {
             window_control::set_edit_mode,
             window_control::set_edit_mode_shortcut,
             window_control::set_overlay_window_shortcut,
+            window_control::set_send_danmaku_shortcut,
+            window_control::open_send_danmaku_window,
+            window_control::hide_send_danmaku_window,
+            window_control::begin_send_danmaku_window_drag,
+            window_control::drag_send_danmaku_window,
+            window_control::end_send_danmaku_window_drag,
             window_control::save_window_layout,
             window_control::load_window_layout,
             bilibili::ws::start_bilibili_danmaku,
             bilibili::ws::stop_bilibili_danmaku,
+            bilibili::send::send_bilibili_danmaku,
+            bilibili::send::get_send_danmaku_status,
             bilibili::diagnostics::test_bilibili_api,
             bilibili::auth::auth_get_status,
             bilibili::auth::auth_start_qr_login,

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   defaultOverlayShortcutLabel,
+  defaultSendDanmakuShortcutLabel,
   defaultShortcutLabel,
   type AppConfig,
   type AppearanceConfig,
@@ -53,6 +54,9 @@ export function ControlPanel({
   const [draftOverlayShortcut, setDraftOverlayShortcut] = useState(
     config.shortcuts.toggleOverlayWindow,
   );
+  const [draftSendShortcut, setDraftSendShortcut] = useState(
+    config.shortcuts.openSendDanmaku,
+  );
   const [shortcutError, setShortcutError] = useState("");
   const [apiTestSteps, setApiTestSteps] = useState<ApiTestStep[]>([]);
   const [apiTestError, setApiTestError] = useState("");
@@ -95,6 +99,10 @@ export function ControlPanel({
   useEffect(() => {
     setDraftOverlayShortcut(config.shortcuts.toggleOverlayWindow);
   }, [config.shortcuts.toggleOverlayWindow]);
+
+  useEffect(() => {
+    setDraftSendShortcut(config.shortcuts.openSendDanmaku);
+  }, [config.shortcuts.openSendDanmaku]);
 
   useEffect(() => {
     void refreshAuthStatus();
@@ -442,7 +450,7 @@ export function ControlPanel({
       fontSize: 20,
       opacity: 0.94,
       scrollDuration: 12,
-      density: "medium",
+      density: "high",
       showUsername: false,
       color: "white",
     });
@@ -480,6 +488,27 @@ export function ControlPanel({
         shortcuts: {
           ...config.shortcuts,
           toggleOverlayWindow: result.shortcut,
+        },
+      });
+    } catch (error) {
+      setShortcutError(String(error));
+    }
+  }
+
+  async function saveSendShortcut() {
+    setShortcutError("");
+    try {
+      const result = await invoke<{ shortcut: string }>(
+        "set_send_danmaku_shortcut",
+        {
+          shortcut: draftSendShortcut,
+        },
+      );
+      await saveConfig({
+        ...config,
+        shortcuts: {
+          ...config.shortcuts,
+          openSendDanmaku: result.shortcut,
         },
       });
     } catch (error) {
@@ -528,16 +557,32 @@ export function ControlPanel({
     }
   }
 
+  async function resetSendShortcut() {
+    setDraftSendShortcut(defaultSendDanmakuShortcutLabel());
+    setShortcutError("");
+    try {
+      const result = await invoke<{ shortcut: string }>(
+        "set_send_danmaku_shortcut",
+        {
+          shortcut: defaultSendDanmakuShortcutLabel(),
+        },
+      );
+      await saveConfig({
+        ...config,
+        shortcuts: {
+          ...config.shortcuts,
+          openSendDanmaku: result.shortcut,
+        },
+      });
+    } catch (error) {
+      setShortcutError(String(error));
+    }
+  }
+
   return (
     <main className="control-window">
       <header className="control-header">
         <strong>Drift 设置</strong>
-        <button
-          onClick={() => invoke("hide_window", { label: "control" })}
-          type="button"
-        >
-          隐藏
-        </button>
       </header>
 
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
@@ -643,11 +688,15 @@ export function ControlPanel({
           <ShortcutSettings
             draftShortcut={draftShortcut}
             draftOverlayShortcut={draftOverlayShortcut}
+            draftSendShortcut={draftSendShortcut}
             onOverlayShortcutChange={setDraftOverlayShortcut}
             onResetShortcut={resetShortcut}
             onResetOverlayShortcut={resetOverlayShortcut}
+            onResetSendShortcut={resetSendShortcut}
             onSaveShortcut={saveShortcut}
             onSaveOverlayShortcut={saveOverlayShortcut}
+            onSaveSendShortcut={saveSendShortcut}
+            onSendShortcutChange={setDraftSendShortcut}
             onShortcutChange={setDraftShortcut}
             shortcutError={shortcutError}
           />
@@ -681,7 +730,8 @@ export function ControlPanel({
       <footer className="control-footer">
         <span>
           {config.shortcuts.toggleEditMode} 切换编辑模式 ·{" "}
-          {config.shortcuts.toggleOverlayWindow} 显示/隐藏弹幕窗口
+          {config.shortcuts.toggleOverlayWindow} 显示/隐藏弹幕窗口 ·{" "}
+          {config.shortcuts.openSendDanmaku} 发送弹幕
         </span>
       </footer>
     </main>

@@ -1,28 +1,37 @@
 import {
   defaultOverlayShortcutLabel,
+  defaultSendDanmakuShortcutLabel,
   defaultShortcutLabel,
 } from "../../types/config";
 
 type ShortcutSettingsProps = {
   draftOverlayShortcut: string;
+  draftSendShortcut: string;
   draftShortcut: string;
   onOverlayShortcutChange: (shortcut: string) => void;
   onResetOverlayShortcut: () => void;
+  onResetSendShortcut: () => void;
   onResetShortcut: () => void;
   onSaveOverlayShortcut: () => void;
+  onSaveSendShortcut: () => void;
   onSaveShortcut: () => void;
+  onSendShortcutChange: (shortcut: string) => void;
   onShortcutChange: (shortcut: string) => void;
   shortcutError: string;
 };
 
 export function ShortcutSettings({
   draftOverlayShortcut,
+  draftSendShortcut,
   draftShortcut,
   onOverlayShortcutChange,
   onResetOverlayShortcut,
+  onResetSendShortcut,
   onResetShortcut,
   onSaveOverlayShortcut,
+  onSaveSendShortcut,
   onSaveShortcut,
+  onSendShortcutChange,
   onShortcutChange,
   shortcutError,
 }: ShortcutSettingsProps) {
@@ -54,6 +63,20 @@ export function ShortcutSettings({
           保存
         </button>
       </div>
+      <div className="settings-row shortcut-form">
+        <label htmlFor="send-shortcut-input">发送弹幕</label>
+        <input
+          id="send-shortcut-input"
+          onChange={(event) =>
+            onSendShortcutChange(event.currentTarget.value)
+          }
+          placeholder={defaultSendDanmakuShortcutLabel()}
+          value={draftSendShortcut}
+        />
+        <button onClick={onSaveSendShortcut} type="button">
+          保存
+        </button>
+      </div>
       {shortcutError ? <p className="control-error">{shortcutError}</p> : null}
       <div className="settings-actions">
         <button onClick={onResetShortcut} type="button">
@@ -61,6 +84,9 @@ export function ShortcutSettings({
         </button>
         <button onClick={onResetOverlayShortcut} type="button">
           恢复弹幕窗口快捷键
+        </button>
+        <button onClick={onResetSendShortcut} type="button">
+          恢复发送弹幕快捷键
         </button>
       </div>
     </div>

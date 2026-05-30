@@ -133,6 +133,14 @@ pub fn export_diagnostics(app: AppHandle) -> Result<String, String> {
     }
     output.push('\n');
 
+    // Danmaku send state (sanitized)
+    output.push_str("=== 弹幕发送状态 ===\n");
+    for line in crate::bilibili::send::diagnostic_lines(&app) {
+        output.push_str(&line);
+        output.push('\n');
+    }
+    output.push('\n');
+
     // Environment info
     output.push_str("=== 环境信息 ===\n");
     output.push_str(&format!("OS: {}\n", std::env::consts::OS));

@@ -41,3 +41,18 @@ export type DanmakuStatus = {
   anchorName?: string;
   liveStatus?: number;
 };
+
+export type SendDanmakuStatus = {
+  canSend: boolean;
+  reason: string;
+  roomId?: number;
+  anchorName?: string;
+  status: DanmakuStatus["status"];
+  cooldownMs: number;
+};
+
+export type SendDanmakuResult = {
+  code: number;
+  message: string;
+  cooldownMs: number;
+};
