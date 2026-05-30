@@ -108,8 +108,6 @@ Windows / Linux: Control+Alt+Enter
 - Drift 只支持普通文本弹幕发送。
 - 单条弹幕长度限制为 60 个 Unicode 字符。
 - 本地会限制连续发送频率，避免误触造成高频发送。
-- 发送窗口只把弹幕文本交给后端；Cookie、CSRF 和当前直播间状态都由 Rust 后端处理。
-- 发送成功后不会本地伪造弹幕，是否显示以 B 站 WebSocket 实际回显为准。
 
 ## macOS 钥匙串密码提示说明
 
