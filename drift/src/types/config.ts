@@ -40,6 +40,7 @@ export type AppearanceConfig = {
 
 export type MessageDisplayConfig = {
   showDanmaku: boolean;
+  showEmotes: boolean;
   showGift: boolean;
   showGuard: boolean;
 };
@@ -118,6 +119,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   messageDisplay: {
     showDanmaku: true,
+    showEmotes: true,
     showGift: true,
     showGuard: true,
   },

@@ -80,6 +80,8 @@ pub struct LiveMessage {
     pub user: String,
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub segments: Option<Vec<LiveMessageSegment>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gift_name: Option<String>,
@@ -89,6 +91,29 @@ pub struct LiveMessage {
     pub guard_level: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveMessageSegment {
+    #[serde(rename = "type")]
+    pub segment_type: LiveMessageSegmentKind,
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum LiveMessageSegmentKind {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "emote")]
+    Emote,
 }
 
 #[derive(Debug, Clone, Serialize)]

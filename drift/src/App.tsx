@@ -24,7 +24,7 @@ import {
 import "./App.css";
 import "./styles/send-window.css";
 
-const MIN_WINDOW_WIDTH = 720;
+const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 160;
 const DEFAULT_SHORTCUT = defaultShortcutLabel();
 const TERMINAL_DANMAKU_STATUSES: DanmakuStatus["status"][] = [
@@ -239,6 +239,7 @@ function App() {
       <DanmakuOverlay
         items={items}
         onItemDone={isConnected || mock.active ? removeDanmakuItem : undefined}
+        showEmotes={config.messageDisplay.showEmotes}
         showUsername={config.appearance.showUsername}
         trackCount={trackCount}
       />

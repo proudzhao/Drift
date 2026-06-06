@@ -1,6 +1,7 @@
 pub(crate) mod auth;
 pub(crate) mod cookies;
 pub(crate) mod diagnostics;
+pub(crate) mod emote_probe;
 pub(crate) mod errors;
 pub(crate) mod http;
 pub(crate) mod protocol;

@@ -1,5 +1,57 @@
 import type { DanmakuItem, LiveMessage } from "../types/danmaku";
 
+type MockSegmentedMessage = {
+  text: string;
+  segments: NonNullable<LiveMessage["segments"]>;
+};
+
+function makeMockEmoteDataUrl(fill: string, accent: string, label: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${fill}"/><circle cx="22" cy="25" r="5" fill="#202124"/><circle cx="42" cy="25" r="5" fill="#202124"/><path d="M20 41c7 7 17 7 24 0" fill="none" stroke="#202124" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="14" r="8" fill="${accent}"/><text x="32" y="57" text-anchor="middle" font-size="10" font-family="Arial, sans-serif" fill="#202124">${label}</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+const mockEmoteMessages: MockSegmentedMessage[] = [
+  {
+    text: "这个表情刚好[星星]",
+    segments: [
+      { type: "text", text: "这个表情刚好" },
+      {
+        type: "emote",
+        text: "[星星]",
+        url: makeMockEmoteDataUrl("#ffe27a", "#7bc7ff", "STAR"),
+        width: 64,
+        height: 64,
+      },
+    ],
+  },
+  {
+    text: "[看病]",
+    segments: [
+      {
+        type: "emote",
+        text: "[看病]",
+        url: makeMockEmoteDataUrl("#b8f3d4", "#ff8ea3", "OK"),
+        width: 64,
+        height: 64,
+      },
+    ],
+  },
+  {
+    text: "主播状态[点赞]太好了",
+    segments: [
+      { type: "text", text: "主播状态" },
+      {
+        type: "emote",
+        text: "[点赞]",
+        url: makeMockEmoteDataUrl("#b9d7ff", "#ffd166", "LIKE"),
+        width: 64,
+        height: 64,
+      },
+      { type: "text", text: "太好了" },
+    ],
+  },
+];
+
 const sampleTexts = [
   "主播刚才那句可以截图当壁纸",
   "前排路过，顺手把咖啡续上",
@@ -92,6 +144,29 @@ function pick<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)];
 }
 
+function cloneSegments(segments: NonNullable<LiveMessage["segments"]>) {
+  return segments.map((segment) => ({ ...segment }));
+}
+
+function buildMockEmoteMessage(id: string, user: string): LiveMessage {
+  const sample = pick(mockEmoteMessages);
+  return {
+    id,
+    kind: "danmaku",
+    user,
+    text: sample.text,
+    segments: cloneSegments(sample.segments),
+  };
+}
+
+function generateMockEmoteMessage(): LiveMessage {
+  mockSeq += 1;
+  return buildMockEmoteMessage(
+    `mock-emote-${Date.now()}-${mockSeq}`,
+    pick(mockUsers),
+  );
+}
+
 /** 生成一条可注入 pendingMessagesRef 的 mock 消息 */
 export function generateMockMessage(): LiveMessage {
   mockSeq += 1;
@@ -124,6 +199,10 @@ export function generateMockMessage(): LiveMessage {
     };
   }
 
+  if (roll >= 0.72) {
+    return buildMockEmoteMessage(`mock-emote-${Date.now()}-${mockSeq}`, user);
+  }
+
   let text: string;
   if (roll < 0.35) {
     text = pick(shortTexts);
@@ -143,7 +222,9 @@ export function generateMockMessage(): LiveMessage {
 
 /** 一次生成指定数量的 mock 消息（用于爆发测试） */
 export function generateMockBatch(count: number): LiveMessage[] {
-  return Array.from({ length: count }, () => generateMockMessage());
+  return Array.from({ length: count }, (_, index) =>
+    index % 12 === 0 ? generateMockEmoteMessage() : generateMockMessage(),
+  );
 }
 
 export function createMockDanmakuItems(): DanmakuItem[] {
@@ -156,8 +237,20 @@ export function createMockDanmakuItems(): DanmakuItem[] {
     delay: index * 1.3,
     createdAt: Date.now(),
   }));
+  const emotePreview = mockEmoteMessages[0];
   return [
     ...items,
+    {
+      id: "mock-emote-preview",
+      kind: "danmaku",
+      user: "表情用户",
+      text: emotePreview.text,
+      segments: cloneSegments(emotePreview.segments),
+      track: 0,
+      duration: 13,
+      delay: 1.1,
+      createdAt: Date.now(),
+    },
     {
       id: "mock-gift-preview",
       kind: "gift",

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size};
 
 const WINDOW_LAYOUT_FILE: &str = "window-layout.json";
-const MIN_WINDOW_WIDTH: u32 = 720;
+const MIN_WINDOW_WIDTH: u32 = 320;
 const MIN_WINDOW_HEIGHT: u32 = 160;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,9 @@
 import type { AppConfig } from "../types/config";
-import type { DanmakuItem, LiveMessage } from "../types/danmaku";
+import type {
+  DanmakuItem,
+  LiveMessage,
+  LiveMessageSegment,
+} from "../types/danmaku";
 
 export const DANMAKU_FLUSH_INTERVAL_MS = 500;
 export const MIN_TRACK_COUNT = 3;
@@ -11,6 +15,10 @@ export const MAX_REQUEUE_ROUNDS = 6;
 export const MAX_REQUEUE_LATENCY_MS = 3000;
 
 const MIN_LANE_GAP_PX = 120;
+const EMOTE_RENDER_HEIGHT_RATIO = 1.55;
+const EMOTE_RENDER_MAX_HEIGHT = 34;
+const EMOTE_FALLBACK_WIDTH_RATIO = 1.8;
+const SEGMENT_GAP_PX = 2;
 
 type Density = AppConfig["appearance"]["density"];
 
@@ -58,10 +66,39 @@ export function estimateMessageWidth(
   message: LiveMessage,
   fontSize: number,
   showUsername: boolean,
+  showEmotes: boolean,
 ) {
-  const displayText =
-    showUsername && message.user ? `${message.user}: ${message.text}` : message.text;
-  return Math.max(80, estimateTextWidth(displayText, fontSize));
+  const usernameWidth =
+    showUsername && message.user
+      ? estimateTextWidth(`${message.user}: `, fontSize)
+      : 0;
+  const contentWidth =
+    showEmotes && message.segments && message.segments.length > 0
+      ? estimateSegmentsWidth(message.segments, fontSize)
+      : estimateTextWidth(message.text, fontSize);
+  return Math.max(80, usernameWidth + contentWidth);
+}
+
+function estimateSegmentsWidth(segments: LiveMessageSegment[], fontSize: number) {
+  return segments.reduce((width, segment, index) => {
+    const gap = index > 0 ? SEGMENT_GAP_PX : 0;
+    return width + gap + estimateSegmentWidth(segment, fontSize);
+  }, 0);
+}
+
+function estimateSegmentWidth(segment: LiveMessageSegment, fontSize: number) {
+  if (segment.type === "text" || !segment.url) {
+    return estimateTextWidth(segment.text, fontSize);
+  }
+
+  const renderedHeight = Math.min(
+    fontSize * EMOTE_RENDER_HEIGHT_RATIO,
+    EMOTE_RENDER_MAX_HEIGHT,
+  );
+  if (segment.width && segment.height && segment.height > 0) {
+    return (segment.width / segment.height) * renderedHeight;
+  }
+  return fontSize * EMOTE_FALLBACK_WIDTH_RATIO;
 }
 
 export function laneCooldownMs(width: number, durationSeconds: number) {

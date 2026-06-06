@@ -249,10 +249,11 @@ export function useDanmakuRuntime({
 
         sequenceRef.current += 1;
         const width = estimateMessageWidth(
-          message,
-          config.appearance.fontSize,
-          config.appearance.showUsername,
-        );
+            message,
+            config.appearance.fontSize,
+            config.appearance.showUsername,
+            config.messageDisplay.showEmotes,
+          );
         laneAvailableAtRef.current[track] =
           now + laneCooldownMs(width, duration);
 
@@ -261,6 +262,7 @@ export function useDanmakuRuntime({
           kind: message.kind,
           user: message.user,
           text: message.text,
+          segments: message.segments,
           track,
           duration,
           delay: 0,
@@ -294,6 +296,7 @@ export function useDanmakuRuntime({
     config.appearance.fontSize,
     config.appearance.scrollDuration,
     config.appearance.showUsername,
+    config.messageDisplay.showEmotes,
     densityLimits,
     showHistory,
     trackCount,

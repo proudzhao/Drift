@@ -1,10 +1,24 @@
 export type LiveMessageKind = "danmaku" | "gift" | "guard";
 
+export type LiveMessageSegment =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "emote";
+      text: string;
+      url?: string;
+      width?: number;
+      height?: number;
+    };
+
 export type DanmakuItem = {
   id: string;
   kind: LiveMessageKind;
   user?: string;
   text: string;
+  segments?: LiveMessageSegment[];
   track: number;
   duration: number;
   delay: number;
@@ -20,6 +34,7 @@ export type LiveMessage = {
   kind: LiveMessageKind;
   user: string;
   text: string;
+  segments?: LiveMessageSegment[];
   timestamp?: number;
   giftName?: string;
   giftCount?: number;

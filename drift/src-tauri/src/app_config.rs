@@ -59,6 +59,8 @@ pub struct AppearanceConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct MessageDisplayConfig {
     pub show_danmaku: bool,
+    #[serde(default = "default_true")]
+    pub show_emotes: bool,
     pub show_gift: bool,
     pub show_guard: bool,
 }
@@ -121,10 +123,15 @@ impl Default for MessageDisplayConfig {
     fn default() -> Self {
         Self {
             show_danmaku: true,
+            show_emotes: true,
             show_gift: true,
             show_guard: true,
         }
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for UpdateConfig {
@@ -263,6 +270,41 @@ fn send_danmaku_shortcut_label() -> &'static str {
         "Command+Option+Enter"
     } else {
         "Control+Alt+Enter"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn old_message_display_config_defaults_show_emotes_to_true() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "messageDisplay": {
+                "showDanmaku": true,
+                "showGift": true,
+                "showGuard": true
+            }
+        }))
+        .expect("old config should deserialize");
+
+        assert!(config.message_display.show_emotes);
+    }
+
+    #[test]
+    fn explicit_show_emotes_false_is_preserved() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "messageDisplay": {
+                "showDanmaku": true,
+                "showEmotes": false,
+                "showGift": true,
+                "showGuard": true
+            }
+        }))
+        .expect("config should deserialize");
+
+        assert!(!config.message_display.show_emotes);
     }
 }
 

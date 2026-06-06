@@ -1,4 +1,7 @@
-use super::types::{LiveMessage, LiveMessageKind, Packet, HEADER_SIZE};
+use super::emote_probe;
+use super::types::{
+    LiveMessage, LiveMessageKind, LiveMessageSegment, LiveMessageSegmentKind, Packet, HEADER_SIZE,
+};
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use std::io::Read;
@@ -127,7 +130,10 @@ fn try_extract_live_message(payload: &[u8]) -> Option<LiveMessage> {
     let value = serde_json::from_slice::<Value>(payload).ok()?;
     let command = value.get("cmd").and_then(Value::as_str)?;
     match command {
-        "DANMU_MSG" => try_extract_danmaku_message(&value),
+        "DANMU_MSG" => {
+            emote_probe::maybe_log_danmaku_sample(&value);
+            try_extract_danmaku_message(&value)
+        }
         "SEND_GIFT" => try_extract_gift_message(&value),
         "GUARD_BUY" => try_extract_guard_message(&value),
         _ => None,
@@ -147,6 +153,7 @@ fn empty_live_message(
         kind,
         user,
         text,
+        segments: None,
         timestamp,
         gift_name: None,
         gift_count: None,
@@ -173,13 +180,170 @@ fn try_extract_danmaku_message(value: &Value) -> Option<LiveMessage> {
         .and_then(Value::as_u64)
         .unwrap_or(0);
 
-    Some(empty_live_message(
+    let mut message = empty_live_message(
         format!("{}-{}-{}", uid, timestamp, text.len()),
         LiveMessageKind::Danmaku,
         user,
         text.to_string(),
         Some(timestamp),
-    ))
+    );
+    message.segments = extract_danmaku_segments(info, text);
+    Some(message)
+}
+
+#[derive(Debug, Clone)]
+struct ParsedEmote {
+    key: String,
+    url: String,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+fn extract_danmaku_segments(info: &[Value], text: &str) -> Option<Vec<LiveMessageSegment>> {
+    let emotes = extract_danmaku_emotes(info);
+    if emotes.is_empty() {
+        return None;
+    }
+    build_danmaku_segments(text, &emotes)
+}
+
+fn extract_danmaku_emotes(info: &[Value]) -> Vec<ParsedEmote> {
+    let Some(extra) = extract_danmaku_extra(info) else {
+        return Vec::new();
+    };
+    let Some(emots) = extra.get("emots").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+
+    emots
+        .iter()
+        .filter_map(|(key, value)| parse_emote_entry(key, value))
+        .collect()
+}
+
+fn extract_danmaku_extra(info: &[Value]) -> Option<Value> {
+    let meta = info.first().and_then(Value::as_array)?;
+    let container = parse_json_value(meta.get(15)?)?;
+    if let Some(extra) = container.get("extra") {
+        parse_json_value(extra)
+    } else {
+        Some(container)
+    }
+}
+
+fn parse_json_value(value: &Value) -> Option<Value> {
+    match value {
+        Value::String(text) => serde_json::from_str::<Value>(text.trim()).ok(),
+        Value::Object(_) => Some(value.clone()),
+        _ => None,
+    }
+}
+
+fn parse_emote_entry(key: &str, value: &Value) -> Option<ParsedEmote> {
+    let key = string_field(value, &["emoji", "text", "content"]).unwrap_or(key);
+    if key.trim().is_empty() {
+        return None;
+    }
+    let url = string_field(value, &["url", "emoticon_url", "img_url", "image_url"])
+        .and_then(sanitize_emote_url)?;
+
+    Some(ParsedEmote {
+        key: key.to_string(),
+        url,
+        width: u32_field(value, &["width", "w"]),
+        height: u32_field(value, &["height", "h"]),
+    })
+}
+
+fn build_danmaku_segments(text: &str, emotes: &[ParsedEmote]) -> Option<Vec<LiveMessageSegment>> {
+    let mut matches = Vec::new();
+    for (index, emote) in emotes.iter().enumerate() {
+        if emote.key.is_empty() {
+            continue;
+        }
+        for (start, _) in text.match_indices(&emote.key) {
+            matches.push((start, start + emote.key.len(), index));
+        }
+    }
+
+    matches.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| (right.1 - right.0).cmp(&(left.1 - left.0)))
+    });
+
+    let mut cursor = 0usize;
+    let mut segments = Vec::new();
+    let mut has_emote = false;
+
+    for (start, end, emote_index) in matches {
+        if start < cursor {
+            continue;
+        }
+        if start > cursor {
+            segments.push(text_segment(&text[cursor..start]));
+        }
+
+        let emote = &emotes[emote_index];
+        segments.push(emote_segment(emote));
+        cursor = end;
+        has_emote = true;
+    }
+
+    if !has_emote {
+        return None;
+    }
+    if cursor < text.len() {
+        segments.push(text_segment(&text[cursor..]));
+    }
+    Some(segments)
+}
+
+fn text_segment(text: &str) -> LiveMessageSegment {
+    LiveMessageSegment {
+        segment_type: LiveMessageSegmentKind::Text,
+        text: text.to_string(),
+        url: None,
+        width: None,
+        height: None,
+    }
+}
+
+fn emote_segment(emote: &ParsedEmote) -> LiveMessageSegment {
+    LiveMessageSegment {
+        segment_type: LiveMessageSegmentKind::Emote,
+        text: emote.key.clone(),
+        url: Some(emote.url.clone()),
+        width: emote.width,
+        height: emote.height,
+    }
+}
+
+fn sanitize_emote_url(url: &str) -> Option<String> {
+    let trimmed = url.trim();
+    let rest = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))?;
+    let authority = rest.split('/').next().unwrap_or_default();
+    if authority.is_empty() || authority.contains('@') {
+        return None;
+    }
+    let host = authority
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if !is_allowed_emote_host(&host) {
+        return None;
+    }
+    Some(format!("https://{}", rest))
+}
+
+fn is_allowed_emote_host(host: &str) -> bool {
+    host == "hdslb.com"
+        || host.ends_with(".hdslb.com")
+        || host == "bilibili.com"
+        || host.ends_with(".bilibili.com")
 }
 
 fn try_extract_gift_message(value: &Value) -> Option<LiveMessage> {
@@ -256,6 +420,10 @@ fn u64_field(value: &Value, keys: &[&str]) -> Option<u64> {
     })
 }
 
+fn u32_field(value: &Value, keys: &[&str]) -> Option<u32> {
+    u64_field(value, keys).and_then(|value| u32::try_from(value).ok())
+}
+
 fn guard_name(level: u8) -> &'static str {
     match level {
         1 => "总督",
@@ -267,6 +435,53 @@ fn guard_name(level: u8) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::{json, Value};
+
+    fn parse_message(value: Value) -> LiveMessage {
+        let bytes = serde_json::to_vec(&value).expect("payload should serialize");
+        try_extract_live_message(&bytes).expect("message should parse")
+    }
+
+    fn danmaku_payload(text: &str, extra_slot: Option<Value>) -> Value {
+        let mut meta = vec![
+            json!(0),
+            json!(1),
+            json!(25),
+            json!(16777215),
+            json!(1710000000_u64),
+            json!(0),
+            json!(0),
+            json!("abc"),
+            json!(0),
+            json!(0),
+            json!(0),
+            json!(""),
+            json!(0),
+            json!("{}"),
+            json!("{}"),
+        ];
+        if let Some(extra_slot) = extra_slot {
+            meta.push(extra_slot);
+        }
+
+        json!({
+            "cmd": "DANMU_MSG",
+            "info": [
+                meta,
+                text,
+                [42, "测试用户"],
+                []
+            ]
+        })
+    }
+
+    fn extra_slot(extra: Value) -> Value {
+        json!({
+            "extra": extra.to_string()
+        })
+        .to_string()
+        .into()
+    }
 
     #[test]
     fn extracts_gift_message() {
@@ -310,5 +525,103 @@ mod tests {
         assert_eq!(message.text, "上舰用户 开通 舰长");
         assert_eq!(message.guard_level, Some(3));
         assert_eq!(message.guard_name.as_deref(), Some("舰长"));
+    }
+
+    #[test]
+    fn plain_danmaku_has_no_segments() {
+        let message = parse_message(danmaku_payload("普通弹幕", None));
+
+        assert!(matches!(message.kind, LiveMessageKind::Danmaku));
+        assert_eq!(message.user, "测试用户");
+        assert_eq!(message.text, "普通弹幕");
+        assert!(message.segments.is_none());
+    }
+
+    #[test]
+    fn extracts_single_emote_segment() {
+        let message = parse_message(danmaku_payload(
+            "[妙]",
+            Some(extra_slot(json!({
+                "dm_type": 0,
+                "content": "[妙]",
+                "emots": {
+                    "[妙]": {
+                        "emoji": "[妙]",
+                        "url": "http://i0.hdslb.com/bfs/live/miao.png",
+                        "width": 20,
+                        "height": 20
+                    }
+                }
+            }))),
+        ));
+
+        let segments = message.segments.expect("emote segments");
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[0].text, "[妙]");
+        assert_eq!(
+            segments[0].url.as_deref(),
+            Some("https://i0.hdslb.com/bfs/live/miao.png")
+        );
+        assert_eq!(segments[0].width, Some(20));
+        assert_eq!(segments[0].height, Some(20));
+    }
+
+    #[test]
+    fn extracts_mixed_text_and_emote_segments() {
+        let message = parse_message(danmaku_payload(
+            "前缀[妙]后缀",
+            Some(extra_slot(json!({
+                "dm_type": 0,
+                "content": "前缀[妙]后缀",
+                "emots": {
+                    "[妙]": {
+                        "emoji": "[妙]",
+                        "url": "https://i0.hdslb.com/bfs/live/miao.png",
+                        "width": 20,
+                        "height": 20
+                    }
+                }
+            }))),
+        ));
+
+        let segments = message.segments.expect("emote segments");
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Text);
+        assert_eq!(segments[0].text, "前缀");
+        assert_eq!(segments[1].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[1].text, "[妙]");
+        assert_eq!(segments[2].segment_type, LiveMessageSegmentKind::Text);
+        assert_eq!(segments[2].text, "后缀");
+    }
+
+    #[test]
+    fn invalid_emote_url_falls_back_to_plain_text() {
+        let message = parse_message(danmaku_payload(
+            "[妙]",
+            Some(extra_slot(json!({
+                "dm_type": 0,
+                "content": "[妙]",
+                "emots": {
+                    "[妙]": {
+                        "emoji": "[妙]",
+                        "url": "https://evil.example/bfs/live/miao.png",
+                        "width": 20,
+                        "height": 20
+                    }
+                }
+            }))),
+        ));
+
+        assert_eq!(message.text, "[妙]");
+        assert!(message.segments.is_none());
+    }
+
+    #[test]
+    fn malformed_emote_extra_falls_back_to_plain_text() {
+        let message = parse_message(danmaku_payload("[妙]", Some(json!("not-json"))));
+
+        assert_eq!(message.text, "[妙]");
+        assert!(message.segments.is_none());
     }
 }
