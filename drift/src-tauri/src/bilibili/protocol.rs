@@ -91,6 +91,7 @@ pub(crate) fn handle_packet(
     app: &tauri::AppHandle,
     status_emitter: impl Fn(&tauri::AppHandle, &str, &str),
     room_id: u64,
+    self_uid: Option<u64>,
     bytes: &[u8],
 ) -> Result<Vec<LiveMessage>, String> {
     let packets = unpack_packets(bytes)?;
@@ -109,7 +110,7 @@ pub(crate) fn handle_packet(
                 }
             }
             5 => {
-                if let Some(mut msg) = try_extract_live_message(&packet.payload) {
+                if let Some(mut msg) = try_extract_live_message(&packet.payload, self_uid) {
                     msg.room_id = Some(room_id);
                     messages.push(msg);
                 }
@@ -126,13 +127,13 @@ pub(crate) fn handle_packet(
     Ok(messages)
 }
 
-fn try_extract_live_message(payload: &[u8]) -> Option<LiveMessage> {
+fn try_extract_live_message(payload: &[u8], self_uid: Option<u64>) -> Option<LiveMessage> {
     let value = serde_json::from_slice::<Value>(payload).ok()?;
     let command = value.get("cmd").and_then(Value::as_str)?;
     match command {
         "DANMU_MSG" => {
             emote_probe::maybe_log_danmaku_sample(&value);
-            try_extract_danmaku_message(&value)
+            try_extract_danmaku_message(&value, self_uid)
         }
         "SEND_GIFT" => try_extract_gift_message(&value),
         "GUARD_BUY" => try_extract_guard_message(&value),
@@ -154,6 +155,7 @@ fn empty_live_message(
         user,
         text,
         segments: None,
+        is_self: false,
         timestamp,
         gift_name: None,
         gift_count: None,
@@ -162,7 +164,7 @@ fn empty_live_message(
     }
 }
 
-fn try_extract_danmaku_message(value: &Value) -> Option<LiveMessage> {
+fn try_extract_danmaku_message(value: &Value, self_uid: Option<u64>) -> Option<LiveMessage> {
     let info = value.get("info").and_then(Value::as_array)?;
     let text = info.get(1).and_then(Value::as_str)?;
     let user_info = info.get(2).and_then(Value::as_array)?;
@@ -187,6 +189,7 @@ fn try_extract_danmaku_message(value: &Value) -> Option<LiveMessage> {
         text.to_string(),
         Some(timestamp),
     );
+    message.is_self = self_uid.is_some_and(|current_uid| current_uid != 0 && current_uid == uid);
     message.segments = extract_danmaku_segments(info, text);
     Some(message)
 }
@@ -438,8 +441,12 @@ mod tests {
     use serde_json::{json, Value};
 
     fn parse_message(value: Value) -> LiveMessage {
+        parse_message_with_self_uid(value, None)
+    }
+
+    fn parse_message_with_self_uid(value: Value, self_uid: Option<u64>) -> LiveMessage {
         let bytes = serde_json::to_vec(&value).expect("payload should serialize");
-        try_extract_live_message(&bytes).expect("message should parse")
+        try_extract_live_message(&bytes, self_uid).expect("message should parse")
     }
 
     fn danmaku_payload(text: &str, extra_slot: Option<Value>) -> Value {
@@ -496,7 +503,8 @@ mod tests {
             }
         }"#;
 
-        let message = try_extract_live_message(payload.as_bytes()).expect("gift should parse");
+        let message =
+            try_extract_live_message(payload.as_bytes(), Some(42)).expect("gift should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::Gift));
         assert_eq!(message.user, "送礼用户");
@@ -518,7 +526,8 @@ mod tests {
             }
         }"#;
 
-        let message = try_extract_live_message(payload.as_bytes()).expect("guard should parse");
+        let message =
+            try_extract_live_message(payload.as_bytes(), Some(7)).expect("guard should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::Guard));
         assert_eq!(message.user, "上舰用户");
@@ -535,6 +544,28 @@ mod tests {
         assert_eq!(message.user, "测试用户");
         assert_eq!(message.text, "普通弹幕");
         assert!(message.segments.is_none());
+        assert!(!message.is_self);
+    }
+
+    #[test]
+    fn marks_self_danmaku_when_sender_uid_matches_authenticated_uid() {
+        let message = parse_message_with_self_uid(danmaku_payload("自己的弹幕", None), Some(42));
+
+        assert!(message.is_self);
+    }
+
+    #[test]
+    fn does_not_mark_self_danmaku_when_sender_uid_differs() {
+        let message = parse_message_with_self_uid(danmaku_payload("别人的弹幕", None), Some(7));
+
+        assert!(!message.is_self);
+    }
+
+    #[test]
+    fn does_not_mark_self_danmaku_without_authenticated_uid() {
+        let message = parse_message_with_self_uid(danmaku_payload("匿名连接弹幕", None), None);
+
+        assert!(!message.is_self);
     }
 
     #[test]

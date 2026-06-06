@@ -268,6 +268,7 @@ export function useDanmakuRuntime({
           delay: 0,
           createdAt: now,
           highlighted: message.highlighted,
+          isSelf: message.isSelf,
         });
       }
 

@@ -3,8 +3,17 @@
   overflow: hidden;
   color: #6f7782;
   font-size: 11px;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.room-status-line {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
 }
 
 .room-meta {
@@ -55,14 +64,20 @@
   color: #b45f06;
 }
 
+.room-list-panels {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
 
 .saved-room-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 8px;
   min-height: 0;
-  padding-top: 4px;
   overflow: hidden;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 7px;
+  padding-top: 2px;
 }
 
 .saved-room-header {
@@ -70,41 +85,221 @@
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.saved-room-header div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
 }
 
 .saved-room-header strong {
   color: #1f1f1f;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
+}
+
+.saved-room-header span {
+  color: #7c8490;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.saved-room-tools {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.saved-room-group-controls {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.saved-room-command-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.saved-room-inline-actions,
+.saved-room-actions {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.saved-room-group-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0 0 2px;
+}
+
+.saved-room-group-editor {
+  display: grid;
+  min-width: 0;
+}
+
+.saved-room-group-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid #d6d9dc;
+  border-radius: 7px;
+  background: #f7f8f9;
+}
+
+.saved-room-confirm-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.saved-room-confirm-dialog {
+  display: grid;
+  gap: 10px;
+  width: min(360px, 100%);
+  padding: 16px;
+  border: 1px solid #c8cdd2;
+  border-radius: 8px;
+  background: #f8f8f8;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.saved-room-confirm-dialog strong {
+  color: #202124;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.saved-room-confirm-dialog p {
+  margin: 0;
+  color: #555d66;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.saved-room-confirm-actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: 6px;
 }
 
 .saved-room-header button,
-.saved-room-actions button {
-  min-height: 28px;
-  border: 1px solid #c6c6c6;
+.saved-room-actions button,
+.saved-room-inline-actions button,
+.saved-room-group-tabs button,
+.saved-room-group-edit-row button,
+.saved-room-confirm-actions button {
+  min-height: 26px;
+  border: 1px solid #c8cdd2;
   border-radius: 7px;
-  background: linear-gradient(#ffffff, #f7f7f7);
-  color: #202124;
+  background: linear-gradient(#ffffff, #f5f6f7);
+  color: #24282d;
   font-size: 11px;
+  font-weight: 600;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   cursor: pointer;
 }
 
 .saved-room-header button {
-  padding: 0 12px;
+  padding: 0 11px;
+}
+
+.saved-room-actions button,
+.saved-room-inline-actions button,
+.saved-room-group-edit-row button,
+.saved-room-confirm-actions button {
+  min-width: 38px;
+  padding: 0 8px;
 }
 
 .saved-room-header button:hover:not(:disabled),
-.saved-room-actions button:hover:not(:disabled) {
-  background: #eeeeee;
+.saved-room-actions button:hover:not(:disabled),
+.saved-room-inline-actions button:hover:not(:disabled),
+.saved-room-group-tabs button:hover:not(:disabled),
+.saved-room-group-edit-row button:hover:not(:disabled),
+.saved-room-confirm-actions button:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #b9c0c7;
 }
 
 .saved-room-header button:disabled,
-.saved-room-actions button:disabled {
-  color: #a8a8a8;
+.saved-room-actions button:disabled,
+.saved-room-inline-actions button:disabled,
+.saved-room-group-edit-row button:disabled,
+.saved-room-confirm-actions button:disabled {
+  color: #a1a7ad;
   cursor: default;
+}
+
+.saved-room-inline-actions button.is-active,
+.saved-room-group-tabs button.is-active {
+  border-color: #0a84ff;
+  background: #0a84ff;
+  color: #ffffff;
+}
+
+.saved-room-inline-actions button.is-active:hover:not(:disabled),
+.saved-room-group-tabs button.is-active:hover:not(:disabled) {
+  border-color: #0a84ff;
+  background: #0a84ff;
+  color: #ffffff;
+}
+
+.saved-room-group-tabs button {
+  min-width: 46px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.saved-room-search-input,
+.saved-room-group-edit-row input,
+.saved-room-group-edit-row select,
+.saved-room-item input,
+.saved-room-item select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 26px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid #c8cdd2;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #202124;
+  font: inherit;
+  outline: none;
+}
+
+.saved-room-search-input:focus,
+.saved-room-group-edit-row input:focus,
+.saved-room-group-edit-row select:focus,
+.saved-room-item input:focus,
+.saved-room-item select:focus {
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.12);
 }
 
 .settings-scroll-list {
@@ -130,10 +325,10 @@
 .saved-room-list {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 5px;
+  min-height: 0;
 }
 
-.saved-room-list,
 .saved-room-panel .empty-state {
   grid-row: 3;
 }
@@ -143,19 +338,20 @@
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  border: 1px solid #d5d5d5;
-  border-radius: 6px;
-  background: #f5f5f5;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #d7dadd;
+  border-radius: 7px;
+  background: #f8f8f8;
 }
 
 .saved-room-item.is-editing {
-  grid-template-columns: minmax(0, 1fr) 88px max-content;
+  grid-template-columns: minmax(0, 1fr) 78px 86px max-content;
 }
 
 .saved-room-info {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -163,7 +359,7 @@
   overflow: hidden;
   color: #202124;
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -171,39 +367,9 @@
 .saved-room-info span {
   overflow: hidden;
   color: #6f7782;
-  font-size: 11px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.saved-room-actions {
-  display: grid;
-  grid-auto-flow: column;
-  gap: 6px;
-}
-
-.saved-room-actions button {
-  min-width: 40px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
-.saved-room-item input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 28px;
-  min-width: 0;
-  padding: 0 8px;
-  border: 1px solid #c6c6c6;
-  border-radius: 7px;
-  background: #ffffff;
-  color: #202124;
-  font: inherit;
-  outline: none;
-}
-
-.saved-room-item input:focus {
-  border-color: #0a84ff;
 }
 
 .empty-state {

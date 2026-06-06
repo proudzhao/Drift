@@ -1,24 +1,33 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppConfig, SavedRoom } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
+import { SavedRoomGroupControls } from "./SavedRoomGroupControls";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
 
 type RoomSettingsProps = {
   config: AppConfig;
   draftRoomId: string;
   editingSavedRoom: EditingSavedRoom | null;
+  filteredSavedRooms: SavedRoom[];
   isConnected: boolean;
+  onCreateGroup: (name: string) => Promise<boolean>;
   onConnect: () => void;
+  onDeleteGroup: (groupId: string) => Promise<boolean>;
   onDeleteRoom: (roomId: string) => void;
   onDisconnect: () => void;
   onEditRoomChange: (room: EditingSavedRoom) => void;
+  onGroupChange: (groupId: string) => void;
+  onRenameGroup: (groupId: string, name: string) => Promise<boolean>;
   onRoomIdChange: (roomId: string) => void;
   onSaveCurrentRoom: () => void;
   onSaveEditedRoom: () => void;
+  onSearchQueryChange: (query: string) => void;
   onSelectRoom: (room: SavedRoom) => void;
   onStartEditRoom: (room: SavedRoom) => void;
   onStopEditRoom: () => void;
   savedRoomError: string;
+  savedRoomSearchQuery: string;
+  selectedGroupId: string;
   status: DanmakuStatus;
 };
 
@@ -26,18 +35,26 @@ export function RoomSettings({
   config,
   draftRoomId,
   editingSavedRoom,
+  filteredSavedRooms,
   isConnected,
+  onCreateGroup,
   onConnect,
+  onDeleteGroup,
   onDeleteRoom,
   onDisconnect,
   onEditRoomChange,
+  onGroupChange,
+  onRenameGroup,
   onRoomIdChange,
   onSaveCurrentRoom,
   onSaveEditedRoom,
+  onSearchQueryChange,
   onSelectRoom,
   onStartEditRoom,
   onStopEditRoom,
   savedRoomError,
+  savedRoomSearchQuery,
+  selectedGroupId,
   status,
 }: RoomSettingsProps) {
   const roomStatusLabel = roomStatusText(status);
@@ -72,36 +89,58 @@ export function RoomSettings({
           </button>
         )}
       </div>
-      <div className="room-meta">
-        <span className="status-dot" data-status={status.status} />
-        <span data-status={status.status}>状态：{roomStatusLabel}</span>
-        <span>主播：{anchorName}</span>
-      </div>
-      <p className="control-status">{status.message}</p>
-      <section className="saved-room-panel">
-        <div className="saved-room-header">
-          <strong>常用直播间</strong>
-          <button
-            disabled={!draftRoomId.trim()}
-            onClick={onSaveCurrentRoom}
-            type="button"
-          >
-            保存当前直播间
-          </button>
+      <div className="room-status-line">
+        <div className="room-meta">
+          <span className="status-dot" data-status={status.status} />
+          <span data-status={status.status}>状态：{roomStatusLabel}</span>
+          <span>主播：{anchorName}</span>
         </div>
-        {savedRoomError ? <p className="control-error">{savedRoomError}</p> : null}
-        <SavedRoomList
-          editingSavedRoom={editingSavedRoom}
-          isConnected={isConnected}
-          onDeleteRoom={onDeleteRoom}
-          onEditRoomChange={onEditRoomChange}
-          onSaveEditedRoom={onSaveEditedRoom}
-          onSelectRoom={onSelectRoom}
-          onStartEditRoom={onStartEditRoom}
-          onStopEditRoom={onStopEditRoom}
-          rooms={config.savedRooms}
-        />
-      </section>
+        <p className="control-status">{status.message}</p>
+      </div>
+      <div className="room-list-panels">
+        <section className="saved-room-panel">
+          <div className="saved-room-header">
+            <div>
+              <strong>常用直播间</strong>
+              <span>{filteredSavedRooms.length} 个</span>
+            </div>
+            <button
+              disabled={!draftRoomId.trim()}
+              onClick={onSaveCurrentRoom}
+              type="button"
+            >
+              保存当前直播间
+            </button>
+          </div>
+          <div className="saved-room-tools">
+            {savedRoomError ? (
+              <p className="control-error">{savedRoomError}</p>
+            ) : null}
+            <SavedRoomGroupControls
+              groups={config.savedRoomGroups}
+              onCreateGroup={onCreateGroup}
+              onDeleteGroup={onDeleteGroup}
+              onRenameGroup={onRenameGroup}
+              onSearchQueryChange={onSearchQueryChange}
+              onSelectedGroupChange={onGroupChange}
+              searchQuery={savedRoomSearchQuery}
+              selectedGroupId={selectedGroupId}
+            />
+          </div>
+          <SavedRoomList
+            editingSavedRoom={editingSavedRoom}
+            groups={config.savedRoomGroups}
+            isConnected={isConnected}
+            onDeleteRoom={onDeleteRoom}
+            onEditRoomChange={onEditRoomChange}
+            onSaveEditedRoom={onSaveEditedRoom}
+            onSelectRoom={onSelectRoom}
+            onStartEditRoom={onStartEditRoom}
+            onStopEditRoom={onStopEditRoom}
+            rooms={filteredSavedRooms}
+          />
+        </section>
+      </div>
     </div>
   );
 }

@@ -131,6 +131,11 @@ button {
     -1px 0 1px rgba(0, 0, 0, 0.68);
 }
 
+.danmaku.is-self {
+  outline: 1.5px solid currentColor;
+  outline-offset: 2px;
+}
+
 @keyframes drift-across {
   from {
     transform: translateX(0);

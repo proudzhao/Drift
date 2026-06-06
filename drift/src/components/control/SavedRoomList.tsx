@@ -1,7 +1,12 @@
-import type { SavedRoom } from "../../types/config";
+import {
+  UNGROUPED_SAVED_ROOM_GROUP_ID,
+  type SavedRoom,
+  type SavedRoomGroup,
+} from "../../types/config";
 
 export type EditingSavedRoom = {
   displayName: string;
+  groupId: string;
   id: string;
   roomId: string;
 };
@@ -15,6 +20,7 @@ type SavedRoomListProps = {
   onSelectRoom: (room: SavedRoom) => void;
   onStartEditRoom: (room: SavedRoom) => void;
   onStopEditRoom: () => void;
+  groups: SavedRoomGroup[];
   rooms: SavedRoom[];
 };
 
@@ -27,6 +33,7 @@ export function SavedRoomList({
   onSelectRoom,
   onStartEditRoom,
   onStopEditRoom,
+  groups,
   rooms,
 }: SavedRoomListProps) {
   if (rooms.length === 0) {
@@ -70,6 +77,23 @@ export function SavedRoomList({
                   }
                   value={editingSavedRoom.roomId}
                 />
+                <select
+                  aria-label="分组"
+                  onChange={(event) =>
+                    onEditRoomChange({
+                      ...editingSavedRoom,
+                      groupId: event.currentTarget.value,
+                    })
+                  }
+                  value={editingSavedRoom.groupId}
+                >
+                  <option value={UNGROUPED_SAVED_ROOM_GROUP_ID}>不分组</option>
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
                 <div className="saved-room-actions">
                   <button onClick={onSaveEditedRoom} type="button">
                     保存
@@ -83,7 +107,8 @@ export function SavedRoomList({
               <>
                 <div className="saved-room-info">
                   <strong>{room.displayName}</strong>
-                  <span>{room.roomId}</span>
+                  <span>{formatRoomMeta(groups, room)}</span>
+                  {room.anchorName ? <span>{room.anchorName}</span> : null}
                 </div>
                 <div className="saved-room-actions">
                   <button
@@ -107,4 +132,9 @@ export function SavedRoomList({
       })}
     </div>
   );
+}
+
+function formatRoomMeta(groups: SavedRoomGroup[], room: SavedRoom) {
+  const groupName = groups.find((group) => group.id === room.groupId)?.name;
+  return groupName ? `${room.roomId} / ${groupName}` : room.roomId;
 }

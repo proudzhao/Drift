@@ -62,13 +62,21 @@ export function ControlPanel({
     updateNotice,
   } = useUpdateNotice();
   const {
+    createSavedRoomGroup,
     deleteSavedRoom,
+    deleteSavedRoomGroup,
     editingSavedRoom,
+    filteredSavedRooms,
+    renameSavedRoomGroup,
     savedRoomError,
+    savedRoomSearchQuery,
     saveCurrentRoom,
     saveEditedRoom,
     selectSavedRoom,
+    selectedSavedRoomGroupId,
     setEditingSavedRoom,
+    setSavedRoomSearchQuery,
+    setSelectedSavedRoomGroupId,
     startEditSavedRoom,
   } = useSavedRooms({
     config,
@@ -187,20 +195,28 @@ export function ControlPanel({
         {activeTab === "room" ? (
           <RoomSettings
             config={config}
+            filteredSavedRooms={filteredSavedRooms}
             draftRoomId={draftRoomId}
             editingSavedRoom={editingSavedRoom}
             isConnected={isConnected}
+            onCreateGroup={createSavedRoomGroup}
             onConnect={() => connectRoom(draftRoomId)}
             onDeleteRoom={deleteSavedRoom}
+            onDeleteGroup={deleteSavedRoomGroup}
             onDisconnect={disconnectRoom}
             onEditRoomChange={setEditingSavedRoom}
+            onGroupChange={setSelectedSavedRoomGroupId}
+            onRenameGroup={renameSavedRoomGroup}
             onRoomIdChange={setDraftRoomId}
             onSaveCurrentRoom={saveCurrentRoom}
             onSaveEditedRoom={saveEditedRoom}
+            onSearchQueryChange={setSavedRoomSearchQuery}
             onSelectRoom={selectSavedRoom}
             onStartEditRoom={startEditSavedRoom}
             onStopEditRoom={() => setEditingSavedRoom(null)}
             savedRoomError={savedRoomError}
+            savedRoomSearchQuery={savedRoomSearchQuery}
+            selectedGroupId={selectedSavedRoomGroupId}
             status={status}
           />
         ) : null}

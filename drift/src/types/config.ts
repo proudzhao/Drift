@@ -1,5 +1,6 @@
 export type AppConfig = {
   roomId: string;
+  savedRoomGroups: SavedRoomGroup[];
   savedRooms: SavedRoom[];
   auth: AuthConfig;
   update: UpdateConfig;
@@ -8,6 +9,16 @@ export type AppConfig = {
   filter: FilterConfig;
   shortcuts: ShortcutConfig;
   mockPanelEnabled: boolean;
+};
+
+export const UNGROUPED_SAVED_ROOM_GROUP_ID = "uncategorized";
+export const ALL_SAVED_ROOM_GROUP_ID = "__all__";
+
+export type SavedRoomGroup = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AuthConfig = {
@@ -26,6 +37,7 @@ export type SavedRoom = {
   roomId: string;
   displayName: string;
   anchorName?: string;
+  groupId: string;
   updatedAt: string;
 };
 
@@ -100,8 +112,20 @@ export function defaultSendDanmakuShortcutLabel() {
     : "Control+Alt+Enter";
 }
 
+export function createDefaultSavedRoomGroups(
+  now = new Date().toISOString(),
+): SavedRoomGroup[] {
+  return [
+    { id: "vtuber", name: "VTuber", createdAt: now, updatedAt: now },
+    { id: "game", name: "游戏", createdAt: now, updatedAt: now },
+    { id: "chat", name: "聊天", createdAt: now, updatedAt: now },
+    { id: "event", name: "赛事", createdAt: now, updatedAt: now },
+  ];
+}
+
 export const DEFAULT_APP_CONFIG: AppConfig = {
   roomId: "",
+  savedRoomGroups: createDefaultSavedRoomGroups(),
   savedRooms: [],
   auth: {
     enabled: false,
@@ -136,6 +160,17 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 };
 
 export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
+  const savedRoomGroups = normalizeSavedRoomGroups(config.savedRoomGroups);
+  const savedRooms = normalizeSavedRooms(config.savedRooms, savedRoomGroups);
+  const roomId =
+    typeof config.roomId === "string"
+      ? config.roomId
+      : DEFAULT_APP_CONFIG.roomId;
+  const mockPanelEnabled =
+    typeof config.mockPanelEnabled === "boolean"
+      ? config.mockPanelEnabled
+      : DEFAULT_APP_CONFIG.mockPanelEnabled;
+
   const toggleEditMode =
     config.shortcuts?.toggleEditMode === "Command+Option+D" ||
     config.shortcuts?.toggleEditMode === "Control+Alt+D"
@@ -143,8 +178,7 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
       : config.shortcuts?.toggleEditMode;
 
   return {
-    ...DEFAULT_APP_CONFIG,
-    ...config,
+    roomId,
     appearance: {
       ...DEFAULT_APP_CONFIG.appearance,
       ...config.appearance,
@@ -169,7 +203,8 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
         : [],
       rules: Array.isArray(config.filter?.rules) ? config.filter.rules : [],
     },
-    savedRooms: Array.isArray(config.savedRooms) ? config.savedRooms : [],
+    savedRoomGroups,
+    savedRooms,
     shortcuts: {
       ...DEFAULT_APP_CONFIG.shortcuts,
       ...config.shortcuts,
@@ -181,5 +216,103 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
         config.shortcuts?.openSendDanmaku ??
         DEFAULT_APP_CONFIG.shortcuts.openSendDanmaku,
     },
+    mockPanelEnabled,
   };
+}
+
+function normalizeSavedRoomGroups(
+  savedRoomGroups: Partial<SavedRoomGroup>[] | undefined,
+): SavedRoomGroup[] {
+  if (!Array.isArray(savedRoomGroups) || savedRoomGroups.length === 0) {
+    return createDefaultSavedRoomGroups();
+  }
+
+  const now = new Date().toISOString();
+  const normalizedGroups = savedRoomGroups
+    .map((group) => ({
+      id: typeof group.id === "string" ? group.id.trim() : "",
+      name: typeof group.name === "string" ? group.name.trim() : "",
+      createdAt:
+        typeof group.createdAt === "string" && group.createdAt
+          ? group.createdAt
+          : now,
+      updatedAt:
+        typeof group.updatedAt === "string" && group.updatedAt
+          ? group.updatedAt
+          : now,
+    }))
+    .filter(
+      (group) =>
+        group.id && group.name && group.id !== UNGROUPED_SAVED_ROOM_GROUP_ID,
+    );
+
+  return normalizedGroups.length > 0
+    ? normalizedGroups
+    : createDefaultSavedRoomGroups(now);
+}
+
+function normalizeSavedRooms(
+  savedRooms: Partial<SavedRoom>[] | undefined,
+  savedRoomGroups: SavedRoomGroup[],
+): SavedRoom[] {
+  if (!Array.isArray(savedRooms)) {
+    return [];
+  }
+
+  const validGroupIds = new Set(savedRoomGroups.map((group) => group.id));
+
+  return savedRooms.map((room) => {
+    const legacyGroup = (room as Partial<SavedRoom> & { group?: string }).group;
+    const groupId = resolveSavedRoomGroupId(
+      room.groupId,
+      legacyGroup,
+      validGroupIds,
+    );
+
+    return {
+      id: typeof room.id === "string" ? room.id : "",
+      roomId: typeof room.roomId === "string" ? room.roomId : "",
+      displayName:
+        typeof room.displayName === "string" ? room.displayName : "",
+      anchorName:
+        typeof room.anchorName === "string" ? room.anchorName : undefined,
+      groupId,
+      updatedAt: typeof room.updatedAt === "string" ? room.updatedAt : "",
+    };
+  });
+}
+
+function resolveSavedRoomGroupId(
+  groupId: string | undefined,
+  legacyGroup: string | undefined,
+  validGroupIds: Set<string>,
+) {
+  if (groupId && validGroupIds.has(groupId)) {
+    return groupId;
+  }
+
+  const migratedGroupId = mapLegacySavedRoomGroup(legacyGroup);
+  if (migratedGroupId === UNGROUPED_SAVED_ROOM_GROUP_ID) {
+    return UNGROUPED_SAVED_ROOM_GROUP_ID;
+  }
+  if (migratedGroupId && validGroupIds.has(migratedGroupId)) {
+    return migratedGroupId;
+  }
+
+  return UNGROUPED_SAVED_ROOM_GROUP_ID;
+}
+
+function mapLegacySavedRoomGroup(group: string | undefined) {
+  switch (group) {
+    case "favorite":
+      return UNGROUPED_SAVED_ROOM_GROUP_ID;
+    case "event":
+      return "event";
+    case "study":
+      return "chat";
+    case "entertainment":
+      return "game";
+    default:
+      return undefined;
+  }
 }

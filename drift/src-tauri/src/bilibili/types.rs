@@ -81,6 +81,8 @@ pub struct LiveMessage {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<LiveMessageSegment>>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_self: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,6 +93,10 @@ pub struct LiveMessage {
     pub guard_level: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard_name: Option<String>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

@@ -197,6 +197,10 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
     let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
     let mut danmaku_buffer: Vec<LiveMessage> = Vec::new();
     let mut danmaku_flush = tokio::time::interval(DANMAKU_FLUSH_INTERVAL);
+    let self_uid = request_identity
+        .is_authenticated
+        .then_some(request_identity.uid)
+        .filter(|uid| *uid != 0);
 
     let status_emitter = |app: &AppHandle, s: &str, m: &str| {
         emit_status(app, s, m);
@@ -225,7 +229,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
             message = reader.next() => {
                 match message {
                     Some(Ok(Message::Binary(bytes))) => {
-                        let messages = protocol::handle_packet(&app, &status_emitter, room_id, &bytes)?;
+                        let messages = protocol::handle_packet(&app, &status_emitter, room_id, self_uid, &bytes)?;
                         danmaku_buffer.extend(messages);
                         if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
                             let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();

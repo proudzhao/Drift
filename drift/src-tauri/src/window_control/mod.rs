@@ -105,6 +105,10 @@ pub fn load_window_layout(app: AppHandle) -> Result<Option<WindowLayout>, String
     layout::load_window_layout(app)
 }
 
+pub fn save_window_layout_for_label(app: &AppHandle, label: &str) -> Result<WindowLayout, String> {
+    layout::save_window_layout_for_label(app, label)
+}
+
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     layout::restore_window_layout(app.handle());
     let configured_shortcuts = app_config::read_app_config(app.handle())

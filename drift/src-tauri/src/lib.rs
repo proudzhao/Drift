@@ -45,6 +45,22 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if window.label() == "main" || window.label() == "control" {
+                if matches!(
+                    event,
+                    tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
+                ) {
+                    if let Err(error) = window_control::save_window_layout_for_label(
+                        window.app_handle(),
+                        window.label(),
+                    ) {
+                        tracing::warn!(
+                            target: "drift::window",
+                            label = window.label(),
+                            error = %error,
+                            "failed to save window layout from window event"
+                        );
+                    }
+                }
                 tray::prevent_close_to_tray(window, event);
             }
         })

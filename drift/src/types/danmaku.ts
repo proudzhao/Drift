@@ -24,6 +24,7 @@ export type DanmakuItem = {
   delay: number;
   createdAt: number;
   highlighted?: boolean;
+  isSelf?: boolean;
   elder?: boolean;
   exiting?: boolean;
 };
@@ -35,6 +36,7 @@ export type LiveMessage = {
   user: string;
   text: string;
   segments?: LiveMessageSegment[];
+  isSelf?: boolean;
   timestamp?: number;
   giftName?: string;
   giftCount?: number;

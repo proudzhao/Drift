@@ -27,6 +27,7 @@ export function DanmakuTrack({
     "danmaku",
     `danmaku-${item.kind}`,
     item.highlighted ? "is-highlighted" : "",
+    item.isSelf ? "is-self" : "",
     item.exiting ? "is-exiting" : "",
   ]
     .filter(Boolean)
