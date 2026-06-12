@@ -1,6 +1,7 @@
 mod app_config;
 mod bilibili;
 mod logging;
+mod system_fonts;
 mod tray;
 mod update_check;
 mod window_control;
@@ -69,6 +70,7 @@ pub fn run() {
             app_config::save_app_config,
             logging::open_log_dir,
             logging::export_diagnostics,
+            system_fonts::list_system_fonts,
             set_click_through,
             tray::hide_window,
             tray::show_window,

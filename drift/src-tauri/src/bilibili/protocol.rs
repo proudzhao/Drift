@@ -1,7 +1,7 @@
-use super::emote_probe;
 use super::types::{
     LiveMessage, LiveMessageKind, LiveMessageSegment, LiveMessageSegmentKind, Packet, HEADER_SIZE,
 };
+use super::{emote_probe, sc_probe};
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use std::io::Read;
@@ -135,6 +135,10 @@ fn try_extract_live_message(payload: &[u8], self_uid: Option<u64>) -> Option<Liv
             emote_probe::maybe_log_danmaku_sample(&value);
             try_extract_danmaku_message(&value, self_uid)
         }
+        "SUPER_CHAT_MESSAGE" | "SUPER_CHAT_MESSAGE_JPN" => {
+            sc_probe::maybe_log_super_chat_sample(&value);
+            try_extract_super_chat_message(&value, self_uid)
+        }
         "SEND_GIFT" => try_extract_gift_message(&value),
         "GUARD_BUY" => try_extract_guard_message(&value),
         _ => None,
@@ -161,6 +165,9 @@ fn empty_live_message(
         gift_count: None,
         guard_level: None,
         guard_name: None,
+        super_chat_price: None,
+        super_chat_duration: None,
+        super_chat_color: None,
     }
 }
 
@@ -408,9 +415,55 @@ fn try_extract_guard_message(value: &Value) -> Option<LiveMessage> {
     Some(message)
 }
 
+fn try_extract_super_chat_message(value: &Value, self_uid: Option<u64>) -> Option<LiveMessage> {
+    let data = value.get("data")?;
+    let text = string_field(data, &["message", "message_trans"])?;
+    let user = string_path(data, &["user_info", "uname"])
+        .or_else(|| string_path(data, &["uinfo", "base", "name"]))
+        .or_else(|| string_field(data, &["uname", "username"]))
+        .unwrap_or("匿名用户");
+    let uid = u64_path(data, &["uid"])
+        .or_else(|| u64_path(data, &["user_info", "uid"]))
+        .or_else(|| u64_path(data, &["uinfo", "uid"]))
+        .unwrap_or(0);
+    let timestamp = u64_field(data, &["start_time", "ts"]);
+    let id = data
+        .get("id")
+        .and_then(id_component)
+        .map(|id| format!("sc-{}", id))
+        .unwrap_or_else(|| format!("sc-{}-{}-{}", uid, timestamp.unwrap_or(0), text.len()));
+
+    let mut message = empty_live_message(
+        id,
+        LiveMessageKind::SuperChat,
+        user.to_string(),
+        text.to_string(),
+        timestamp,
+    );
+    message.is_self = self_uid.is_some_and(|current_uid| current_uid != 0 && current_uid == uid);
+    message.super_chat_price = u64_field(data, &["price", "rmb"]);
+    message.super_chat_duration = u64_field(data, &["time"]);
+    message.super_chat_color = string_field(
+        data,
+        &[
+            "background_color",
+            "background_color_start",
+            "background_color_end",
+        ],
+    )
+    .and_then(sanitize_super_chat_color);
+    Some(message)
+}
+
 fn string_field<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter()
         .find_map(|key| value.get(*key).and_then(Value::as_str))
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn string_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
+    value_at_path(value, path)
+        .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
 }
 
@@ -423,8 +476,45 @@ fn u64_field(value: &Value, keys: &[&str]) -> Option<u64> {
     })
 }
 
+fn u64_path(value: &Value, path: &[&str]) -> Option<u64> {
+    let value = value_at_path(value, path)?;
+    value
+        .as_u64()
+        .or_else(|| value.as_str()?.parse::<u64>().ok())
+}
+
+fn value_at_path<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    Some(current)
+}
+
 fn u32_field(value: &Value, keys: &[&str]) -> Option<u32> {
     u64_field(value, keys).and_then(|value| u32::try_from(value).ok())
+}
+
+fn sanitize_super_chat_color(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    let rest = trimmed.strip_prefix('#')?;
+    if rest.len() == 6 && rest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Some(trimmed.to_string())
+    } else {
+        None
+    }
+}
+
+fn id_component(value: &Value) -> Option<String> {
+    value.as_u64().map(|value| value.to_string()).or_else(|| {
+        let text = value.as_str()?.trim();
+        let is_safe = !text.is_empty()
+            && text.len() <= 64
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'));
+        is_safe.then(|| text.to_string())
+    })
 }
 
 fn guard_name(level: u8) -> &'static str {
@@ -534,6 +624,81 @@ mod tests {
         assert_eq!(message.text, "上舰用户 开通 舰长");
         assert_eq!(message.guard_level, Some(3));
         assert_eq!(message.guard_name.as_deref(), Some("舰长"));
+    }
+
+    #[test]
+    fn extracts_super_chat_message_from_sample_shape() {
+        let payload = r##"{
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": {
+                "message": "这是一条醒目留言",
+                "message_trans": "",
+                "price": 2,
+                "time": 5,
+                "start_time": 1781273831,
+                "end_time": 1781273836,
+                "background_color": "#F5A962",
+                "uid": 42,
+                "user_info": {
+                    "uid": 42,
+                    "uname": "SC 用户"
+                }
+            }
+        }"##;
+
+        let message = try_extract_live_message(payload.as_bytes(), Some(42))
+            .expect("super chat should parse");
+
+        assert!(matches!(message.kind, LiveMessageKind::SuperChat));
+        assert_eq!(message.user, "SC 用户");
+        assert_eq!(message.text, "这是一条醒目留言");
+        assert_eq!(message.timestamp, Some(1781273831));
+        assert_eq!(message.super_chat_price, Some(2));
+        assert_eq!(message.super_chat_duration, Some(5));
+        assert_eq!(message.super_chat_color.as_deref(), Some("#F5A962"));
+        assert!(message.is_self);
+    }
+
+    #[test]
+    fn extracts_super_chat_with_missing_optional_fields() {
+        let payload = r#"{
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": {
+                "message": "只有正文也要显示"
+            }
+        }"#;
+
+        let message =
+            try_extract_live_message(payload.as_bytes(), None).expect("super chat should parse");
+
+        assert!(matches!(message.kind, LiveMessageKind::SuperChat));
+        assert_eq!(message.user, "匿名用户");
+        assert_eq!(message.text, "只有正文也要显示");
+        assert_eq!(message.timestamp, None);
+        assert_eq!(message.super_chat_price, None);
+        assert_eq!(message.super_chat_duration, None);
+        assert_eq!(message.super_chat_color, None);
+        assert!(!message.is_self);
+    }
+
+    #[test]
+    fn drops_unsafe_super_chat_color() {
+        let payload = r#"{
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": {
+                "message": "颜色字段不能信任",
+                "price": 30,
+                "background_color": "linear-gradient(secret)"
+            }
+        }"#;
+
+        let message =
+            try_extract_live_message(payload.as_bytes(), None).expect("super chat should parse");
+
+        assert!(matches!(message.kind, LiveMessageKind::SuperChat));
+        assert_eq!(message.text, "颜色字段不能信任");
+        assert_eq!(message.super_chat_price, Some(30));
+        assert_eq!(message.super_chat_color, None);
     }
 
     #[test]

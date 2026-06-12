@@ -121,6 +121,50 @@ button {
     -1px 0 1px rgba(0, 0, 0, 0.68);
 }
 
+.danmaku-super_chat {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: calc(var(--danmaku-font-size, 20px) + 10px);
+  padding: 3px 10px 3px 6px;
+  border: 1px solid var(--super-chat-color, #f5a962);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: rgba(24, 20, 15, 0.56);
+  color: #fff8ea;
+  font-weight: 760;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.36),
+    0 0 10px rgba(245, 169, 98, 0.26);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.72);
+}
+
+.danmaku-super-chat-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.danmaku-super-chat-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35em;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--super-chat-color, #f5a962);
+  color: #1c1409;
+  font-size: 0.72em;
+  font-weight: 800;
+  text-shadow: none;
+}
+
+.danmaku-super-chat-text {
+  display: inline-block;
+}
+
 .danmaku.is-highlighted {
   color: #dfffe8;
   text-shadow:

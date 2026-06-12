@@ -137,6 +137,26 @@ const mockGuards = [
   { level: 2, name: "提督" },
   { level: 1, name: "总督" },
 ] as const;
+const mockSuperChats = [
+  {
+    text: "这条 SC 想让弹幕稍微醒目一点",
+    price: 30,
+    duration: 60,
+    color: "#F5A962",
+  },
+  {
+    text: "主播刚才那段太精彩了",
+    price: 50,
+    duration: 90,
+    color: "#4FB3FF",
+  },
+  {
+    text: "前排支持一下，继续加油",
+    price: 10,
+    duration: 45,
+    color: "#7BCFA6",
+  },
+] as const;
 
 let mockSeq = 0;
 
@@ -167,12 +187,40 @@ function generateMockEmoteMessage(): LiveMessage {
   );
 }
 
+function buildMockSuperChatMessage(id: string, user: string): LiveMessage {
+  const sample = pick(mockSuperChats);
+  return {
+    id,
+    kind: "super_chat",
+    user,
+    text: sample.text,
+    superChatPrice: sample.price,
+    superChatDuration: sample.duration,
+    superChatColor: sample.color,
+  };
+}
+
+function generateMockSuperChatMessage(): LiveMessage {
+  mockSeq += 1;
+  return buildMockSuperChatMessage(
+    `mock-super-chat-${Date.now()}-${mockSeq}`,
+    pick(mockUsers),
+  );
+}
+
 /** 生成一条可注入 pendingMessagesRef 的 mock 消息 */
 export function generateMockMessage(): LiveMessage {
   mockSeq += 1;
 
   const user = pick(mockUsers);
   const roll = Math.random();
+
+  if (roll >= 0.97) {
+    return buildMockSuperChatMessage(
+      `mock-super-chat-${Date.now()}-${mockSeq}`,
+      user,
+    );
+  }
 
   if (roll >= 0.93) {
     const guard = pick(mockGuards);
@@ -223,7 +271,11 @@ export function generateMockMessage(): LiveMessage {
 /** 一次生成指定数量的 mock 消息（用于爆发测试） */
 export function generateMockBatch(count: number): LiveMessage[] {
   return Array.from({ length: count }, (_, index) =>
-    index % 12 === 0 ? generateMockEmoteMessage() : generateMockMessage(),
+    index % 20 === 5
+      ? generateMockSuperChatMessage()
+      : index % 12 === 0
+        ? generateMockEmoteMessage()
+        : generateMockMessage(),
   );
 }
 
@@ -269,6 +321,19 @@ export function createMockDanmakuItems(): DanmakuItem[] {
       track: 2,
       duration: 15,
       delay: 4.2,
+      createdAt: Date.now(),
+    },
+    {
+      id: "mock-super-chat-preview",
+      kind: "super_chat",
+      user: "SC 用户",
+      text: "Mock 醒目留言基础样例",
+      superChatPrice: 30,
+      superChatDuration: 60,
+      superChatColor: "#F5A962",
+      track: 3,
+      duration: 15,
+      delay: 5.5,
       createdAt: Date.now(),
     },
   ];

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import type { DanmakuItem } from "../types/danmaku";
 import type { LiveMessageSegment } from "../types/danmaku";
 import { TRACK_HEIGHT } from "../utils/danmakuRuntime";
@@ -21,8 +21,10 @@ export function DanmakuTrack({
   const track = item.track % trackCount;
   const hasVisibleSegments =
     showEmotes && item.segments && item.segments.length > 0;
+  const isSuperChat = item.kind === "super_chat";
   const fallbackText =
     showUsername && item.user ? `${item.user}: ${item.text}` : item.text;
+  const superChatColor = item.superChatColor ?? "#F5A962";
   const className = [
     "danmaku",
     `danmaku-${item.kind}`,
@@ -32,6 +34,12 @@ export function DanmakuTrack({
   ]
     .filter(Boolean)
     .join(" ");
+  const style = {
+    top: `${track * TRACK_HEIGHT + 16}px`,
+    animationDuration: `${item.duration}s`,
+    animationDelay: `${item.delay}s`,
+    ...(isSuperChat ? { "--super-chat-color": superChatColor } : {}),
+  } as CSSProperties;
 
   return (
     <div
@@ -46,13 +54,19 @@ export function DanmakuTrack({
           onDone?.(item.id);
         }
       }}
-      style={{
-        top: `${track * TRACK_HEIGHT + 16}px`,
-        animationDuration: `${item.duration}s`,
-        animationDelay: `${item.delay}s`,
-      }}
+      style={style}
     >
-      {hasVisibleSegments ? (
+      {isSuperChat ? (
+        <span className="danmaku-super-chat-content">
+          <span className="danmaku-super-chat-badge">
+            {item.superChatPrice ? `SC ¥${item.superChatPrice}` : "SC"}
+          </span>
+          {showUsername && item.user ? (
+            <span className="danmaku-user-prefix">{item.user}: </span>
+          ) : null}
+          <span className="danmaku-super-chat-text">{item.text}</span>
+        </span>
+      ) : hasVisibleSegments ? (
         <span className="danmaku-content">
           {showUsername && item.user ? (
             <span className="danmaku-user-prefix">{item.user}: </span>

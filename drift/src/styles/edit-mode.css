@@ -73,6 +73,12 @@
   background: rgba(126, 168, 196, 0.32);
 }
 
+.edit-panel button.is-active {
+  border-color: rgba(101, 214, 173, 0.72);
+  background: rgba(101, 214, 173, 0.24);
+  color: #e9fff7;
+}
+
 .resize-handle {
   position: absolute;
   width: 18px;
@@ -111,4 +117,3 @@
   left: 8px;
   cursor: nesw-resize;
 }
-

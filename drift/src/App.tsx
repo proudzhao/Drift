@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
 import { DanmakuHistoryDrawer } from "./components/DanmakuHistoryDrawer";
+import { DanmakuStatsDrawer } from "./components/DanmakuStatsDrawer";
 import { EditModePanel } from "./components/EditModePanel";
 import { MockDanmakuPanel } from "./components/MockDanmakuPanel";
 import { SendDanmakuWindow } from "./components/SendDanmakuWindow";
@@ -65,9 +66,12 @@ function App() {
     items,
     mock,
     removeDanmakuItem,
+    setShowStats,
     setShowHistory,
     showHistory,
+    showStats,
     startMockDanmaku,
+    statsSnapshot,
     stopMockDanmaku,
     triggerMockBurst,
   } = useDanmakuRuntime({
@@ -135,7 +139,7 @@ function App() {
           event.payload.status,
         );
 
-        if (isNewConnectionStart || isRoomChanged || isTerminalStatus) {
+        if (isNewConnectionStart || isRoomChanged) {
           clearLiveMessageState();
         }
 
@@ -202,6 +206,13 @@ function App() {
     return () => window.removeEventListener("resize", updateTrackCount);
   }, [windowLabel]);
 
+  useEffect(() => {
+    if (!isEditMode) {
+      setShowHistory(false);
+      setShowStats(false);
+    }
+  }, [isEditMode, setShowHistory, setShowStats]);
+
   const overlayClassName = [
     "overlay",
     isClickThrough ? "is-click-through" : "",
@@ -209,6 +220,26 @@ function App() {
   ]
     .filter(Boolean)
     .join(" ");
+
+  function toggleHistoryDrawer() {
+    setShowHistory((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowStats(false);
+      }
+      return next;
+    });
+  }
+
+  function toggleStatsDrawer() {
+    setShowStats((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowHistory(false);
+      }
+      return next;
+    });
+  }
 
   if (windowLabel === "control") {
     return (
@@ -254,15 +285,22 @@ function App() {
           </section>
           <EditModePanel
             onExitEditMode={exitEditMode}
-            onToggleHistory={() =>
-              setShowHistory((prev) => !prev)
-            }
+            onToggleHistory={toggleHistoryDrawer}
+            onToggleStats={toggleStatsDrawer}
+            showHistory={showHistory}
+            showStats={showStats}
             shortcut={shortcut}
           />
           {showHistory ? (
             <DanmakuHistoryDrawer
               messages={historySnapshot}
               onClose={() => setShowHistory(false)}
+            />
+          ) : null}
+          {showStats ? (
+            <DanmakuStatsDrawer
+              onClose={() => setShowStats(false)}
+              stats={statsSnapshot}
             />
           ) : null}
           {config.mockPanelEnabled ? (

@@ -24,17 +24,28 @@ import {
   ensureLaneAvailability,
   estimateMessageWidth,
   findAvailableTrack,
+  isPriorityMessage,
   isMessageTypeVisible,
   laneCooldownMs,
   markExitingItems,
   MAX_PENDING_QUEUE,
   MAX_REQUEUE_LATENCY_MS,
   MAX_REQUEUE_ROUNDS,
+  resolveMessageDuration,
   type QueuedLiveMessage,
 } from "../utils/danmakuRuntime";
+import {
+  appendStatsEntries,
+  buildStatsSnapshot,
+  createEmptyStatsSnapshot,
+  createKindCounts,
+  type DanmakuStatsEntry,
+  type DanmakuStatsSnapshot,
+} from "../utils/danmakuStats";
 import { applyFilterConfig } from "../utils/filterRules";
 
 const HISTORY_MAX = 300;
+const STATS_REFRESH_INTERVAL_MS = 1000;
 
 export type MockState = {
   active: boolean;
@@ -58,9 +69,12 @@ export type UseDanmakuRuntimeResult = {
   items: DanmakuItem[];
   mock: MockState;
   removeDanmakuItem: (itemId: string) => void;
+  setShowStats: Dispatch<SetStateAction<boolean>>;
   setShowHistory: Dispatch<SetStateAction<boolean>>;
   showHistory: boolean;
+  showStats: boolean;
   startMockDanmaku: () => void;
+  statsSnapshot: DanmakuStatsSnapshot;
   stopMockDanmaku: () => void;
   triggerMockBurst: () => void;
 };
@@ -74,12 +88,22 @@ export function useDanmakuRuntime({
   const configRef = useRef<AppConfig>(config);
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
+  const priorityMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
   const activeRoomIdRef = useRef<number | null>(null);
   const sequenceRef = useRef(0);
   const historyRef = useRef<HistoryMessage[]>([]);
+  const statsStartedAtRef = useRef(Date.now());
+  const statsEntriesRef = useRef<DanmakuStatsEntry[]>([]);
+  const statsKindCountsRef = useRef(createKindCounts());
+  const statsTotalMessagesRef = useRef(0);
+  const statsDirtyRef = useRef(false);
   const [historySnapshot, setHistorySnapshot] = useState<HistoryMessage[]>([]);
+  const [statsSnapshot, setStatsSnapshot] = useState(() =>
+    createEmptyStatsSnapshot(statsStartedAtRef.current),
+  );
   const [showHistory, setShowHistory] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [mock, setMock] = useState<MockState>({
     active: false,
     rate: 50,
@@ -98,11 +122,23 @@ export function useDanmakuRuntime({
 
   function clearLiveMessageState() {
     pendingMessagesRef.current = [];
+    priorityMessagesRef.current = [];
     laneAvailableAtRef.current = [];
     sequenceRef.current = 0;
     historyRef.current = [];
+    resetStats();
     setHistorySnapshot([]);
     setLiveItems([]);
+  }
+
+  function resetStats() {
+    const now = Date.now();
+    statsStartedAtRef.current = now;
+    statsEntriesRef.current = [];
+    statsKindCountsRef.current = createKindCounts();
+    statsTotalMessagesRef.current = 0;
+    statsDirtyRef.current = false;
+    setStatsSnapshot(createEmptyStatsSnapshot(now));
   }
 
   function acceptsCurrentRoomMessage(message: LiveMessage) {
@@ -154,11 +190,82 @@ export function useDanmakuRuntime({
     }
   }
 
+  function pushToStats(messages: QueuedLiveMessage[]) {
+    if (messages.length === 0) {
+      return;
+    }
+
+    appendStatsEntries(
+      statsEntriesRef.current,
+      statsKindCountsRef.current,
+      messages,
+    );
+    statsTotalMessagesRef.current += messages.length;
+    statsDirtyRef.current = true;
+  }
+
+  function refreshStatsSnapshot(force = false) {
+    if (!force && !statsDirtyRef.current) {
+      return;
+    }
+
+    const nextSnapshot = buildStatsSnapshot(
+      statsEntriesRef.current,
+      statsKindCountsRef.current,
+      statsTotalMessagesRef.current,
+      statsStartedAtRef.current,
+    );
+    setStatsSnapshot(nextSnapshot);
+    statsDirtyRef.current = false;
+  }
+
   function enqueueMessages(messages: QueuedLiveMessage[]) {
-    pendingMessagesRef.current.push(...messages);
+    for (const message of messages) {
+      if (isPriorityMessage(message)) {
+        priorityMessagesRef.current.push(message);
+      } else {
+        pendingMessagesRef.current.push(message);
+      }
+    }
+    trimPendingMessages();
+  }
+
+  function trimPendingMessages() {
     const excess = pendingMessagesRef.current.length - MAX_PENDING_QUEUE;
     if (excess > 0) {
       pendingMessagesRef.current.splice(0, excess);
+    }
+  }
+
+  function takePendingMessages(limit: number) {
+    const priorityMessages = priorityMessagesRef.current.splice(0, limit);
+    if (priorityMessages.length >= limit) {
+      return priorityMessages;
+    }
+
+    return priorityMessages.concat(
+      pendingMessagesRef.current.splice(0, limit - priorityMessages.length),
+    );
+  }
+
+  function requeueDelayedMessages(messages: QueuedLiveMessage[]) {
+    const delayedPriorityMessages: QueuedLiveMessage[] = [];
+    const delayedNormalMessages: QueuedLiveMessage[] = [];
+
+    for (const message of messages) {
+      if (isPriorityMessage(message)) {
+        delayedPriorityMessages.push(message);
+      } else {
+        delayedNormalMessages.push(message);
+      }
+    }
+
+    if (delayedPriorityMessages.length > 0) {
+      priorityMessagesRef.current.unshift(...delayedPriorityMessages);
+    }
+    if (delayedNormalMessages.length > 0) {
+      pendingMessagesRef.current.unshift(...delayedNormalMessages);
+      trimPendingMessages();
     }
   }
 
@@ -173,6 +280,7 @@ export function useDanmakuRuntime({
 
     enqueueMessages(currentRoomMessages);
     pushToHistory(currentRoomMessages);
+    pushToStats(currentRoomMessages);
   }
 
   function removeDanmakuItem(itemId: string) {
@@ -197,6 +305,7 @@ export function useDanmakuRuntime({
     const acceptedMessages = filterMessages(batch);
     enqueueMessages(acceptedMessages);
     pushToHistory(acceptedMessages);
+    pushToStats(acceptedMessages);
     setMock((prev) => ({
       ...prev,
       totalGenerated: prev.totalGenerated + batch.length,
@@ -216,10 +325,7 @@ export function useDanmakuRuntime({
 
     const interval = window.setInterval(() => {
       ensureLaneAvailability(laneAvailableAtRef.current, trackCount);
-      const pendingMessages = pendingMessagesRef.current.splice(
-        0,
-        densityLimits.perFlush,
-      );
+      const pendingMessages = takePendingMessages(densityLimits.perFlush);
 
       if (pendingMessages.length === 0) {
         return;
@@ -231,13 +337,18 @@ export function useDanmakuRuntime({
       for (const message of pendingMessages) {
         const sequence = sequenceRef.current;
 
-        const duration = config.appearance.scrollDuration + (sequence % 3);
+        const duration = resolveMessageDuration(
+          message,
+          config.appearance.scrollDuration,
+          sequence,
+        );
         const now = Date.now();
         const track = findAvailableTrack(laneAvailableAtRef.current, now);
         if (track === null) {
           if (
-            message.attempts < MAX_REQUEUE_ROUNDS &&
-            now - message.queuedAt < MAX_REQUEUE_LATENCY_MS
+            isPriorityMessage(message) ||
+            (message.attempts < MAX_REQUEUE_ROUNDS &&
+              now - message.queuedAt < MAX_REQUEUE_LATENCY_MS)
           ) {
             delayedMessages.push({
               ...message,
@@ -249,11 +360,11 @@ export function useDanmakuRuntime({
 
         sequenceRef.current += 1;
         const width = estimateMessageWidth(
-            message,
-            config.appearance.fontSize,
-            config.appearance.showUsername,
-            config.messageDisplay.showEmotes,
-          );
+          message,
+          config.appearance.fontSize,
+          config.appearance.showUsername,
+          config.messageDisplay.showEmotes,
+        );
         laneAvailableAtRef.current[track] =
           now + laneCooldownMs(width, duration);
 
@@ -269,11 +380,14 @@ export function useDanmakuRuntime({
           createdAt: now,
           highlighted: message.highlighted,
           isSelf: message.isSelf,
+          superChatPrice: message.superChatPrice,
+          superChatDuration: message.superChatDuration,
+          superChatColor: message.superChatColor,
         });
       }
 
       if (delayedMessages.length > 0) {
-        pendingMessagesRef.current.unshift(...delayedMessages);
+        requeueDelayedMessages(delayedMessages);
       }
 
       if (nextItems.length === 0) {
@@ -318,6 +432,24 @@ export function useDanmakuRuntime({
   }, [showHistory]);
 
   useEffect(() => {
+    if (showStats) {
+      refreshStatsSnapshot(true);
+    }
+  }, [showStats]);
+
+  useEffect(() => {
+    if (windowLabel !== "main" || !showStats) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      refreshStatsSnapshot(true);
+    }, STATS_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [showStats, windowLabel]);
+
+  useEffect(() => {
     if (windowLabel !== "main" || !mock.active) {
       return;
     }
@@ -328,6 +460,7 @@ export function useDanmakuRuntime({
       const acceptedMessages = filterMessages([message]);
       enqueueMessages(acceptedMessages);
       pushToHistory(acceptedMessages);
+      pushToStats(acceptedMessages);
       setMock((prev) => ({
         ...prev,
         totalGenerated: prev.totalGenerated + 1,
@@ -346,9 +479,12 @@ export function useDanmakuRuntime({
     items,
     mock,
     removeDanmakuItem,
+    setShowStats,
     setShowHistory,
     showHistory,
+    showStats,
     startMockDanmaku,
+    statsSnapshot,
     stopMockDanmaku,
     triggerMockBurst,
   };

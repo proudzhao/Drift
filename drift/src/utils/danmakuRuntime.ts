@@ -13,12 +13,15 @@ export const MAX_PENDING_QUEUE = 200;
 export const ELDER_RATIO = 0.15;
 export const MAX_REQUEUE_ROUNDS = 6;
 export const MAX_REQUEUE_LATENCY_MS = 3000;
+export const SUPER_CHAT_SCROLL_DURATION_RATIO = 1.2;
 
 const MIN_LANE_GAP_PX = 120;
 const EMOTE_RENDER_HEIGHT_RATIO = 1.55;
 const EMOTE_RENDER_MAX_HEIGHT = 34;
 const EMOTE_FALLBACK_WIDTH_RATIO = 1.8;
 const SEGMENT_GAP_PX = 2;
+const SUPER_CHAT_HORIZONTAL_CHROME_PX = 44;
+const SUPER_CHAT_BADGE_GAP_PX = 6;
 
 type Density = AppConfig["appearance"]["density"];
 
@@ -68,6 +71,10 @@ export function estimateMessageWidth(
   showUsername: boolean,
   showEmotes: boolean,
 ) {
+  if (message.kind === "super_chat") {
+    return estimateSuperChatWidth(message, fontSize, showUsername);
+  }
+
   const usernameWidth =
     showUsername && message.user
       ? estimateTextWidth(`${message.user}: `, fontSize)
@@ -77,6 +84,31 @@ export function estimateMessageWidth(
       ? estimateSegmentsWidth(message.segments, fontSize)
       : estimateTextWidth(message.text, fontSize);
   return Math.max(80, usernameWidth + contentWidth);
+}
+
+function estimateSuperChatWidth(
+  message: LiveMessage,
+  fontSize: number,
+  showUsername: boolean,
+) {
+  const badgeText = message.superChatPrice
+    ? `SC ¥${message.superChatPrice}`
+    : "SC";
+  const badgeWidth = estimateTextWidth(badgeText, fontSize * 0.72) + 12;
+  const usernameWidth =
+    showUsername && message.user
+      ? estimateTextWidth(`${message.user}: `, fontSize)
+      : 0;
+  const textWidth = estimateTextWidth(message.text, fontSize);
+
+  return Math.max(
+    120,
+    SUPER_CHAT_HORIZONTAL_CHROME_PX +
+      badgeWidth +
+      SUPER_CHAT_BADGE_GAP_PX +
+      usernameWidth +
+      textWidth,
+  );
 }
 
 function estimateSegmentsWidth(segments: LiveMessageSegment[], fontSize: number) {
@@ -109,6 +141,19 @@ export function laneCooldownMs(width: number, durationSeconds: number) {
   return Math.ceil((width + MIN_LANE_GAP_PX) / pixelsPerMs);
 }
 
+export function resolveMessageDuration(
+  message: LiveMessage,
+  scrollDuration: number,
+  sequence: number,
+) {
+  const baseDuration = scrollDuration + (sequence % 3);
+  if (message.kind !== "super_chat") {
+    return baseDuration;
+  }
+
+  return baseDuration * SUPER_CHAT_SCROLL_DURATION_RATIO;
+}
+
 export function ensureLaneAvailability(lanes: number[], trackCount: number) {
   if (lanes.length > trackCount) {
     lanes.length = trackCount;
@@ -139,10 +184,20 @@ export function isMessageTypeVisible(message: LiveMessage, config: AppConfig) {
       return config.messageDisplay.showGift;
     case "guard":
       return config.messageDisplay.showGuard;
+    case "super_chat":
+      return config.messageDisplay.showSuperChat;
     case "danmaku":
     default:
       return config.messageDisplay.showDanmaku;
   }
+}
+
+export function isPriorityMessage(message: Pick<LiveMessage, "kind">) {
+  return (
+    message.kind === "super_chat" ||
+    message.kind === "guard" ||
+    message.kind === "gift"
+  );
 }
 
 export function markExitingItems(
@@ -167,6 +222,7 @@ export function markExitingItems(
     let promoted = 0;
     combined = combined.map((item) => {
       if (promoted >= openElderSlots) return item;
+      if (!canExitBeforeAnimationEnd(item)) return item;
       if (item.elder || item.exiting) return item;
       if (promoteNow - item.createdAt < MIN_ALIVE_MS) return item;
       promoted++;
@@ -191,9 +247,14 @@ export function markExitingItems(
   let marked = 0;
   return combined.map((item) => {
     if (item.exiting || marked >= toMark) return item;
+    if (!canExitBeforeAnimationEnd(item)) return item;
     if (item.elder) return item;
     if (markNow - item.createdAt < MIN_ALIVE_MS) return item;
     marked++;
     return { ...item, exiting: true };
   });
+}
+
+function canExitBeforeAnimationEnd(item: DanmakuItem) {
+  return !isPriorityMessage(item);
 }

@@ -43,6 +43,7 @@ export type SavedRoom = {
 
 export type AppearanceConfig = {
   fontSize: number;
+  fontFamily: string;
   opacity: number;
   scrollDuration: number;
   density: "low" | "medium" | "high";
@@ -55,6 +56,7 @@ export type MessageDisplayConfig = {
   showEmotes: boolean;
   showGift: boolean;
   showGuard: boolean;
+  showSuperChat: boolean;
 };
 
 export type FilterConfig = {
@@ -135,6 +137,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   appearance: {
     fontSize: 20,
+    fontFamily: "system",
     opacity: 0.94,
     scrollDuration: 12,
     density: "high",
@@ -146,6 +149,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     showEmotes: true,
     showGift: true,
     showGuard: true,
+    showSuperChat: true,
   },
   filter: {
     blockedWords: [],

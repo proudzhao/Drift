@@ -71,6 +71,7 @@ export function useControlConfig({
   async function resetAppearance() {
     await updateAppearance({
       fontSize: 20,
+      fontFamily: "system",
       opacity: 0.94,
       scrollDuration: 12,
       density: "high",

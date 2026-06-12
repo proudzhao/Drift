@@ -130,3 +130,160 @@
   font-size: 10px;
 }
 
+.stats-drawer {
+  gap: 6px;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.stats-tile {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(126, 168, 196, 0.26);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stats-tile strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-tile span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-section {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.stats-section h2 {
+  margin: 0;
+  color: rgba(126, 168, 196, 0.88);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stats-kind-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.stats-kind-row {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stats-kind-row span,
+.stats-kind-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-kind-row span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+}
+
+.stats-kind-row strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.stats-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.stats-lists::-webkit-scrollbar {
+  width: 8px;
+}
+
+.stats-lists::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.stats-ranking {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-ranking li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 4px;
+}
+
+.stats-ranking li:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stats-ranking span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-ranking strong {
+  color: rgba(101, 214, 173, 0.92);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.stats-empty {
+  grid-template-columns: minmax(0, 1fr) !important;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+}
+
+@media (max-height: 240px) {
+  .stats-drawer .history-footer {
+    display: none;
+  }
+}

@@ -5,6 +5,7 @@ pub(crate) mod emote_probe;
 pub(crate) mod errors;
 pub(crate) mod http;
 pub(crate) mod protocol;
+pub(crate) mod sc_probe;
 pub(crate) mod send;
 pub(crate) mod session;
 pub(crate) mod types;

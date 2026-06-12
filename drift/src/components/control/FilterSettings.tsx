@@ -32,6 +32,14 @@ const ACTION_LABELS: Record<FilterAction, string> = {
   highlight: "高亮",
 };
 
+const VALUE_PLACEHOLDERS: Record<FilterTarget, string> = {
+  text: "匹配内容",
+  user: "匹配用户名",
+  messageType: "danmaku / super_chat / gift / guard",
+  giftName: "匹配礼物名",
+  guardLevel: "1 / 2 / 3",
+};
+
 export function FilterSettings({
   onRulesChange,
   rules,
@@ -131,7 +139,7 @@ export function FilterSettings({
           </select>
           <input
             onChange={(event) => setValue(event.currentTarget.value)}
-            placeholder={target === "guardLevel" ? "1 / 2 / 3" : "匹配内容"}
+            placeholder={VALUE_PLACEHOLDERS[target]}
             value={value}
           />
           <button onClick={addRule} type="button">

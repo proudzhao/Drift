@@ -60,6 +60,8 @@ pub struct UpdateConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct AppearanceConfig {
     pub font_size: u32,
+    #[serde(default = "default_font_family")]
+    pub font_family: String,
     pub opacity: f64,
     pub scroll_duration: f64,
     pub density: String,
@@ -75,6 +77,8 @@ pub struct MessageDisplayConfig {
     pub show_emotes: bool,
     pub show_gift: bool,
     pub show_guard: bool,
+    #[serde(default = "default_true")]
+    pub show_super_chat: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -122,6 +126,7 @@ impl Default for AppearanceConfig {
     fn default() -> Self {
         Self {
             font_size: 20,
+            font_family: default_font_family(),
             opacity: 0.94,
             scroll_duration: 12.0,
             density: "high".to_string(),
@@ -138,12 +143,17 @@ impl Default for MessageDisplayConfig {
             show_emotes: true,
             show_gift: true,
             show_guard: true,
+            show_super_chat: true,
         }
     }
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_font_family() -> String {
+    "system".to_string()
 }
 
 impl Default for UpdateConfig {
@@ -273,6 +283,7 @@ pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<AppConfi
         target: "drift::config",
         room_id = %config.room_id,
         font_size = config.appearance.font_size,
+        font_family = %config.appearance.font_family,
         opacity = config.appearance.opacity,
         density = %config.appearance.density,
         show_username = config.appearance.show_username,
@@ -332,6 +343,10 @@ fn app_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 fn normalize_app_config(config: &mut AppConfig) {
+    if config.appearance.font_family.trim().is_empty() {
+        config.appearance.font_family = default_font_family();
+    }
+
     normalize_saved_room_groups(&mut config.saved_room_groups);
     let valid_group_ids: HashSet<String> = config
         .saved_room_groups
@@ -438,6 +453,21 @@ mod tests {
     }
 
     #[test]
+    fn old_message_display_config_defaults_show_super_chat_to_true() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "messageDisplay": {
+                "showDanmaku": true,
+                "showEmotes": true,
+                "showGift": true,
+                "showGuard": true
+            }
+        }))
+        .expect("old config should deserialize");
+
+        assert!(config.message_display.show_super_chat);
+    }
+
+    #[test]
     fn explicit_show_emotes_false_is_preserved() {
         let config: AppConfig = serde_json::from_value(json!({
             "messageDisplay": {
@@ -450,6 +480,49 @@ mod tests {
         .expect("config should deserialize");
 
         assert!(!config.message_display.show_emotes);
+    }
+
+    #[test]
+    fn explicit_show_super_chat_false_is_preserved() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "messageDisplay": {
+                "showDanmaku": true,
+                "showEmotes": true,
+                "showGift": true,
+                "showGuard": true,
+                "showSuperChat": false
+            }
+        }))
+        .expect("config should deserialize");
+
+        assert!(!config.message_display.show_super_chat);
+    }
+
+    #[test]
+    fn old_appearance_config_defaults_font_family_to_system() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "appearance": {
+                "fontSize": 20,
+                "opacity": 0.94,
+                "scrollDuration": 12.0,
+                "density": "high",
+                "showUsername": false,
+                "color": "white"
+            }
+        }))
+        .expect("old config should deserialize");
+
+        assert_eq!(config.appearance.font_family, "system");
+    }
+
+    #[test]
+    fn normalize_app_config_resets_empty_font_family_to_system() {
+        let mut config = AppConfig::default();
+        config.appearance.font_family = "   ".to_string();
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(config.appearance.font_family, "system");
     }
 
     #[test]

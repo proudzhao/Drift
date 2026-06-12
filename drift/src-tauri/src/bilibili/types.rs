@@ -93,6 +93,12 @@ pub struct LiveMessage {
     pub guard_level: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub super_chat_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub super_chat_duration: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub super_chat_color: Option<String>,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -131,6 +137,8 @@ pub enum LiveMessageKind {
     Gift,
     #[serde(rename = "guard")]
     Guard,
+    #[serde(rename = "super_chat")]
+    SuperChat,
 }
 
 #[derive(Debug, Clone, Serialize)]

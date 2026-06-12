@@ -110,6 +110,18 @@ export function DisplaySettings({
             type="checkbox"
           />
         </label>
+        <label className="settings-row toggle-row">
+          <span>醒目留言</span>
+          <input
+            checked={messageDisplay.showSuperChat}
+            onChange={(event) =>
+              onUpdateMessageDisplay({
+                showSuperChat: event.currentTarget.checked,
+              })
+            }
+            type="checkbox"
+          />
+        </label>
       </fieldset>
       <fieldset className="settings-group">
         <legend>弹幕窗口</legend>

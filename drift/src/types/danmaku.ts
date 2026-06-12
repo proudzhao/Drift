@@ -1,4 +1,4 @@
-export type LiveMessageKind = "danmaku" | "gift" | "guard";
+export type LiveMessageKind = "danmaku" | "gift" | "guard" | "super_chat";
 
 export type LiveMessageSegment =
   | {
@@ -25,6 +25,9 @@ export type DanmakuItem = {
   createdAt: number;
   highlighted?: boolean;
   isSelf?: boolean;
+  superChatPrice?: number;
+  superChatDuration?: number;
+  superChatColor?: string;
   elder?: boolean;
   exiting?: boolean;
 };
@@ -42,6 +45,9 @@ export type LiveMessage = {
   giftCount?: number;
   guardLevel?: 1 | 2 | 3;
   guardName?: "总督" | "提督" | "舰长";
+  superChatPrice?: number;
+  superChatDuration?: number;
+  superChatColor?: string;
 };
 
 export type DanmakuStatus = {
