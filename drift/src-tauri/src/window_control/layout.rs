@@ -6,6 +6,8 @@ use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size};
 const WINDOW_LAYOUT_FILE: &str = "window-layout.json";
 const MIN_WINDOW_WIDTH: u32 = 320;
 const MIN_WINDOW_HEIGHT: u32 = 160;
+const CONTROL_MIN_WINDOW_WIDTH: u32 = 440;
+const CONTROL_MIN_WINDOW_HEIGHT: u32 = 420;
 const CONTROL_WINDOW_MARGIN: i32 = 32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,7 +226,7 @@ fn min_window_width(label: &str) -> u32 {
     if label == "main" {
         MIN_WINDOW_WIDTH
     } else {
-        1
+        CONTROL_MIN_WINDOW_WIDTH
     }
 }
 
@@ -232,7 +234,7 @@ fn min_window_height(label: &str) -> u32 {
     if label == "main" {
         MIN_WINDOW_HEIGHT
     } else {
-        1
+        CONTROL_MIN_WINDOW_HEIGHT
     }
 }
 

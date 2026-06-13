@@ -1,6 +1,6 @@
 [package]
 name = "drift"
-version = "0.6.0"
+version = "0.6.1"
 description = "Let comments drift across your desktop."
 authors = ["proudzhao"]
 edition = "2021"
