@@ -1,7 +1,4 @@
-@import "./styles/edit-mode.css";
 @import "./styles/control-panel.css";
-@import "./styles/mock-panel.css";
-@import "./styles/history-drawer.css";
 
 :root {
   font-family:
@@ -27,29 +24,10 @@ body,
 }
 
 button {
-  font: inherit;
+  font-family: inherit;
 }
 
-.overlay {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background: transparent;
-  outline: 0;
-}
-
-.overlay.is-edit-mode {
-  background: rgba(9, 14, 20, 0.16);
-  outline: 1px dashed rgba(126, 168, 196, 0.82);
-}
-
-.danmaku-stage {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
+/* Runtime danmaku styles stay here: animation, CSS variables, inline emotes, and message-type effects are not Tailwind-owned. */
 .danmaku {
   position: absolute;
   left: calc(100% + 32px);
@@ -70,11 +48,6 @@ button {
   animation-timing-function: linear;
   animation-fill-mode: forwards;
   will-change: transform;
-  transition: opacity 300ms ease-out;
-}
-
-.danmaku.is-exiting {
-  opacity: 0 !important;
 }
 
 .danmaku-content {

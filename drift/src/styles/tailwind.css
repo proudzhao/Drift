@@ -1,0 +1,19 @@
+@layer theme, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  --color-drift-bg: #f4f5f7;
+  --color-drift-surface: #eef0f3;
+  --color-drift-panel: #ffffff;
+  --color-drift-border: #d8dde6;
+  --color-drift-text: #1f2937;
+  --color-drift-muted: #667085;
+  --color-drift-primary: #2563eb;
+  --color-drift-primary-hover: #1d4ed8;
+  --color-drift-danger: #dc2626;
+  --color-drift-danger-bg: #fef2f2;
+  --radius-drift: 8px;
+  --shadow-drift-control: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px rgba(255, 255, 255, 0.72);
+}

@@ -17,7 +17,10 @@ export function DanmakuOverlay({
   trackCount,
 }: DanmakuOverlayProps) {
   return (
-    <section className="danmaku-stage" aria-label="Drift danmaku preview">
+    <section
+      className="pointer-events-none absolute inset-0"
+      aria-label="Drift danmaku preview"
+    >
       {items.map((item) => (
         <DanmakuTrack
           item={item}

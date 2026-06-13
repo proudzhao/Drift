@@ -1,9 +1,2 @@
-@import "./control-panel/layout.css";
-@import "./control-panel/forms.css";
 @import "./control-panel/room.css";
-@import "./control-panel/display.css";
-@import "./control-panel/account.css";
-@import "./control-panel/diagnostics.css";
-@import "./control-panel/shortcuts.css";
-@import "./control-panel/filter.css";
 @import "./control-panel/about-help.css";

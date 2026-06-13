@@ -142,19 +142,16 @@ const mockSuperChats = [
     text: "这条 SC 想让弹幕稍微醒目一点",
     price: 30,
     duration: 60,
-    color: "#F5A962",
   },
   {
     text: "主播刚才那段太精彩了",
     price: 50,
     duration: 90,
-    color: "#4FB3FF",
   },
   {
     text: "前排支持一下，继续加油",
     price: 10,
     duration: 45,
-    color: "#7BCFA6",
   },
 ] as const;
 
@@ -196,8 +193,18 @@ function buildMockSuperChatMessage(id: string, user: string): LiveMessage {
     text: sample.text,
     superChatPrice: sample.price,
     superChatDuration: sample.duration,
-    superChatColor: sample.color,
+    superChatColor: superChatColorForPrice(sample.price),
   };
+}
+
+function superChatColorForPrice(price: number) {
+  if (price >= 2000) return "#ab1932";
+  if (price >= 1000) return "#e54d4d";
+  if (price >= 500) return "#e09544";
+  if (price >= 100) return "#e2b52b";
+  if (price >= 50) return "#437d9e";
+  if (price >= 30) return "#2a60b3";
+  return "#eff6ff";
 }
 
 function generateMockSuperChatMessage(): LiveMessage {
@@ -330,7 +337,7 @@ export function createMockDanmakuItems(): DanmakuItem[] {
       text: "Mock 醒目留言基础样例",
       superChatPrice: 30,
       superChatDuration: 60,
-      superChatColor: "#F5A962",
+      superChatColor: "#2a60b3",
       track: 3,
       duration: 15,
       delay: 5.5,

@@ -27,7 +27,6 @@ import {
   isPriorityMessage,
   isMessageTypeVisible,
   laneCooldownMs,
-  markExitingItems,
   MAX_PENDING_QUEUE,
   MAX_REQUEUE_LATENCY_MS,
   MAX_REQUEUE_ROUNDS,
@@ -87,6 +86,7 @@ export function useDanmakuRuntime({
 }: UseDanmakuRuntimeParams): UseDanmakuRuntimeResult {
   const configRef = useRef<AppConfig>(config);
   const [liveItems, setLiveItems] = useState<DanmakuItem[]>([]);
+  const liveItemsRef = useRef<DanmakuItem[]>([]);
   const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const priorityMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
@@ -128,6 +128,7 @@ export function useDanmakuRuntime({
     historyRef.current = [];
     resetStats();
     setHistorySnapshot([]);
+    liveItemsRef.current = [];
     setLiveItems([]);
   }
 
@@ -237,6 +238,12 @@ export function useDanmakuRuntime({
     }
   }
 
+  function dropExpiredPendingMessages(now: number) {
+    pendingMessagesRef.current = pendingMessagesRef.current.filter(
+      (message) => now - message.queuedAt < MAX_REQUEUE_LATENCY_MS,
+    );
+  }
+
   function takePendingMessages(limit: number) {
     const priorityMessages = priorityMessagesRef.current.splice(0, limit);
     if (priorityMessages.length >= limit) {
@@ -284,7 +291,9 @@ export function useDanmakuRuntime({
   }
 
   function removeDanmakuItem(itemId: string) {
-    setLiveItems((current) => current.filter((item) => item.id !== itemId));
+    const nextItems = liveItemsRef.current.filter((item) => item.id !== itemId);
+    liveItemsRef.current = nextItems;
+    setLiveItems(nextItems);
   }
 
   function startMockDanmaku() {
@@ -325,7 +334,20 @@ export function useDanmakuRuntime({
 
     const interval = window.setInterval(() => {
       ensureLaneAvailability(laneAvailableAtRef.current, trackCount);
-      const pendingMessages = takePendingMessages(densityLimits.perFlush);
+      const now = Date.now();
+      dropExpiredPendingMessages(now);
+
+      const openItemSlots = Math.max(
+        0,
+        densityLimits.maxItems - liveItemsRef.current.length,
+      );
+      if (openItemSlots === 0) {
+        return;
+      }
+
+      const pendingMessages = takePendingMessages(
+        Math.min(densityLimits.perFlush, openItemSlots),
+      );
 
       if (pendingMessages.length === 0) {
         return;
@@ -342,13 +364,13 @@ export function useDanmakuRuntime({
           config.appearance.scrollDuration,
           sequence,
         );
-        const now = Date.now();
-        const track = findAvailableTrack(laneAvailableAtRef.current, now);
+        const messageNow = Date.now();
+        const track = findAvailableTrack(laneAvailableAtRef.current, messageNow);
         if (track === null) {
           if (
             isPriorityMessage(message) ||
             (message.attempts < MAX_REQUEUE_ROUNDS &&
-              now - message.queuedAt < MAX_REQUEUE_LATENCY_MS)
+              messageNow - message.queuedAt < MAX_REQUEUE_LATENCY_MS)
           ) {
             delayedMessages.push({
               ...message,
@@ -366,7 +388,7 @@ export function useDanmakuRuntime({
           config.messageDisplay.showEmotes,
         );
         laneAvailableAtRef.current[track] =
-          now + laneCooldownMs(width, duration);
+          messageNow + laneCooldownMs(width, duration);
 
         nextItems.push({
           id: `${message.id}-${sequence}`,
@@ -377,7 +399,7 @@ export function useDanmakuRuntime({
           track,
           duration,
           delay: 0,
-          createdAt: now,
+          createdAt: messageNow,
           highlighted: message.highlighted,
           isSelf: message.isSelf,
           superChatPrice: message.superChatPrice,
@@ -397,9 +419,9 @@ export function useDanmakuRuntime({
         return;
       }
 
-      setLiveItems((current) =>
-        markExitingItems(current, nextItems, densityLimits),
-      );
+      const nextLiveItems = liveItemsRef.current.concat(nextItems);
+      liveItemsRef.current = nextLiveItems;
+      setLiveItems(nextLiveItems);
 
       if (showHistory) {
         setHistorySnapshot([...historyRef.current]);

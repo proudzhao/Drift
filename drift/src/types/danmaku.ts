@@ -28,8 +28,6 @@ export type DanmakuItem = {
   superChatPrice?: number;
   superChatDuration?: number;
   superChatColor?: string;
-  elder?: boolean;
-  exiting?: boolean;
 };
 
 export type LiveMessage = {

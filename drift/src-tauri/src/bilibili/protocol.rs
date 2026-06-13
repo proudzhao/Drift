@@ -443,15 +443,21 @@ fn try_extract_super_chat_message(value: &Value, self_uid: Option<u64>) -> Optio
     message.is_self = self_uid.is_some_and(|current_uid| current_uid != 0 && current_uid == uid);
     message.super_chat_price = u64_field(data, &["price", "rmb"]);
     message.super_chat_duration = u64_field(data, &["time"]);
-    message.super_chat_color = string_field(
-        data,
-        &[
-            "background_color",
-            "background_color_start",
-            "background_color_end",
-        ],
-    )
-    .and_then(sanitize_super_chat_color);
+    message.super_chat_color = message
+        .super_chat_price
+        .and_then(super_chat_color_for_price)
+        .map(str::to_string)
+        .or_else(|| {
+            string_field(
+                data,
+                &[
+                    "background_color",
+                    "background_color_start",
+                    "background_color_end",
+                ],
+            )
+            .and_then(sanitize_super_chat_color)
+        });
     Some(message)
 }
 
@@ -502,6 +508,19 @@ fn sanitize_super_chat_color(value: &str) -> Option<String> {
         Some(trimmed.to_string())
     } else {
         None
+    }
+}
+
+fn super_chat_color_for_price(price: u64) -> Option<&'static str> {
+    match price {
+        1..=29 => Some("#eff6ff"),
+        30..=49 => Some("#2a60b3"),
+        50..=99 => Some("#437d9e"),
+        100..=499 => Some("#e2b52b"),
+        500..=999 => Some("#e09544"),
+        1000..=1999 => Some("#e54d4d"),
+        2000.. => Some("#ab1932"),
+        _ => None,
     }
 }
 
@@ -655,7 +674,7 @@ mod tests {
         assert_eq!(message.timestamp, Some(1781273831));
         assert_eq!(message.super_chat_price, Some(2));
         assert_eq!(message.super_chat_duration, Some(5));
-        assert_eq!(message.super_chat_color.as_deref(), Some("#F5A962"));
+        assert_eq!(message.super_chat_color.as_deref(), Some("#eff6ff"));
         assert!(message.is_self);
     }
 
@@ -682,11 +701,11 @@ mod tests {
     }
 
     #[test]
-    fn drops_unsafe_super_chat_color() {
+    fn maps_super_chat_color_from_price_before_payload_color() {
         let payload = r#"{
             "cmd": "SUPER_CHAT_MESSAGE",
             "data": {
-                "message": "颜色字段不能信任",
+                "message": "价格决定颜色",
                 "price": 30,
                 "background_color": "linear-gradient(secret)"
             }
@@ -696,9 +715,33 @@ mod tests {
             try_extract_live_message(payload.as_bytes(), None).expect("super chat should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::SuperChat));
-        assert_eq!(message.text, "颜色字段不能信任");
+        assert_eq!(message.text, "价格决定颜色");
         assert_eq!(message.super_chat_price, Some(30));
-        assert_eq!(message.super_chat_color, None);
+        assert_eq!(message.super_chat_color.as_deref(), Some("#2a60b3"));
+    }
+
+    #[test]
+    fn maps_super_chat_color_price_boundaries() {
+        let cases = [
+            (0, None),
+            (1, Some("#eff6ff")),
+            (29, Some("#eff6ff")),
+            (30, Some("#2a60b3")),
+            (49, Some("#2a60b3")),
+            (50, Some("#437d9e")),
+            (99, Some("#437d9e")),
+            (100, Some("#e2b52b")),
+            (499, Some("#e2b52b")),
+            (500, Some("#e09544")),
+            (999, Some("#e09544")),
+            (1000, Some("#e54d4d")),
+            (1999, Some("#e54d4d")),
+            (2000, Some("#ab1932")),
+        ];
+
+        for (price, expected_color) in cases {
+            assert_eq!(super_chat_color_for_price(price), expected_color);
+        }
     }
 
     #[test]

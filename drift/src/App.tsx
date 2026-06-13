@@ -22,8 +22,9 @@ import {
   MIN_TRACK_COUNT,
   TRACK_HEIGHT,
 } from "./utils/danmakuRuntime";
+import { classNames } from "./utils/classNames";
+import "./styles/tailwind.css";
 import "./App.css";
-import "./styles/send-window.css";
 
 const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 160;
@@ -41,6 +42,16 @@ type EditModeChanged = {
 };
 
 type ResizeDirection = "NorthWest" | "NorthEast" | "SouthEast" | "SouthWest";
+
+const RESIZE_HANDLE_BASE_CLASS =
+  "pointer-events-auto absolute size-[18px] rounded border border-[rgba(126,168,196,0.8)] bg-[rgba(126,168,196,0.26)] p-0 transition-colors hover:bg-[rgba(126,168,196,0.42)]";
+
+const RESIZE_HANDLE_POSITION_CLASSES: Record<ResizeDirection, string> = {
+  NorthWest: "left-2 top-2 cursor-nwse-resize",
+  NorthEast: "right-2 top-2 cursor-nesw-resize",
+  SouthEast: "bottom-2 right-2 cursor-nwse-resize",
+  SouthWest: "bottom-2 left-2 cursor-nesw-resize",
+};
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -213,14 +224,6 @@ function App() {
     }
   }, [isEditMode, setShowHistory, setShowStats]);
 
-  const overlayClassName = [
-    "overlay",
-    isClickThrough ? "is-click-through" : "",
-    isEditMode ? "is-edit-mode" : "is-display-mode",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   function toggleHistoryDrawer() {
     setShowHistory((prev) => {
       const next = !prev;
@@ -259,7 +262,13 @@ function App() {
 
   return (
     <main
-      className={overlayClassName}
+      className={classNames(
+        "relative h-screen w-screen min-w-0 overflow-hidden",
+        isClickThrough && "is-click-through",
+        isEditMode
+          ? "is-edit-mode bg-[rgba(9,14,20,0.16)] [outline:1px_dashed_rgba(126,168,196,0.82)]"
+          : "is-display-mode bg-transparent outline-0",
+      )}
       style={
         {
           "--danmaku-font-size": `${config.appearance.fontSize}px`,
@@ -277,11 +286,13 @@ function App() {
       {isEditMode ? (
         <>
           <section
-            className="edit-drag-region"
+            className="pointer-events-auto absolute inset-x-[18px] bottom-14 top-4 grid cursor-move select-none place-items-center rounded-drift border border-dashed border-[rgba(126,168,196,0.35)] text-[11px] leading-none text-[rgba(255,255,255,0.38)]"
             data-tauri-drag-region
             onMouseDown={startDragging}
           >
-            <span>拖动调整弹幕区域位置</span>
+            <span className="rounded-md bg-[rgba(15,17,21,0.58)] px-2 py-1.5 backdrop-blur-md [backdrop-filter:blur(10px)]">
+              拖动调整弹幕区域位置
+            </span>
           </section>
           <EditModePanel
             onExitEditMode={exitEditMode}
@@ -321,10 +332,13 @@ function App() {
               ["SouthEast", "se"],
               ["SouthWest", "sw"],
             ] as const
-          ).map(([direction, className]) => (
+          ).map(([direction]) => (
             <button
               aria-label={`Resize ${direction}`}
-              className={`resize-handle resize-handle-${className}`}
+              className={classNames(
+                RESIZE_HANDLE_BASE_CLASS,
+                RESIZE_HANDLE_POSITION_CLASSES[direction],
+              )}
               key={direction}
               onMouseDown={(event) => startResizeDragging(direction, event)}
               title="拖拽调整窗口大小"

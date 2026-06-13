@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import iconUrl from "/icon.png";
 import type { UpdateConfig } from "../../types/config";
+import { Button, Toggle } from "../ui";
 
 type AppVersion = {
   version: string;
@@ -72,37 +73,43 @@ export function AboutSettings({
   }
 
   return (
-    <div className="settings-page">
-      <div className="about-section">
-        <img alt="Drift" className="about-icon" src={iconUrl} />
-        <strong className="about-app-name">Drift</strong>
-        <span className="about-version">版本 {appVersion}</span>
-        <p className="about-desc">桌面弹幕悬浮工具</p>
+    <div className="grid min-h-0 content-start gap-3.5 overflow-hidden">
+      <div className="grid justify-items-center gap-1 pb-4 pt-6">
+        <img
+          alt="Drift"
+          className="mb-2 size-[72px] rounded-2xl"
+          src={iconUrl}
+        />
+        <strong className="text-lg font-bold text-[#202124]">Drift</strong>
+        <span className="text-[13px] text-[#6f7782]">版本 {appVersion}</span>
+        <p className="m-[2px_0_0] text-xs text-[#8e949a]">
+          桌面弹幕悬浮工具
+        </p>
       </div>
 
-      <div className="about-actions">
-        <button
+      <div className="flex justify-center gap-2">
+        <Button
+          className="px-6"
           disabled={isCheckingUpdate || Boolean(cachedUpdate?.isChecking)}
           onClick={checkUpdate}
-          type="button"
         >
           {isCheckingUpdate || cachedUpdate?.isChecking ? "检查中" : "检查更新"}
-        </button>
+        </Button>
       </div>
 
-      <label className="about-toggle">
+      <div className="flex min-h-[30px] items-center justify-center gap-2.5 text-xs text-[#555d66]">
         <span>启动时自动检查更新</span>
-        <input
+        <Toggle
+          aria-label="启动时自动检查更新"
           checked={updateConfig.checkOnStartup}
-          onChange={(event) =>
-            onUpdateConfigChange({ checkOnStartup: event.currentTarget.checked })
+          onCheckedChange={(checked) =>
+            onUpdateConfigChange({ checkOnStartup: checked })
           }
-          type="checkbox"
         />
-      </label>
+      </div>
 
       {updateResult ? (
-        <p className="control-status" style={{ margin: 0, textAlign: "center" }}>
+        <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-center text-[11px] text-[#6f7782]">
           {updateResult.error
             ? updateResult.error
             : updateResult.hasUpdate
@@ -112,19 +119,20 @@ export function AboutSettings({
       ) : null}
 
       {cachedUpdate?.checkedAt ? (
-        <p className="control-status" style={{ margin: 0, textAlign: "center" }}>
+        <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-center text-[11px] text-[#6f7782]">
           最近检查：{formatUnixTime(cachedUpdate.checkedAt)}
         </p>
       ) : null}
 
       {updateResult?.hasUpdate && updateResult.releaseUrl ? (
-        <div className="about-actions">
-          <button
+        <div className="flex justify-center gap-2">
+          <Button
+            className="px-6"
             onClick={() => openUrl(updateResult.releaseUrl)}
-            type="button"
+            variant="primary"
           >
             前往下载
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>

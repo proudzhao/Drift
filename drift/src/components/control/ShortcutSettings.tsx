@@ -3,6 +3,7 @@ import {
   defaultSendDanmakuShortcutLabel,
   defaultShortcutLabel,
 } from "../../types/config";
+import { Button, Input } from "../ui";
 
 type ShortcutSettingsProps = {
   draftOverlayShortcut: string;
@@ -35,59 +36,70 @@ export function ShortcutSettings({
   onShortcutChange,
   shortcutError,
 }: ShortcutSettingsProps) {
+  const shortcutRows = [
+    {
+      id: "edit-shortcut-input",
+      label: "编辑模式",
+      onChange: onShortcutChange,
+      onSave: onSaveShortcut,
+      placeholder: defaultShortcutLabel(),
+      value: draftShortcut,
+    },
+    {
+      id: "overlay-shortcut-input",
+      label: "弹幕窗口",
+      onChange: onOverlayShortcutChange,
+      onSave: onSaveOverlayShortcut,
+      placeholder: defaultOverlayShortcutLabel(),
+      value: draftOverlayShortcut,
+    },
+    {
+      id: "send-shortcut-input",
+      label: "发送弹幕",
+      onChange: onSendShortcutChange,
+      onSave: onSaveSendShortcut,
+      placeholder: defaultSendDanmakuShortcutLabel(),
+      value: draftSendShortcut,
+    },
+  ];
+
   return (
-    <div className="settings-page shortcut-settings">
-      <div className="settings-row shortcut-form">
-        <label htmlFor="edit-shortcut-input">编辑模式</label>
-        <input
-          id="edit-shortcut-input"
-          onChange={(event) => onShortcutChange(event.currentTarget.value)}
-          placeholder={defaultShortcutLabel()}
-          value={draftShortcut}
-        />
-        <button onClick={onSaveShortcut} type="button">
-          保存
-        </button>
-      </div>
-      <div className="settings-row shortcut-form">
-        <label htmlFor="overlay-shortcut-input">弹幕窗口</label>
-        <input
-          id="overlay-shortcut-input"
-          onChange={(event) =>
-            onOverlayShortcutChange(event.currentTarget.value)
-          }
-          placeholder={defaultOverlayShortcutLabel()}
-          value={draftOverlayShortcut}
-        />
-        <button onClick={onSaveOverlayShortcut} type="button">
-          保存
-        </button>
-      </div>
-      <div className="settings-row shortcut-form">
-        <label htmlFor="send-shortcut-input">发送弹幕</label>
-        <input
-          id="send-shortcut-input"
-          onChange={(event) =>
-            onSendShortcutChange(event.currentTarget.value)
-          }
-          placeholder={defaultSendDanmakuShortcutLabel()}
-          value={draftSendShortcut}
-        />
-        <button onClick={onSaveSendShortcut} type="button">
-          保存
-        </button>
-      </div>
-      {shortcutError ? <p className="control-error">{shortcutError}</p> : null}
-      <div className="settings-actions">
-        <button onClick={onResetShortcut} type="button">
+    <div className="grid min-h-0 content-start gap-3.5 overflow-hidden">
+      {shortcutRows.map((row) => (
+        <div
+          className="grid grid-cols-[72px_minmax(0,1fr)_64px] items-center gap-2"
+          key={row.id}
+        >
+          <label
+            className="text-[13px] font-semibold text-[#1f1f1f]"
+            htmlFor={row.id}
+          >
+            {row.label}
+          </label>
+          <Input
+            id={row.id}
+            onChange={(event) => row.onChange(event.currentTarget.value)}
+            placeholder={row.placeholder}
+            value={row.value}
+          />
+          <Button onClick={row.onSave}>保存</Button>
+        </div>
+      ))}
+      {shortcutError ? (
+        <p className="m-0 text-[11px] leading-snug text-[#b45f06]">
+          {shortcutError}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-3 gap-2">
+        <Button onClick={onResetShortcut}>
           恢复编辑模式快捷键
-        </button>
-        <button onClick={onResetOverlayShortcut} type="button">
+        </Button>
+        <Button onClick={onResetOverlayShortcut}>
           恢复弹幕窗口快捷键
-        </button>
-        <button onClick={onResetSendShortcut} type="button">
+        </Button>
+        <Button onClick={onResetSendShortcut}>
           恢复发送弹幕快捷键
-        </button>
+        </Button>
       </div>
     </div>
   );

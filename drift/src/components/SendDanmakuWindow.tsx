@@ -6,8 +6,10 @@ import type {
   SendDanmakuResult,
   SendDanmakuStatus,
 } from "../types/danmaku";
+import { classNames } from "../utils/classNames";
 
 const TEXT_LIMIT = 60;
+const NO_DRAG_CLASS = "[-webkit-app-region:no-drag]";
 
 export function SendDanmakuWindow() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -241,18 +243,25 @@ export function SendDanmakuWindow() {
       : "未连接";
 
   return (
-    <main className="send-window">
+    <main className="box-border h-screen w-screen overflow-hidden rounded-xl border border-[rgba(195,221,214,0.28)] bg-[linear-gradient(145deg,rgba(13,18,19,0.58),rgba(28,36,35,0.52)),rgba(12,14,15,0.44)] px-3 py-2 text-sm text-[#eef8f4] shadow-[0_18px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08)]">
       <header
-        className="send-window-header"
+        className="mb-1.5 flex min-h-[26px] cursor-move select-none items-center justify-between gap-3"
         onMouseDown={(event) => void startManualDrag(event)}
       >
-        <div className="send-window-target">
-          <span className="send-window-kicker">发送到直播间</span>
-          <span className="send-window-target-name">{targetText}</span>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <span className="block whitespace-nowrap text-[11px] leading-none text-[#9fb2ac]">
+            发送到直播间
+          </span>
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold leading-tight text-white">
+            {targetText}
+          </span>
         </div>
         <button
           aria-label="关闭发送窗口"
-          className="send-window-close"
+          className={classNames(
+            NO_DRAG_CLASS,
+            "relative z-[2] size-[26px] shrink-0 cursor-pointer rounded-full border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.08)] p-0 text-[#c9d8d2] transition-colors hover:bg-[rgba(255,255,255,0.14)] hover:text-white",
+          )}
           onClick={() => void hideWindow()}
           type="button"
         >
@@ -260,8 +269,12 @@ export function SendDanmakuWindow() {
         </button>
       </header>
 
-      <div className="send-window-compose">
+      <div className={classNames(NO_DRAG_CLASS, "flex items-center gap-[7px]")}>
         <input
+          className={classNames(
+            NO_DRAG_CLASS,
+            "box-border h-[34px] min-w-0 flex-1 rounded-drift border border-[rgba(196,221,214,0.28)] bg-[rgba(255,255,255,0.13)] px-[11px] text-white outline-none placeholder:text-[rgba(223,234,230,0.45)] focus:border-[rgba(96,214,180,0.68)] focus:shadow-[0_0_0_3px_rgba(96,214,180,0.16)]",
+          )}
           ref={inputRef}
           maxLength={TEXT_LIMIT + 8}
           onChange={(event) => setText(event.currentTarget.value)}
@@ -270,7 +283,10 @@ export function SendDanmakuWindow() {
           value={text}
         />
         <button
-          className="send-window-submit"
+          className={classNames(
+            NO_DRAG_CLASS,
+            "h-[34px] w-[60px] cursor-pointer rounded-drift border-0 bg-[#76e0b7] font-bold text-[#092017] transition-colors hover:bg-[#8ef0ca] disabled:cursor-not-allowed disabled:bg-[rgba(255,255,255,0.1)] disabled:text-[rgba(210,220,216,0.52)]",
+          )}
           disabled={!canSend}
           onClick={() => void sendDanmaku()}
           type="button"
@@ -279,11 +295,13 @@ export function SendDanmakuWindow() {
         </button>
       </div>
 
-      <footer className="send-window-footer">
-        <span className={status?.canSend ? "is-ready" : "is-blocked"}>
+      <footer className="mt-1.5 flex items-center justify-between gap-3 text-[11px] leading-tight text-[#9fb2ac]">
+        <span
+          className={status?.canSend ? "text-[#8feac4]" : "text-[#ffd37a]"}
+        >
           {feedback || status?.reason || "读取发送状态"}
         </span>
-        <span className={remaining < 0 ? "is-over-limit" : ""}>
+        <span className={remaining < 0 ? "text-[#ffd37a]" : ""}>
           {Math.max(0, remaining)}
         </span>
       </footer>

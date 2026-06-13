@@ -1,16 +1,10 @@
 import type { AppConfig } from "../types/config";
-import type {
-  DanmakuItem,
-  LiveMessage,
-  LiveMessageSegment,
-} from "../types/danmaku";
+import type { LiveMessage, LiveMessageSegment } from "../types/danmaku";
 
 export const DANMAKU_FLUSH_INTERVAL_MS = 500;
 export const MIN_TRACK_COUNT = 3;
 export const TRACK_HEIGHT = 38;
-export const MIN_ALIVE_MS = 4000;
 export const MAX_PENDING_QUEUE = 200;
-export const ELDER_RATIO = 0.15;
 export const MAX_REQUEUE_ROUNDS = 6;
 export const MAX_REQUEUE_LATENCY_MS = 3000;
 export const SUPER_CHAT_SCROLL_DURATION_RATIO = 1.2;
@@ -198,63 +192,4 @@ export function isPriorityMessage(message: Pick<LiveMessage, "kind">) {
     message.kind === "guard" ||
     message.kind === "gift"
   );
-}
-
-export function markExitingItems(
-  currentItems: DanmakuItem[],
-  nextItems: DanmakuItem[],
-  densityLimits: DensityLimits,
-) {
-  let combined = [...currentItems, ...nextItems];
-
-  const elderPoolSize = Math.max(
-    1,
-    Math.ceil(densityLimits.maxItems * ELDER_RATIO),
-  );
-  const elderCount = combined.reduce(
-    (count, item) => count + (item.elder ? 1 : 0),
-    0,
-  );
-  const openElderSlots = elderPoolSize - elderCount;
-
-  if (openElderSlots > 0) {
-    const promoteNow = Date.now();
-    let promoted = 0;
-    combined = combined.map((item) => {
-      if (promoted >= openElderSlots) return item;
-      if (!canExitBeforeAnimationEnd(item)) return item;
-      if (item.elder || item.exiting) return item;
-      if (promoteNow - item.createdAt < MIN_ALIVE_MS) return item;
-      promoted++;
-      return { ...item, elder: true };
-    });
-  }
-
-  const excess = combined.length - densityLimits.maxItems;
-  if (excess <= 0) {
-    return combined;
-  }
-
-  const alreadyExiting = combined.reduce(
-    (count, item) => count + (item.exiting ? 1 : 0),
-    0,
-  );
-  const toMark = Math.max(0, excess - alreadyExiting);
-
-  if (toMark <= 0) return combined;
-
-  const markNow = Date.now();
-  let marked = 0;
-  return combined.map((item) => {
-    if (item.exiting || marked >= toMark) return item;
-    if (!canExitBeforeAnimationEnd(item)) return item;
-    if (item.elder) return item;
-    if (markNow - item.createdAt < MIN_ALIVE_MS) return item;
-    marked++;
-    return { ...item, exiting: true };
-  });
-}
-
-function canExitBeforeAnimationEnd(item: DanmakuItem) {
-  return !isPriorityMessage(item);
 }

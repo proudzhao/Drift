@@ -9,14 +9,16 @@ import { useShortcutSettings } from "../../hooks/control/useShortcutSettings";
 import { useUpdateNotice } from "../../hooks/control/useUpdateNotice";
 import type { AppConfig } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
+import { classNames } from "../../utils/classNames";
 import { AccountSettings } from "./AccountSettings";
-import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { AboutSettings } from "./AboutSettings";
+import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { DisplaySettings } from "./DisplaySettings";
 import { FilterSettings } from "./FilterSettings";
 import { RoomSettings } from "./RoomSettings";
 import { SettingsTabs, type SettingsTab } from "./SettingsTabs";
 import { ShortcutSettings } from "./ShortcutSettings";
+import { Button } from "../ui";
 
 type ControlPanelProps = {
   config: AppConfig;
@@ -113,7 +115,6 @@ export function ControlPanel({
     setDraftRoomId(config.roomId);
   }, [config.roomId]);
 
-
   async function connectRoom(roomId: string) {
     const numericRoomId = Number(roomId.trim());
     if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
@@ -139,55 +140,64 @@ export function ControlPanel({
     onStatusChange({ status: "disconnected", message: "已手动断开" });
   }
 
+  const settingsPanelClassName = classNames(
+    "relative grid min-h-0 gap-3 overflow-hidden border border-[#d6d6d6] bg-[#e4e4e4] px-10 py-5",
+    shouldShowUpdateNotice
+      ? "grid-rows-[auto_minmax(0,1fr)]"
+      : "grid-rows-[minmax(0,1fr)]",
+  );
+
   return (
-    <main className="control-window">
-      <header className="control-header">
-        <strong>Drift 设置</strong>
+    <main className="box-border grid h-screen min-h-screen grid-rows-[auto_auto_minmax(0,1fr)_auto] content-start gap-3 overflow-hidden bg-[#ececec] px-6 pb-4 pt-2.5 text-[#202124]">
+      <header className="grid grid-cols-[minmax(0,1fr)] items-center">
+        <strong className="text-center text-[13px] font-bold leading-tight text-[#4b4b4b]">
+          Drift 设置
+        </strong>
       </header>
 
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <section
-        className={
-          shouldShowUpdateNotice
-            ? "settings-panel has-update-notice"
-            : "settings-panel"
-        }
-      >
+      <section className={settingsPanelClassName}>
         {shouldShowUpdateNotice && updateNotice ? (
-          <div className="update-notice" role="status">
-            <div>
-              <strong>发现新版本 {updateNotice.latestVersion}</strong>
-              <span>
+          <div
+            className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3.5 rounded-[7px] border border-blue-300/70 bg-[#eef6ff] px-3 py-2.5 shadow-drift-control"
+            role="status"
+          >
+            <div className="grid min-w-0 gap-0.5">
+              <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-[#145da0]">
+                发现新版本 {updateNotice.latestVersion}
+              </strong>
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#4f657a]">
                 当前版本 {updateNotice.currentVersion}，可前往 GitHub Releases
                 下载。
               </span>
             </div>
-            <div className="update-notice-actions">
-              <button
+            <div className="grid grid-flow-col gap-1.5">
+              <Button
                 onClick={() => openUrl(updateNotice.releaseUrl)}
-                type="button"
+                size="sm"
               >
                 前往下载
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setActiveTab("about");
                   setDismissedUpdateVersion(updateNotice.latestVersion);
                 }}
-                type="button"
+                size="sm"
               >
                 查看详情
-              </button>
-              <button
+              </Button>
+              <Button
                 aria-label="稍后提醒"
                 onClick={() =>
                   setDismissedUpdateVersion(updateNotice.latestVersion)
                 }
-                type="button"
+                size="sm"
+                variant="ghost"
               >
                 稍后
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -295,8 +305,8 @@ export function ControlPanel({
         ) : null}
       </section>
 
-      <footer className="control-footer">
-        <span>
+      <footer>
+        <span className="text-[11px] text-[#6f7782]">
           {config.shortcuts.toggleEditMode} 切换编辑模式 ·{" "}
           {config.shortcuts.toggleOverlayWindow} 显示/隐藏弹幕窗口 ·{" "}
           {config.shortcuts.openSendDanmaku} 发送弹幕

@@ -30,7 +30,6 @@ export function DanmakuTrack({
     `danmaku-${item.kind}`,
     item.highlighted ? "is-highlighted" : "",
     item.isSelf ? "is-self" : "",
-    item.exiting ? "is-exiting" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -46,11 +45,6 @@ export function DanmakuTrack({
       className={className}
       onAnimationEnd={(event) => {
         if (event.animationName === "drift-across") {
-          onDone?.(item.id);
-        }
-      }}
-      onTransitionEnd={(event) => {
-        if (event.propertyName === "opacity" && item.exiting) {
           onDone?.(item.id);
         }
       }}
