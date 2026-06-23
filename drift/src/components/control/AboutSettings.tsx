@@ -1,76 +1,46 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import iconUrl from "/icon.png";
+import type { AppUpdateState } from "../../hooks/control/useAppUpdate";
 import type { UpdateConfig } from "../../types/config";
 import { Button, Toggle } from "../ui";
 
-type AppVersion = {
-  version: string;
-};
-
-export type CheckUpdateResult = {
-  hasUpdate: boolean;
-  currentVersion: string;
-  latestVersion: string;
-  releaseUrl: string;
-  error: string | null;
-};
-
-export type CachedUpdateResult = {
-  result: CheckUpdateResult | null;
-  checkedAt?: number;
-  isChecking: boolean;
-};
-
 type AboutSettingsProps = {
-  cachedUpdate: CachedUpdateResult | null;
+  onCheckUpdate: () => void;
+  onInstallUpdate: () => void;
+  onLoadCurrentVersion: () => void;
+  onRestartApp: () => void;
   onUpdateConfigChange: (update: Partial<UpdateConfig>) => void;
+  updateState: AppUpdateState;
   updateConfig: UpdateConfig;
 };
 
 export function AboutSettings({
-  cachedUpdate,
+  onCheckUpdate,
+  onInstallUpdate,
+  onLoadCurrentVersion,
+  onRestartApp,
   onUpdateConfigChange,
+  updateState,
   updateConfig,
 }: AboutSettingsProps) {
-  const [appVersion, setAppVersion] = useState("");
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [updateResult, setUpdateResult] = useState<CheckUpdateResult | null>(
-    null,
-  );
+  const isBusy =
+    updateState.status === "checking" ||
+    updateState.status === "downloading" ||
+    updateState.status === "installing";
+  const progressPercent =
+    updateState.totalBytes && updateState.totalBytes > 0
+      ? Math.min(
+          100,
+          Math.round((updateState.downloadedBytes / updateState.totalBytes) * 100),
+        )
+      : null;
+  const appVersion = updateState.currentVersion;
+  const statusText = getUpdateStatusText(updateState, progressPercent);
 
   useEffect(() => {
-    invoke<AppVersion>("get_app_version")
-      .then((result) => setAppVersion(result.version))
-      .catch(() => setAppVersion(""));
-  }, []);
-
-  useEffect(() => {
-    if (cachedUpdate?.result) {
-      setUpdateResult(cachedUpdate.result);
-    }
-  }, [cachedUpdate?.result]);
-
-  async function checkUpdate() {
-    setIsCheckingUpdate(true);
-    setUpdateResult(null);
-
-    try {
-      const result = await invoke<CheckUpdateResult>("check_update");
-      setUpdateResult(result);
-    } catch (error) {
-      setUpdateResult({
-        hasUpdate: false,
-        currentVersion: "",
-        latestVersion: "",
-        releaseUrl: "",
-        error: String(error),
-      });
-    } finally {
-      setIsCheckingUpdate(false);
-    }
-  }
+    onLoadCurrentVersion();
+  }, [onLoadCurrentVersion]);
 
   return (
     <div className="grid min-h-0 content-start gap-3.5 overflow-hidden">
@@ -90,10 +60,10 @@ export function AboutSettings({
       <div className="flex justify-center gap-2">
         <Button
           className="px-6"
-          disabled={isCheckingUpdate || Boolean(cachedUpdate?.isChecking)}
-          onClick={checkUpdate}
+          disabled={isBusy}
+          onClick={onCheckUpdate}
         >
-          {isCheckingUpdate || cachedUpdate?.isChecking ? "检查中" : "检查更新"}
+          {getCheckButtonText(updateState.status)}
         </Button>
       </div>
 
@@ -108,30 +78,87 @@ export function AboutSettings({
         />
       </div>
 
-      {updateResult ? (
+      {statusText ? (
+        <div className="grid gap-2 rounded-[7px] border border-[#d8dde6] bg-white px-3 py-2 text-center shadow-drift-control">
+          <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-semibold text-[#374151]">
+            {statusText}
+          </p>
+          {updateState.status === "downloading" ? (
+            <div className="grid gap-1">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#e5e7eb]">
+                <div
+                  className="h-full rounded-full bg-drift-primary transition-[width]"
+                  style={{
+                    width: progressPercent === null ? "35%" : `${progressPercent}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[10px] text-[#6f7782]">
+                {progressPercent === null
+                  ? formatBytes(updateState.downloadedBytes)
+                  : `${progressPercent}% · ${formatBytes(
+                      updateState.downloadedBytes,
+                    )} / ${formatBytes(updateState.totalBytes ?? 0)}`}
+              </span>
+            </div>
+          ) : null}
+          {updateState.notes ? (
+            <p className="m-0 line-clamp-2 text-[10px] leading-4 text-[#6f7782]">
+              {updateState.notes}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {updateState.checkedAt ? (
         <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-center text-[11px] text-[#6f7782]">
-          {updateResult.error
-            ? updateResult.error
-            : updateResult.hasUpdate
-              ? "发现新版本 " + updateResult.latestVersion
-              : "已是最新版本"}
+          最近检查：{formatCheckedAt(updateState.checkedAt)}
         </p>
       ) : null}
 
-      {cachedUpdate?.checkedAt ? (
-        <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-center text-[11px] text-[#6f7782]">
-          最近检查：{formatUnixTime(cachedUpdate.checkedAt)}
-        </p>
-      ) : null}
-
-      {updateResult?.hasUpdate && updateResult.releaseUrl ? (
+      {updateState.status === "available" ? (
         <div className="flex justify-center gap-2">
           <Button
-            className="px-6"
-            onClick={() => openUrl(updateResult.releaseUrl)}
+            className="px-5"
+            disabled={isBusy}
+            onClick={onInstallUpdate}
             variant="primary"
           >
-            前往下载
+            下载并安装
+          </Button>
+          <Button
+            className="px-5"
+            onClick={() => openUrl(updateState.releaseUrl)}
+          >
+            前往 GitHub 下载
+          </Button>
+        </div>
+      ) : null}
+
+      {updateState.status === "error" ? (
+        <div className="flex justify-center gap-2">
+          <Button className="px-5" onClick={onCheckUpdate}>
+            重试
+          </Button>
+          <Button
+            className="px-5"
+            onClick={() => openUrl(updateState.releaseUrl)}
+          >
+            前往 GitHub 下载
+          </Button>
+        </div>
+      ) : null}
+
+      {updateState.status === "installed" ? (
+        <div className="flex justify-center gap-2">
+          <Button className="px-5" onClick={onRestartApp} variant="primary">
+            重启 Drift
+          </Button>
+          <Button
+            className="px-5"
+            onClick={() => openUrl(updateState.releaseUrl)}
+          >
+            查看发布页
           </Button>
         </div>
       ) : null}
@@ -139,7 +166,48 @@ export function AboutSettings({
   );
 }
 
-function formatUnixTime(value?: number) {
-  if (!value) return "尚未检查";
-  return new Date(value * 1000).toLocaleString();
+function getCheckButtonText(status: AppUpdateState["status"]) {
+  if (status === "checking") return "检查中";
+  if (status === "not_available" || status === "error") return "重新检查";
+  return "检查更新";
+}
+
+function getUpdateStatusText(
+  updateState: AppUpdateState,
+  progressPercent: number | null,
+) {
+  if (updateState.status === "idle") return "";
+  if (updateState.status === "checking") return "正在检查更新";
+  if (updateState.status === "not_available") return "已是最新版本";
+  if (updateState.status === "available") {
+    return `发现新版本 ${updateState.latestVersion}`;
+  }
+  if (updateState.status === "downloading") {
+    return progressPercent === null
+      ? "正在下载更新"
+      : `正在下载更新 ${progressPercent}%`;
+  }
+  if (updateState.status === "installing") return "正在安装更新";
+  if (updateState.status === "installed") return "安装完成，重启后生效";
+  return updateState.error || "更新失败";
+}
+
+function formatCheckedAt(checkedAt?: number) {
+  if (checkedAt) return new Date(checkedAt).toLocaleString();
+  return "尚未检查";
+}
+
+function formatBytes(value: number) {
+  if (value <= 0) return "0 B";
+
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }

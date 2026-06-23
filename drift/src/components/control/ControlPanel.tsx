@@ -6,7 +6,7 @@ import { useControlConfig } from "../../hooks/control/useControlConfig";
 import { useDiagnosticsPanel } from "../../hooks/control/useDiagnosticsPanel";
 import { useSavedRooms } from "../../hooks/control/useSavedRooms";
 import { useShortcutSettings } from "../../hooks/control/useShortcutSettings";
-import { useUpdateNotice } from "../../hooks/control/useUpdateNotice";
+import { useAppUpdate } from "../../hooks/control/useAppUpdate";
 import type { AppConfig } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
 import { classNames } from "../../utils/classNames";
@@ -37,6 +37,9 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const [draftRoomId, setDraftRoomId] = useState(config.roomId);
   const [activeTab, setActiveTab] = useState<SettingsTab>("room");
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<
+    string | null
+  >(null);
 
   const {
     resetAppearance,
@@ -58,11 +61,12 @@ export function ControlPanel({
     validateAuthSession,
   } = useAuthPanel();
   const {
-    cachedUpdate,
-    setDismissedUpdateVersion,
-    shouldShowUpdateNotice,
-    updateNotice,
-  } = useUpdateNotice();
+    checkForUpdate,
+    installUpdate,
+    loadCurrentVersion,
+    restartApp,
+    state: updateState,
+  } = useAppUpdate({ checkOnStartup: config.update.checkOnStartup });
   const {
     createSavedRoomGroup,
     deleteSavedRoom,
@@ -115,6 +119,24 @@ export function ControlPanel({
     setDraftRoomId(config.roomId);
   }, [config.roomId]);
 
+  const updateProgressPercent =
+    updateState.totalBytes && updateState.totalBytes > 0
+      ? Math.min(
+          100,
+          Math.round((updateState.downloadedBytes / updateState.totalBytes) * 100),
+        )
+      : null;
+  const shouldShowUpdateNotice =
+    (updateState.status === "available" &&
+      updateState.latestVersion !== dismissedUpdateVersion) ||
+    updateState.status === "downloading" ||
+    updateState.status === "installing" ||
+    updateState.status === "installed";
+  const updateNoticeText = getUpdateNoticeText(
+    updateState,
+    updateProgressPercent,
+  );
+
   async function connectRoom(roomId: string) {
     const numericRoomId = Number(roomId.trim());
     if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
@@ -158,46 +180,71 @@ export function ControlPanel({
       <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       <section className={settingsPanelClassName}>
-        {shouldShowUpdateNotice && updateNotice ? (
+        {shouldShowUpdateNotice ? (
           <div
             className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3.5 rounded-[7px] border border-blue-300/70 bg-[#eef6ff] px-3 py-2.5 shadow-drift-control"
             role="status"
           >
-            <div className="grid min-w-0 gap-0.5">
+            <div className="grid min-w-0 gap-1">
               <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-[#145da0]">
-                发现新版本 {updateNotice.latestVersion}
+                {updateNoticeText.title}
               </strong>
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#4f657a]">
-                当前版本 {updateNotice.currentVersion}，可前往 GitHub Releases
-                下载。
+                {updateNoticeText.description}
               </span>
+              {updateState.status === "downloading" ? (
+                <div className="h-1.5 overflow-hidden rounded-full bg-blue-100">
+                  <div
+                    className="h-full rounded-full bg-drift-primary transition-[width]"
+                    style={{
+                      width:
+                        updateProgressPercent === null
+                          ? "35%"
+                          : `${updateProgressPercent}%`,
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="grid grid-flow-col gap-1.5">
-              <Button
-                onClick={() => openUrl(updateNotice.releaseUrl)}
-                size="sm"
-              >
-                前往下载
-              </Button>
+              {updateState.status === "available" ? (
+                <Button onClick={installUpdate} size="sm" variant="primary">
+                  下载并安装
+                </Button>
+              ) : null}
+              {updateState.status === "installed" ? (
+                <Button onClick={restartApp} size="sm" variant="primary">
+                  重启 Drift
+                </Button>
+              ) : null}
+              {updateState.status === "available" ? (
+                <Button
+                  onClick={() => openUrl(updateState.releaseUrl)}
+                  size="sm"
+                >
+                  GitHub
+                </Button>
+              ) : null}
               <Button
                 onClick={() => {
                   setActiveTab("about");
-                  setDismissedUpdateVersion(updateNotice.latestVersion);
                 }}
                 size="sm"
               >
                 查看详情
               </Button>
-              <Button
-                aria-label="稍后提醒"
-                onClick={() =>
-                  setDismissedUpdateVersion(updateNotice.latestVersion)
-                }
-                size="sm"
-                variant="ghost"
-              >
-                稍后
-              </Button>
+              {updateState.status === "available" ? (
+                <Button
+                  aria-label="稍后提醒"
+                  onClick={() =>
+                    setDismissedUpdateVersion(updateState.latestVersion)
+                  }
+                  size="sm"
+                  variant="ghost"
+                >
+                  稍后
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -298,8 +345,12 @@ export function ControlPanel({
 
         {activeTab === "about" ? (
           <AboutSettings
-            cachedUpdate={cachedUpdate}
+            onCheckUpdate={checkForUpdate}
+            onInstallUpdate={installUpdate}
+            onLoadCurrentVersion={loadCurrentVersion}
+            onRestartApp={restartApp}
             onUpdateConfigChange={updateUpdateConfig}
+            updateState={updateState}
             updateConfig={config.update}
           />
         ) : null}
@@ -314,4 +365,60 @@ export function ControlPanel({
       </footer>
     </main>
   );
+}
+
+type UpdateState = ReturnType<typeof useAppUpdate>["state"];
+
+function getUpdateNoticeText(
+  updateState: UpdateState,
+  progressPercent: number | null,
+) {
+  if (updateState.status === "downloading") {
+    return {
+      title:
+        progressPercent === null
+          ? "正在下载更新"
+          : `正在下载更新 ${progressPercent}%`,
+      description:
+        progressPercent === null
+          ? `已下载 ${formatBytes(updateState.downloadedBytes)}`
+          : `${formatBytes(updateState.downloadedBytes)} / ${formatBytes(
+              updateState.totalBytes ?? 0,
+            )}`,
+    };
+  }
+
+  if (updateState.status === "installing") {
+    return {
+      title: "正在安装更新",
+      description: "安装过程中请不要关闭 Drift。",
+    };
+  }
+
+  if (updateState.status === "installed") {
+    return {
+      title: "安装完成，重启后生效",
+      description: "重启 Drift 后即可使用新版本。",
+    };
+  }
+
+  return {
+    title: `发现新版本 ${updateState.latestVersion}`,
+    description: `当前版本 ${updateState.currentVersion || "未知"}，可在应用内下载并安装。`,
+  };
+}
+
+function formatBytes(value: number) {
+  if (value <= 0) return "0 B";
+
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }

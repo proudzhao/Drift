@@ -35,13 +35,14 @@ pub fn run() {
         .manage(bilibili::DanmakuTaskState::default())
         .manage(bilibili::send::SendDanmakuState::default())
         .manage(window_control::EditModeState::default())
-        .manage(update_check::UpdateCheckState::default())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             logging::init(app.handle())?;
+            tracing::debug!(target: "drift::update", "tauri updater plugin initialized");
             window_control::setup(app)?;
             tray::setup(app)?;
-            update_check::start_auto_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -96,8 +97,6 @@ pub fn run() {
             bilibili::auth::auth_validate_session,
             bilibili::auth::auth_logout,
             update_check::get_app_version,
-            update_check::check_update,
-            update_check::get_cached_update_result,
             open_help_window
         ])
         .run(tauri::generate_context!())

@@ -4,9 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag, e.g. v0.1.0"
+        description: "Release tag, e.g. v0.6.3"
         required: true
-        default: "v0.1.0"
+        default: "v0.6.3"
+      draft:
+        description: "Create the release as a draft"
+        required: true
+        type: boolean
+        default: false
+      prerelease:
+        description: "Mark the release as a prerelease"
+        required: true
+        type: boolean
+        default: false
+      release_body:
+        description: "Release notes"
+        required: true
+        default: "See the assets to download this version and install."
 
 jobs:
   release:
@@ -18,10 +32,13 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
+            updaterPlatform: darwin-aarch64
             args: "--target aarch64-apple-darwin --bundles dmg"
           - platform: macos-latest
+            updaterPlatform: darwin-x86_64
             args: "--target x86_64-apple-darwin --bundles dmg"
           - platform: windows-latest
+            updaterPlatform: windows-x86_64
             args: "--bundles nsis,msi"
 
     runs-on: ${{ matrix.platform }}
@@ -50,15 +67,110 @@ jobs:
         run: npm ci
         working-directory: drift
 
+      - name: Verify updater signing secrets
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::Missing GitHub Actions secret TAURI_SIGNING_PRIVATE_KEY."
+            exit 1
+          fi
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty; continuing with an unencrypted updater signing key."
+          fi
+
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: drift
-          tagName: ${{ github.event.inputs.tag }}
-          releaseName: "Drift ${{ github.event.inputs.tag }}"
-          releaseBody: "Drift desktop danmaku overlay preview release."
-          releaseDraft: true
-          prerelease: true
+          tagName: ${{ inputs.tag }}
+          releaseName: "Drift ${{ inputs.tag }}"
+          releaseBody: ${{ inputs.release_body }}
+          releaseDraft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          assetNamePattern: "drift-[version]-[platform]-[arch][setup][ext]"
           args: ${{ matrix.args }}
+
+      - name: Upload updater signatures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          signature_count="$(find drift/src-tauri/target/release/bundle -type f -name "*.sig" | wc -l | tr -d ' ')"
+          if [ "$signature_count" = "0" ]; then
+            echo "::error::No updater signature files were generated. Check TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD."
+            exit 1
+          fi
+          signature_upload_dir="$(mktemp -d)"
+          find drift/src-tauri/target/release/bundle -type f -name "*.sig" -print0 \
+            | while IFS= read -r -d '' signature; do
+                signature_name="${{ matrix.updaterPlatform }}-$(basename "$signature")"
+                cp "$signature" "$signature_upload_dir/$signature_name"
+                gh release upload "${{ inputs.tag }}" "$signature_upload_dir/$signature_name" --clobber
+              done
+
+  validate-updater-manifest:
+    needs: release
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh release download "${{ inputs.tag }}" --pattern latest.json --dir release-assets
+
+      - name: Validate updater manifest
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("release-assets/latest.json", "utf8"));
+          const version = String(manifest.version ?? "");
+          if (!/^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+            throw new Error(`Invalid updater version: ${version}`);
+          }
+
+          const requiredPlatforms = [
+            "windows-x86_64",
+            "darwin-aarch64",
+            "darwin-x86_64",
+          ];
+          for (const platform of requiredPlatforms) {
+            const entry = manifest.platforms?.[platform];
+            if (!entry?.url || !entry?.signature) {
+              throw new Error(`Missing updater url or signature for ${platform}`);
+            }
+          }
+          NODE
+
+      - name: Verify updater signatures are uploaded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          asset_names="$(gh release view "${{ inputs.tag }}" --json assets --jq '.assets[].name')"
+          printf '%s\n' "$asset_names" | grep -Eq '^windows-x86_64-.*\.sig$'
+          printf '%s\n' "$asset_names" | grep -Eq '^darwin-aarch64-.*\.sig$'
+          printf '%s\n' "$asset_names" | grep -Eq '^darwin-x86_64-.*\.sig$'
+
+      - name: Verify latest release endpoint
+        if: ${{ inputs.draft == false && inputs.prerelease == false }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            "https://github.com/proudzhao/Drift/releases/latest/download/latest.json" \
+            --output /tmp/latest.json
+          test -s /tmp/latest.json
