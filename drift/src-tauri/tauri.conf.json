@@ -59,7 +59,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxRUNFQUVBOTBCOEE3NDgKUldSSXA3aVE2dXJzUVl3aXZDMk9qSVFjaHpyeGJFTDg3NzRpRjN1dWpUVU41MXhJWWdLajFDcmEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdCQUYxNDc5OTJFRjVGNzEKUldSeFgrK1NlUlN2ZTdsUFhEU3c5aFBXSnZIWm81aG1VbklKNWkrbjlWdU1wdkVFakFFbUF2aXMK",
       "endpoints": [
         "https://github.com/proudzhao/Drift/releases/latest/download/latest.json"
       ]
