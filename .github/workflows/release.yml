@@ -70,15 +70,21 @@ jobs:
       - name: Verify updater signing secrets
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY || secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || secrets.TAURI_PRIVATE_KEY_PASSWORD || secrets.TAURI_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
             echo "::error::Missing GitHub Actions secret TAURI_SIGNING_PRIVATE_KEY."
             exit 1
           fi
-          if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+          if printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" | grep -qi 'encrypted'; then
+            if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+              echo "::error::TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required for encrypted updater keys."
+              echo "::error::Set TAURI_SIGNING_PRIVATE_KEY_PASSWORD (or TAURI_PRIVATE_KEY_PASSWORD / TAURI_KEY_PASSWORD)."
+              exit 1
+            fi
+          elif [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
             echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty; continuing with an unencrypted updater signing key."
           fi
 
@@ -86,8 +92,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY || secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || secrets.TAURI_PRIVATE_KEY_PASSWORD || secrets.TAURI_KEY_PASSWORD }}
         with:
           projectPath: drift
           tagName: ${{ inputs.tag }}
