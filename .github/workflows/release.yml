@@ -106,18 +106,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          signature_count="$(find drift/src-tauri/target/release/bundle -type f -name "*.sig" | wc -l | tr -d ' ')"
+          bundle_dirs=()
+          for candidate in drift/src-tauri/target/release/bundle drift/src-tauri/target/*/release/bundle; do
+            if [ -d "$candidate" ]; then
+              bundle_dirs+=("$candidate")
+            fi
+          done
+          if [ "${#bundle_dirs[@]}" = "0" ]; then
+            echo "::error::No Tauri bundle directories were found under drift/src-tauri/target."
+            find drift/src-tauri/target -maxdepth 4 -type d -print || true
+            exit 1
+          fi
+
+          signature_upload_dir="$(mktemp -d)"
+          signature_count=0
+          for bundle_dir in "${bundle_dirs[@]}"; do
+            while IFS= read -r -d '' signature; do
+              signature_name="${{ matrix.updaterPlatform }}-$(basename "$signature")"
+              cp "$signature" "$signature_upload_dir/$signature_name"
+              gh release upload "${{ inputs.tag }}" "$signature_upload_dir/$signature_name" --clobber
+              signature_count=$((signature_count + 1))
+            done < <(find "$bundle_dir" -type f -name "*.sig" -print0)
+          done
+
           if [ "$signature_count" = "0" ]; then
             echo "::error::No updater signature files were generated. Check TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD."
             exit 1
           fi
-          signature_upload_dir="$(mktemp -d)"
-          find drift/src-tauri/target/release/bundle -type f -name "*.sig" -print0 \
-            | while IFS= read -r -d '' signature; do
-                signature_name="${{ matrix.updaterPlatform }}-$(basename "$signature")"
-                cp "$signature" "$signature_upload_dir/$signature_name"
-                gh release upload "${{ inputs.tag }}" "$signature_upload_dir/$signature_name" --clobber
-              done
 
   validate-updater-manifest:
     needs: release
