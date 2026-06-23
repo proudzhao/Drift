@@ -146,7 +146,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          gh release download "${{ inputs.tag }}" --pattern latest.json --dir release-assets
+          gh release download "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern latest.json \
+            --dir release-assets
 
       - name: Validate updater manifest
         run: |
@@ -176,7 +179,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          asset_names="$(gh release view "${{ inputs.tag }}" --json assets --jq '.assets[].name')"
+          asset_names="$(gh release view "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --json assets \
+            --jq '.assets[].name')"
           printf '%s\n' "$asset_names" | grep -Eq '^windows-x86_64-.*\.sig$'
           printf '%s\n' "$asset_names" | grep -Eq '^darwin-aarch64-.*\.sig$'
           printf '%s\n' "$asset_names" | grep -Eq '^darwin-x86_64-.*\.sig$'
