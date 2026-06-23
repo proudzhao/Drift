@@ -78,14 +78,16 @@ jobs:
             echo "::error::Missing GitHub Actions secret TAURI_SIGNING_PRIVATE_KEY."
             exit 1
           fi
-          if printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" | grep -qi '^untrusted comment:.*encrypted'; then
+          if printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" | grep -q '^untrusted comment:.*encrypted'; then
             if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
               echo "::error::TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required for encrypted updater keys."
               echo "::error::Set one of: TAURI_SIGNING_PRIVATE_KEY_PASSWORD, TAURI_PRIVATE_KEY_PASSWORD, or TAURI_KEY_PASSWORD."
               exit 1
             fi
-          elif [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
-            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty; continuing with an unencrypted updater signing key."
+          else
+            if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+              echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD is empty; continuing with an unencrypted updater signing key."
+            fi
           fi
 
       - name: Build and upload release assets
