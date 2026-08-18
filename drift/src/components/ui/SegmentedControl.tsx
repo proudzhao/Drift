@@ -25,7 +25,10 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       aria-label={ariaLabel}
-      className={classNames("inline-grid grid-flow-col gap-1", className)}
+      className={classNames(
+        "drift-segmented-control inline-grid grid-flow-col gap-1",
+        className,
+      )}
       role="group"
     >
       {options.map((option) => (

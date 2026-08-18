@@ -101,6 +101,7 @@ fn parse_macos_system_profiler_fonts(value: &Value) -> Vec<String> {
     fonts
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn parse_fc_list_families(output: &str) -> Vec<String> {
     output
         .lines()

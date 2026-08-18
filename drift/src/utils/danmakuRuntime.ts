@@ -186,8 +186,11 @@ export function isMessageTypeVisible(message: LiveMessage, config: AppConfig) {
   }
 }
 
-export function isPriorityMessage(message: Pick<LiveMessage, "kind">) {
+export function isProtectedMessage(
+  message: Pick<LiveMessage, "kind" | "isSelf">,
+) {
   return (
+    message.isSelf === true ||
     message.kind === "super_chat" ||
     message.kind === "guard" ||
     message.kind === "gift"

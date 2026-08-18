@@ -7,8 +7,8 @@ pub struct AppVersion {
 }
 
 #[tauri::command]
-pub fn get_app_version() -> AppVersion {
+pub fn get_app_version(app: tauri::AppHandle) -> AppVersion {
     AppVersion {
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: app.package_info().version.to_string(),
     }
 }

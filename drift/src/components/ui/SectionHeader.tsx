@@ -17,7 +17,7 @@ export function SectionHeader({
   return (
     <header
       className={classNames(
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3",
+        "drift-section-header grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3",
         className,
       )}
       {...props}

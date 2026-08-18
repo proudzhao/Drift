@@ -1,3 +1,5 @@
+import { DataValue, SettingsRow } from "./settings-ui";
+
 type ControlSliderProps = {
   label: string;
   max: number;
@@ -15,21 +17,30 @@ export function ControlSlider({
   suffix,
   value,
 }: ControlSliderProps) {
+  const id = `control-slider-${label}`;
+
   return (
-    <label className="grid grid-cols-[72px_minmax(0,1fr)_48px] items-center gap-2.5">
-      <span className="text-[13px] font-semibold text-[#1f1f1f]">{label}</span>
-      <input
-        className="w-full accent-[#0a84ff]"
-        max={max}
-        min={min}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-        type="range"
-        value={value}
-      />
-      <strong className="text-right text-[11px] font-medium text-[#606873]">
-        {value}
-        {suffix}
-      </strong>
-    </label>
+    <SettingsRow
+      control={
+        <div className="grid min-w-[180px] grid-cols-[minmax(96px,1fr)_48px] items-center gap-3 max-[519px]:min-w-0">
+          <input
+            aria-label={label}
+            className="w-full accent-drift-signal"
+            id={id}
+            max={max}
+            min={min}
+            onChange={(event) => onChange(Number(event.currentTarget.value))}
+            type="range"
+            value={value}
+          />
+          <DataValue className="text-right">
+            {value}
+            {suffix}
+          </DataValue>
+        </div>
+      }
+      htmlFor={id}
+      label={label}
+    />
   );
 }

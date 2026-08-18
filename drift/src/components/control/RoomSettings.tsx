@@ -1,10 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppConfig, SavedRoom } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
-import { classNames } from "../../utils/classNames";
 import { Button, Input, IconButton } from "../ui";
 import { SavedRoomGroupControls } from "./SavedRoomGroupControls";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
+import {
+  DataValue,
+  SettingsPage,
+  SettingsRow,
+  SettingsSection,
+  StatusBanner,
+  StatusDot,
+  type StatusTone,
+} from "./settings-ui";
 
 type RoomSettingsProps = {
   config: AppConfig;
@@ -59,97 +67,95 @@ export function RoomSettings({
   selectedGroupId,
   status,
 }: RoomSettingsProps) {
-  const roomStatusLabel = roomStatusText(status);
-  const roomStatusClassName = roomStatusColor(status.status);
-  const anchorName = status.anchorName || "未知";
-
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] content-stretch gap-3 overflow-hidden">
-      <div className="grid grid-cols-[max-content_minmax(0,1fr)_auto_64px] items-center gap-2">
-        <label
-          className="flex items-center gap-1 text-[13px] font-semibold text-[#1f1f1f]"
-          htmlFor="control-room-id"
-        >
-          房间号
-        </label>
-        <Input
-          disabled={isConnected}
-          id="control-room-id"
-          inputMode="numeric"
-          onChange={(event) => onRoomIdChange(event.currentTarget.value)}
-          placeholder="输入房间号"
-          value={draftRoomId}
-        />
-        <IconButton
-          aria-label="如何获取房间号"
-          onClick={() => invoke("open_help_window")}
-          size="sm"
-          title="如何获取房间号"
-          variant="ghost"
-        >
-          ?
-        </IconButton>
-        {isConnected ? (
-          <Button onClick={onDisconnect}>
-            断开
-          </Button>
-        ) : (
-          <Button disabled={!draftRoomId.trim()} onClick={onConnect}>
-            连接
-          </Button>
-        )}
-      </div>
-      <div className="grid min-w-0 grid-cols-[minmax(0,max-content)_minmax(0,1fr)] items-center gap-4">
-        <div className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium text-[#555d66]">
-          <span
-            className={classNames(
-              "size-2.5 shrink-0 rounded-full",
-              roomStatusClassName.dot,
-            )}
-          />
-          <span className={roomStatusClassName.text}>状态：{roomStatusLabel}</span>
-          <span>主播：{anchorName}</span>
-        </div>
-        <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-right text-[11px] text-[#6f7782]">
-          {status.message}
-        </p>
-      </div>
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
-        <section className="grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-[7px] overflow-hidden pt-0.5">
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_max-content] items-center gap-2">
-            <div className="flex min-w-0 items-baseline gap-[7px]">
-              <strong className="text-[13px] font-bold text-[#1f1f1f]">
-                常用直播间
-              </strong>
-              <span className="text-[10px] font-semibold text-[#7c8490]">
-                {filteredSavedRooms.length} 个
-              </span>
+    <SettingsPage>
+      <SettingsSection title="连接">
+        <SettingsRow
+          control={
+            <div className="grid min-w-[280px] grid-cols-[minmax(0,1fr)_28px_64px] gap-2 max-[519px]:min-w-0">
+              <Input
+                disabled={isConnected}
+                id="control-room-id"
+                inputMode="numeric"
+                onChange={(event) =>
+                  onRoomIdChange(event.currentTarget.value)
+                }
+                placeholder="输入房间号"
+                value={draftRoomId}
+              />
+              <IconButton
+                aria-label="如何获取房间号"
+                onClick={() => invoke("open_help_window")}
+                size="sm"
+                title="如何获取房间号"
+                variant="ghost"
+              >
+                ?
+              </IconButton>
+              {isConnected ? (
+                <Button onClick={onDisconnect}>断开</Button>
+              ) : (
+                <Button disabled={!draftRoomId.trim()} onClick={onConnect}>
+                  连接
+                </Button>
+              )}
             </div>
-            <Button
-              disabled={!draftRoomId.trim()}
-              onClick={onSaveCurrentRoom}
-              size="sm"
-            >
-              保存当前直播间
-            </Button>
-          </div>
-          <div className="grid min-w-0 gap-1.5">
-            {savedRoomError ? (
-              <p className="m-0 text-[11px] leading-snug text-[#b45f06]">
-                {savedRoomError}
-              </p>
-            ) : null}
-            <SavedRoomGroupControls
-              groups={config.savedRoomGroups}
-              onCreateGroup={onCreateGroup}
-              onDeleteGroup={onDeleteGroup}
-              onRenameGroup={onRenameGroup}
-              onSearchQueryChange={onSearchQueryChange}
-              onSelectedGroupChange={onGroupChange}
-              searchQuery={savedRoomSearchQuery}
-              selectedGroupId={selectedGroupId}
+          }
+          description={status.message}
+          descriptionLayout="inline"
+          htmlFor="control-room-id"
+          label="房间号"
+        />
+        <SettingsRow
+          control={<DataValue>{status.anchorName || "未知"}</DataValue>}
+          description="当前直播间主播"
+          descriptionLayout="inline"
+          label="主播"
+        />
+        <SettingsRow
+          control={
+            <StatusDot
+              label={roomStatusText(status)}
+              tone={roomStatusTone(status.status)}
             />
-          </div>
+          }
+          description="连接、重连或房间状态"
+          descriptionLayout="inline"
+          label="状态"
+        />
+      </SettingsSection>
+
+      <SettingsSection
+        actions={
+          <Button
+            disabled={!draftRoomId.trim()}
+            onClick={onSaveCurrentRoom}
+            size="sm"
+          >
+            保存当前直播间
+          </Button>
+        }
+        description={`${filteredSavedRooms.length} 个`}
+        title="常用直播间"
+      >
+        <div className="grid min-h-0 gap-2 p-3">
+          <SavedRoomGroupControls
+            groups={config.savedRoomGroups}
+            onCreateGroup={onCreateGroup}
+            onDeleteGroup={onDeleteGroup}
+            onRenameGroup={onRenameGroup}
+            onSearchQueryChange={onSearchQueryChange}
+            onSelectedGroupChange={onGroupChange}
+            searchQuery={savedRoomSearchQuery}
+            selectedGroupId={selectedGroupId}
+          />
+          {savedRoomError ? (
+            <StatusBanner
+              description={savedRoomError}
+              title="常用直播间操作失败"
+              tone="danger"
+            />
+          ) : null}
           <SavedRoomList
             editingSavedRoom={editingSavedRoom}
             groups={config.savedRoomGroups}
@@ -162,9 +168,9 @@ export function RoomSettings({
             onStopEditRoom={onStopEditRoom}
             rooms={filteredSavedRooms}
           />
-        </section>
-      </div>
-    </div>
+        </div>
+      </SettingsSection>
+    </SettingsPage>
   );
 }
 
@@ -188,35 +194,19 @@ function roomStatusText(status: DanmakuStatus) {
   }
 }
 
-function roomStatusColor(status: DanmakuStatus["status"]) {
+function roomStatusTone(status: DanmakuStatus["status"]): StatusTone {
   switch (status) {
     case "connected":
-      return {
-        dot: "bg-[#34c759]",
-        text: "text-[#248a3d]",
-      };
+      return "success";
     case "connecting":
-      return {
-        dot: "bg-[#0a84ff]",
-        text: "text-[#555d66]",
-      };
     case "reconnecting":
-      return {
-        dot: "bg-[#0a84ff]",
-        text: "text-[#b45f06]",
-      };
+      return "signal";
     case "not_live":
     case "invalid_room":
     case "disconnected":
-      return {
-        dot: "bg-[#ff9500]",
-        text: "text-[#b45f06]",
-      };
+      return "warning";
     case "idle":
     default:
-      return {
-        dot: "bg-[#a8a8a8]",
-        text: "text-[#555d66]",
-      };
+      return "neutral";
   }
 }

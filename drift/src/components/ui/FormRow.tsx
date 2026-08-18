@@ -23,7 +23,7 @@ export function FormRow({
   return (
     <div
       className={classNames(
-        "grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3",
+        "drift-form-row grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3",
         className,
       )}
       {...props}
@@ -37,7 +37,7 @@ export function FormRow({
           labelContent
         )}
         {description ? (
-          <span className="text-[11px] leading-4 text-drift-muted">
+          <span className="drift-form-row-description text-[11px] leading-4 text-drift-muted">
             {description}
           </span>
         ) : null}

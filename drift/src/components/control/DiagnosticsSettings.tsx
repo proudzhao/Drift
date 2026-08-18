@@ -2,6 +2,14 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { classNames } from "../../utils/classNames";
 import { Button, Toggle } from "../ui";
+import {
+  DataValue,
+  SettingsPage,
+  SettingsRow,
+  SettingsSection,
+  StatusBanner,
+  StatusDot,
+} from "./settings-ui";
 
 export type ApiTestStep = {
   key: string;
@@ -53,96 +61,80 @@ export function DiagnosticsSettings({
   }
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] content-stretch gap-3 overflow-hidden">
-      <fieldset className="m-[6px_0_0] grid gap-2.5 rounded-sm border border-[#d1d1d1] bg-[#e7e7e7] px-[18px] pb-3.5 pt-4">
-        <legend className="px-2 text-[11px] font-semibold text-[#333333]">
-          开发者工具
-        </legend>
-        <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2.5">
-          <span className="text-[13px] font-semibold text-[#1f1f1f]">
-            Mock 弹幕
-          </span>
-          <Toggle
-            aria-label="Mock 弹幕"
-            checked={mockPanelEnabled}
-            onCheckedChange={onMockPanelToggle}
-          />
-        </div>
-        <p className="m-0 text-[11px] text-[#6f7782]">
-          启用后可在编辑模式下生成模拟弹幕，用于测试渲染效果
-        </p>
-      </fieldset>
+    <SettingsPage>
+      <SettingsSection
+        description="只影响当前运行会话中的测试入口"
+        title="开发者工具"
+      >
+        <SettingsRow
+          control={
+            <Toggle
+              aria-label="Mock 弹幕"
+              checked={mockPanelEnabled}
+              onCheckedChange={onMockPanelToggle}
+            />
+          }
+          description="启用后可在编辑模式下生成模拟弹幕，用于测试渲染效果"
+          label="Mock 弹幕"
+        />
+      </SettingsSection>
 
-      <fieldset className="m-[6px_0_0] grid min-h-0 grid-rows-[auto_auto_auto_auto_minmax(0,1fr)] gap-2.5 overflow-hidden rounded-sm border border-[#d1d1d1] bg-[#e7e7e7] px-[18px] pb-3.5 pt-4">
-        <legend className="px-2 text-[11px] font-semibold text-[#333333]">
-          API 诊断
-        </legend>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            disabled={isApiTesting || !draftRoomId.trim()}
-            onClick={onTestApi}
-          >
-            {isApiTesting ? "测试中" : "测试 API"}
-          </Button>
-          <Button onClick={() => invoke("open_log_dir")}>
-            打开日志目录
-          </Button>
-        </div>
+      <SettingsSection
+        description="检查当前直播间的真实连接链路"
+        title="API 诊断"
+      >
+        <SettingsRow
+          control={
+            <DataValue>{draftRoomId.trim() || "未填写"}</DataValue>
+          }
+          description="测试将使用此房间号"
+          label="直播间"
+        />
+        <SettingsRow
+          control={
+            <div className="flex max-w-full flex-wrap justify-end gap-2">
+              <Button
+                disabled={isApiTesting || !draftRoomId.trim()}
+                onClick={onTestApi}
+              >
+                {isApiTesting ? "测试中" : "测试 API"}
+              </Button>
+              <Button onClick={() => invoke("open_log_dir")}>
+                打开日志目录
+              </Button>
+              <Button disabled={isExporting} onClick={exportDiagnostics}>
+                {isExporting ? "导出中" : "导出诊断包"}
+              </Button>
+            </div>
+          }
+          description="日志目录和诊断报告仅保存在本机"
+          label="操作"
+        />
 
-        <div className="grid w-[min(160px,100%)]">
-          <Button disabled={isExporting} onClick={exportDiagnostics}>
-            {isExporting ? "导出中" : "导出诊断包"}
-          </Button>
-        </div>
-
-        {exportMessage ? (
-          <p className="m-0 text-[11px] text-[#6f7782]">
-            {exportMessage}
-          </p>
-        ) : null}
-
-        {apiTestError ? (
-          <p className="m-0 text-[11px] leading-snug text-[#b45f06]">
-            {apiTestError}
-          </p>
-        ) : null}
         {apiTestSteps.length > 0 ? (
-          <div className="settings-scroll-list grid min-h-0 content-start gap-2 overflow-y-auto">
+          <div className="settings-scroll-list grid content-start gap-2 border-t border-drift-line p-2">
             {apiTestSteps.map((step) => {
               const isExpanded = expandedApiStepKey === step.key;
 
               return (
                 <button
-                  className="grid w-full cursor-pointer appearance-none grid-cols-[26px_minmax(0,1fr)] gap-2 rounded-md border border-[#d5d5d5] bg-[#f5f5f5] p-2 text-left font-[inherit] text-inherit hover:border-[#c4c4c4] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]/45"
+                  className="grid w-full min-w-0 cursor-pointer appearance-none grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-drift-line bg-[#0d191e] p-2 text-left font-[inherit] text-inherit transition-colors hover:border-[#36515a] hover:bg-drift-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/30"
                   key={step.key}
                   onClick={() =>
                     onExpandedApiStepChange(isExpanded ? null : step.key)
                   }
                   type="button"
                 >
-                  <span
-                    className={classNames(
-                      "grid size-[22px] place-items-center rounded-full text-[9px] font-bold",
-                      apiTestMarkClassName(step.status),
-                    )}
-                  >
-                    {apiTestMark(step.status)}
-                  </span>
-                  <div>
-                    <div className="flex items-baseline justify-between gap-2.5">
-                      <strong className="text-[11px] font-semibold text-[#202124]">
-                        {step.label}
-                      </strong>
-                      <span className="text-[10px] text-[#7b8490]">
-                        {step.durationMs} ms
-                      </span>
-                    </div>
-                    <p className="mb-0.5 mt-1 text-[11px] text-[#606873]">
+                  <div className="min-w-0">
+                    <strong className="text-[11px] font-semibold text-drift-ink">
+                      {step.label}
+                    </strong>
+                    <p className="mb-0.5 mt-1 text-[10px] text-[#9db4ba]">
                       {step.message}
                     </p>
                     <small
                       className={classNames(
-                        "block text-[10px] text-[#7b8490]",
+                        "block text-[9px] leading-4 text-[#6f878e]",
                         isExpanded
                           ? "whitespace-pre-wrap break-words"
                           : "overflow-hidden text-ellipsis whitespace-nowrap",
@@ -151,36 +143,60 @@ export function DiagnosticsSettings({
                       {step.detail}
                     </small>
                   </div>
+                  <div className="grid shrink-0 justify-items-end gap-1">
+                    <StatusDot
+                      label={apiTestMark(step.status)}
+                      tone={apiTestTone(step.status)}
+                    />
+                    <DataValue>{step.durationMs} ms</DataValue>
+                  </div>
                 </button>
               );
             })}
           </div>
         ) : null}
-      </fieldset>
-    </div>
+      </SettingsSection>
+
+      {exportMessage ? (
+        <StatusBanner
+          description={exportMessage}
+          title={exportMessage.startsWith("导出失败：") ? "诊断导出失败" : "诊断导出完成"}
+          tone={exportMessage.startsWith("导出失败：") ? "danger" : "success"}
+        />
+      ) : null}
+
+      {apiTestError ? (
+        <StatusBanner
+          description={apiTestError}
+          title="API 诊断失败"
+          tone="danger"
+        />
+      ) : null}
+    </SettingsPage>
   );
 }
 
-function apiTestMarkClassName(status: ApiTestStep["status"]) {
+function apiTestTone(status: ApiTestStep["status"]) {
   switch (status) {
     case "success":
-      return "bg-[#34c759]/15 text-[#248a3d]";
+      return "success" as const;
     case "warning":
+      return "warning" as const;
     case "failed":
-      return "bg-[#ff9500]/15 text-[#b45f06]";
+      return "danger" as const;
     default:
-      return "bg-[#e6e6e6] text-[#555d66]";
+      return "neutral" as const;
   }
 }
 
 function apiTestMark(status: ApiTestStep["status"]) {
   switch (status) {
     case "success":
-      return "OK";
+      return "成功";
     case "warning":
-      return "!";
+      return "警告";
     case "failed":
     default:
-      return "X";
+      return "失败";
   }
 }

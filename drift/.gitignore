@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local updater end-to-end test keys and artifacts
+.updater-test/

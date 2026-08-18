@@ -5,10 +5,10 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
-import { DanmakuHistoryDrawer } from "./components/DanmakuHistoryDrawer";
-import { DanmakuStatsDrawer } from "./components/DanmakuStatsDrawer";
-import { EditModePanel } from "./components/EditModePanel";
-import { MockDanmakuPanel } from "./components/MockDanmakuPanel";
+import {
+  OverlayEditWorkspace,
+  type OverlayResizeDirection,
+} from "./components/OverlayEditWorkspace";
 import { SendDanmakuWindow } from "./components/SendDanmakuWindow";
 import { useDanmakuRuntime } from "./hooks/useDanmakuRuntime";
 import {
@@ -39,18 +39,6 @@ type EditModeChanged = {
   is_edit_mode: boolean;
   is_click_through: boolean;
   shortcut: string;
-};
-
-type ResizeDirection = "NorthWest" | "NorthEast" | "SouthEast" | "SouthWest";
-
-const RESIZE_HANDLE_BASE_CLASS =
-  "pointer-events-auto absolute size-[18px] rounded border border-[rgba(126,168,196,0.8)] bg-[rgba(126,168,196,0.26)] p-0 transition-colors hover:bg-[rgba(126,168,196,0.42)]";
-
-const RESIZE_HANDLE_POSITION_CLASSES: Record<ResizeDirection, string> = {
-  NorthWest: "left-2 top-2 cursor-nwse-resize",
-  NorthEast: "right-2 top-2 cursor-nesw-resize",
-  SouthEast: "bottom-2 right-2 cursor-nwse-resize",
-  SouthWest: "bottom-2 left-2 cursor-nesw-resize",
 };
 
 function App() {
@@ -113,7 +101,7 @@ function App() {
   }
 
   async function startResizeDragging(
-    direction: ResizeDirection,
+    direction: OverlayResizeDirection,
     event: MouseEvent<HTMLButtonElement>,
   ) {
     if (event.button !== 0 || !isEditMode) {
@@ -244,6 +232,11 @@ function App() {
     });
   }
 
+  function showMockWorkspace() {
+    setShowHistory(false);
+    setShowStats(false);
+  }
+
   if (windowLabel === "control") {
     return (
       <ControlPanel
@@ -284,68 +277,34 @@ function App() {
         trackCount={trackCount}
       />
       {isEditMode ? (
-        <>
-          <section
-            className="pointer-events-auto absolute inset-x-[18px] bottom-14 top-4 grid cursor-move select-none place-items-center rounded-drift border border-dashed border-[rgba(126,168,196,0.35)] text-[11px] leading-none text-[rgba(255,255,255,0.38)]"
-            data-tauri-drag-region
-            onMouseDown={startDragging}
-          >
-            <span className="rounded-md bg-[rgba(15,17,21,0.58)] px-2 py-1.5 backdrop-blur-md [backdrop-filter:blur(10px)]">
-              拖动调整弹幕区域位置
-            </span>
-          </section>
-          <EditModePanel
-            onExitEditMode={exitEditMode}
-            onToggleHistory={toggleHistoryDrawer}
-            onToggleStats={toggleStatsDrawer}
-            showHistory={showHistory}
-            showStats={showStats}
-            shortcut={shortcut}
-          />
-          {showHistory ? (
-            <DanmakuHistoryDrawer
-              messages={historySnapshot}
-              onClose={() => setShowHistory(false)}
-            />
-          ) : null}
-          {showStats ? (
-            <DanmakuStatsDrawer
-              onClose={() => setShowStats(false)}
-              stats={statsSnapshot}
-            />
-          ) : null}
-          {config.mockPanelEnabled ? (
-            <MockDanmakuPanel
-              active={mock.active}
-              onBurst={triggerMockBurst}
-              onRateChange={handleMockRateChange}
-              onStart={startMockDanmaku}
-              onStop={stopMockDanmaku}
-              rate={mock.rate}
-              totalGenerated={mock.totalGenerated}
-            />
-          ) : null}
-          {(
-            [
-              ["NorthWest", "nw"],
-              ["NorthEast", "ne"],
-              ["SouthEast", "se"],
-              ["SouthWest", "sw"],
-            ] as const
-          ).map(([direction]) => (
-            <button
-              aria-label={`Resize ${direction}`}
-              className={classNames(
-                RESIZE_HANDLE_BASE_CLASS,
-                RESIZE_HANDLE_POSITION_CLASSES[direction],
-              )}
-              key={direction}
-              onMouseDown={(event) => startResizeDragging(direction, event)}
-              title="拖拽调整窗口大小"
-              type="button"
-            />
-          ))}
-        </>
+        <OverlayEditWorkspace
+          historyMessages={historySnapshot}
+          mock={
+            config.mockPanelEnabled
+              ? {
+                  active: mock.active,
+                  onBurst: triggerMockBurst,
+                  onRateChange: handleMockRateChange,
+                  onStart: startMockDanmaku,
+                  onStop: stopMockDanmaku,
+                  rate: mock.rate,
+                  totalGenerated: mock.totalGenerated,
+                }
+              : null
+          }
+          onDragStart={startDragging}
+          onExit={() => void exitEditMode()}
+          onResizeStart={(direction, event) =>
+            void startResizeDragging(direction, event)
+          }
+          onShowMock={showMockWorkspace}
+          onToggleHistory={toggleHistoryDrawer}
+          onToggleStats={toggleStatsDrawer}
+          shortcut={shortcut}
+          showHistory={showHistory}
+          showStats={showStats}
+          stats={statsSnapshot}
+        />
       ) : null}
     </main>
   );

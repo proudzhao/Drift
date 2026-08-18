@@ -6,6 +6,7 @@ import {
   type Update,
 } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getUpdateErrorMessage } from "../../utils/updateErrorMessage";
 
 const DEFAULT_RELEASE_URL = "https://github.com/proudzhao/Drift/releases/latest";
 
@@ -135,13 +136,13 @@ export function useAppUpdate({
         releaseUrl: fallbackReleaseUrl,
       }));
       return update;
-    } catch (error) {
+    } catch {
       setState((current) => ({
         ...current,
         status: "error",
         downloadedBytes: 0,
         totalBytes: undefined,
-        error: readableError(error),
+        error: getUpdateErrorMessage("check"),
         checkedAt: Date.now(),
         releaseUrl: fallbackReleaseUrl,
       }));
@@ -215,11 +216,11 @@ export function useAppUpdate({
         error: "",
         releaseUrl: fallbackReleaseUrl,
       }));
-    } catch (error) {
+    } catch {
       setState((current) => ({
         ...current,
         status: "error",
-        error: readableError(error),
+        error: getUpdateErrorMessage("download_install"),
         releaseUrl: fallbackReleaseUrl,
       }));
     }
@@ -228,11 +229,11 @@ export function useAppUpdate({
   const restartApp = useCallback(async () => {
     try {
       await relaunch();
-    } catch (error) {
+    } catch {
       setState((current) => ({
         ...current,
         status: "error",
-        error: readableError(error),
+        error: getUpdateErrorMessage("restart"),
         releaseUrl: fallbackReleaseUrl,
       }));
     }
@@ -258,13 +259,6 @@ export function useAppUpdate({
     restartApp,
     state,
   };
-}
-
-function readableError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }
 
 function isWindowsPlatform() {

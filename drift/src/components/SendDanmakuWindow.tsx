@@ -6,10 +6,12 @@ import type {
   SendDanmakuResult,
   SendDanmakuStatus,
 } from "../types/danmaku";
-import { classNames } from "../utils/classNames";
+import {
+  SendDanmakuView,
+  type SendFeedbackTone,
+} from "./SendDanmakuView";
 
 const TEXT_LIMIT = 60;
-const NO_DRAG_CLASS = "[-webkit-app-region:no-drag]";
 
 export function SendDanmakuWindow() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -19,6 +21,8 @@ export function SendDanmakuWindow() {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<SendDanmakuStatus | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [feedbackTone, setFeedbackTone] =
+    useState<SendFeedbackTone>("signal");
   const [isSending, setIsSending] = useState(false);
 
   const trimmedText = text.trim();
@@ -37,11 +41,14 @@ export function SendDanmakuWindow() {
       setStatus(nextStatus);
       if (!nextStatus.canSend) {
         setFeedback(nextStatus.reason);
+        setFeedbackTone("warning");
       } else {
         setFeedback("准备发送");
+        setFeedbackTone("signal");
       }
     } catch (error) {
       setFeedback(String(error));
+      setFeedbackTone("danger");
     }
   }, []);
 
@@ -73,6 +80,7 @@ export function SendDanmakuWindow() {
       isDraggingRef.current = false;
       latestDragPointRef.current = null;
       setFeedback(`拖动失败：${String(error)}`);
+      setFeedbackTone("danger");
     }
   }
 
@@ -114,21 +122,25 @@ export function SendDanmakuWindow() {
     }
     if (!status?.canSend) {
       setFeedback(status?.reason || "当前不可发送");
+      setFeedbackTone("warning");
       await refreshStatus();
       focusInput();
       return;
     }
     if (!trimmedText) {
       setFeedback("请输入弹幕内容");
+      setFeedbackTone("warning");
       return;
     }
     if (remaining < 0) {
       setFeedback(`弹幕内容不能超过 ${TEXT_LIMIT} 个字符`);
+      setFeedbackTone("danger");
       return;
     }
 
     setIsSending(true);
     setFeedback("发送中");
+    setFeedbackTone("signal");
     try {
       const result = await invoke<SendDanmakuResult>("send_bilibili_danmaku", {
         text: trimmedText,
@@ -145,10 +157,13 @@ export function SendDanmakuWindow() {
           : current,
       );
       setFeedback(result.message);
+      setFeedbackTone("success");
       focusInput();
     } catch (error) {
-      setFeedback(String(error));
+      const failureMessage = String(error);
       await refreshStatus();
+      setFeedback(failureMessage);
+      setFeedbackTone("danger");
       focusInput();
     } finally {
       setIsSending(false);
@@ -243,68 +258,20 @@ export function SendDanmakuWindow() {
       : "未连接";
 
   return (
-    <main className="box-border h-screen w-screen overflow-hidden rounded-xl border border-[rgba(195,221,214,0.28)] bg-[linear-gradient(145deg,rgba(13,18,19,0.58),rgba(28,36,35,0.52)),rgba(12,14,15,0.44)] px-3 py-2 text-sm text-[#eef8f4] shadow-[0_18px_48px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.08)]">
-      <header
-        className="mb-1.5 flex min-h-[26px] cursor-move select-none items-center justify-between gap-3"
-        onMouseDown={(event) => void startManualDrag(event)}
-      >
-        <div className="flex min-w-0 items-baseline gap-1.5">
-          <span className="block whitespace-nowrap text-[11px] leading-none text-[#9fb2ac]">
-            发送到直播间
-          </span>
-          <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold leading-tight text-white">
-            {targetText}
-          </span>
-        </div>
-        <button
-          aria-label="关闭发送窗口"
-          className={classNames(
-            NO_DRAG_CLASS,
-            "relative z-[2] size-[26px] shrink-0 cursor-pointer rounded-full border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.08)] p-0 text-[#c9d8d2] transition-colors hover:bg-[rgba(255,255,255,0.14)] hover:text-white",
-          )}
-          onClick={() => void hideWindow()}
-          type="button"
-        >
-          ×
-        </button>
-      </header>
-
-      <div className={classNames(NO_DRAG_CLASS, "flex items-center gap-[7px]")}>
-        <input
-          className={classNames(
-            NO_DRAG_CLASS,
-            "box-border h-[34px] min-w-0 flex-1 rounded-drift border border-[rgba(196,221,214,0.28)] bg-[rgba(255,255,255,0.13)] px-[11px] text-white outline-none placeholder:text-[rgba(223,234,230,0.45)] focus:border-[rgba(96,214,180,0.68)] focus:shadow-[0_0_0_3px_rgba(96,214,180,0.16)]",
-          )}
-          ref={inputRef}
-          maxLength={TEXT_LIMIT + 8}
-          onChange={(event) => setText(event.currentTarget.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="输入弹幕内容"
-          value={text}
-        />
-        <button
-          className={classNames(
-            NO_DRAG_CLASS,
-            "h-[34px] w-[60px] cursor-pointer rounded-drift border-0 bg-[#76e0b7] font-bold text-[#092017] transition-colors hover:bg-[#8ef0ca] disabled:cursor-not-allowed disabled:bg-[rgba(255,255,255,0.1)] disabled:text-[rgba(210,220,216,0.52)]",
-          )}
-          disabled={!canSend}
-          onClick={() => void sendDanmaku()}
-          type="button"
-        >
-          发送
-        </button>
-      </div>
-
-      <footer className="mt-1.5 flex items-center justify-between gap-3 text-[11px] leading-tight text-[#9fb2ac]">
-        <span
-          className={status?.canSend ? "text-[#8feac4]" : "text-[#ffd37a]"}
-        >
-          {feedback || status?.reason || "读取发送状态"}
-        </span>
-        <span className={remaining < 0 ? "text-[#ffd37a]" : ""}>
-          {Math.max(0, remaining)}
-        </span>
-      </footer>
-    </main>
+    <SendDanmakuView
+      canSend={canSend}
+      feedback={feedback || status?.reason || "读取发送状态"}
+      inputRef={inputRef}
+      isSending={isSending}
+      onClose={() => void hideWindow()}
+      onDragStart={(event) => void startManualDrag(event)}
+      onInputKeyDown={handleKeyDown}
+      onSend={() => void sendDanmaku()}
+      onTextChange={setText}
+      remaining={remaining}
+      targetText={targetText}
+      text={text}
+      tone={feedbackTone}
+    />
   );
 }

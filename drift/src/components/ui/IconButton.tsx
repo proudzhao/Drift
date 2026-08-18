@@ -23,7 +23,11 @@ export function IconButton({
 }: IconButtonProps) {
   return (
     <Button
-      className={classNames("shrink-0", SIZE_CLASSES[size], className)}
+      className={classNames(
+        "drift-icon-button shrink-0",
+        SIZE_CLASSES[size],
+        className,
+      )}
       size="sm"
       variant={variant}
       {...props}

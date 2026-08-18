@@ -69,7 +69,7 @@ pub(super) fn show_send_danmaku_window(app: &AppHandle) -> Result<(), String> {
         None => (
             WebviewWindowBuilder::new(app, "send", WebviewUrl::App("index.html".into()))
                 .title("发送弹幕")
-                .inner_size(460.0, 116.0)
+                .inner_size(460.0, 132.0)
                 .resizable(false)
                 .decorations(false)
                 .transparent(true)

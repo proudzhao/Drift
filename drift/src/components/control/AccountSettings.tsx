@@ -4,9 +4,16 @@ import type {
   QrLoginPollResult,
   QrLoginSession,
 } from "../../types/auth";
-import { classNames } from "../../utils/classNames";
 import { createQrSvgDataUri } from "../../utils/qrCode";
 import { Button } from "../ui";
+import {
+  DataValue,
+  SettingsPage,
+  SettingsRow,
+  SettingsSection,
+  StatusBanner,
+  StatusDot,
+} from "./settings-ui";
 
 type AccountSettingsProps = {
   authError: string;
@@ -43,109 +50,101 @@ export function AccountSettings({
   const statusText = accountStatusText(authStatus, pollResult);
 
   return (
-    <div className="grid min-h-0 content-start gap-3 overflow-y-auto pr-1">
-      <section className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3.5 rounded-md border border-[#d1d1d1] bg-[#f2f2f2] px-4 py-3.5">
-        <div className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)] items-center gap-2.5">
-          <span
-            className={classNames(
-              "size-2.5 rounded-full",
-              isLoggedIn ? "bg-[#34c759]" : "bg-[#ff9500]",
+    <SettingsPage>
+      <StatusBanner
+        actions={
+          <>
+            <Button
+              disabled={isAuthBusy}
+              onClick={onValidateSession}
+              size="sm"
+            >
+              校验状态
+            </Button>
+            {isLoggedIn ? (
+              <Button
+                disabled={isAuthBusy}
+                onClick={onLogout}
+                size="sm"
+                variant="danger"
+              >
+                退出登录
+              </Button>
+            ) : (
+              <Button
+                disabled={isAuthBusy}
+                onClick={onStartLogin}
+                size="sm"
+                variant="primary"
+              >
+                扫码登录
+              </Button>
             )}
-          />
-          <div className="grid min-w-0 gap-0.5">
-            <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-[#202124]">
-              {isLoggedIn ? "已登录 B 站" : "未登录 B 站"}
-            </strong>
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#6f7782]">
-              {statusText}
-            </span>
-          </div>
-        </div>
-        <div className="grid grid-flow-col gap-2">
-          <Button
-            disabled={isAuthBusy}
-            onClick={onValidateSession}
-            size="sm"
-          >
-            校验状态
-          </Button>
-          {isLoggedIn ? (
-            <Button
-              disabled={isAuthBusy}
-              onClick={onLogout}
-              size="sm"
-              variant="danger"
-            >
-              退出登录
-            </Button>
-          ) : (
-            <Button
-              disabled={isAuthBusy}
-              onClick={onStartLogin}
-              size="sm"
-              variant="primary"
-            >
-              扫码登录
-            </Button>
-          )}
-        </div>
-      </section>
+          </>
+        }
+        description={statusText}
+        title={isLoggedIn ? "已登录 B 站" : "未登录 B 站"}
+        tone={isLoggedIn ? "success" : "warning"}
+      />
 
       {authStatus ? (
-        <section className="grid grid-cols-2 gap-2">
-          {[
-            ["昵称", authStatus.username || "未获取"],
-            ["UID", authStatus.uid ?? "未获取"],
-            ["最近校验", formatUnixTime(authStatus.lastValidatedAt)],
-            ["过期时间", formatUnixTime(authStatus.expiresAt)],
-          ].map(([label, value]) => (
-            <div
-              className="grid min-w-0 gap-1 rounded-md border border-[#d5d5d5] bg-[#f5f5f5] px-3 py-2.5"
-              key={label}
-            >
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#6f7782]">
-                {label}
-              </span>
-              <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-[#202124]">
-                {value}
-              </strong>
-            </div>
-          ))}
-        </section>
+        <SettingsSection title="账号信息">
+          <SettingsRow
+            control={<DataValue>{authStatus.username || "未获取"}</DataValue>}
+            label="昵称"
+          />
+          <SettingsRow
+            control={<DataValue>{authStatus.uid ?? "未获取"}</DataValue>}
+            label="UID"
+          />
+          <SettingsRow
+            control={
+              <DataValue>{formatUnixTime(authStatus.lastValidatedAt)}</DataValue>
+            }
+            label="最近校验"
+          />
+          <SettingsRow
+            control={<DataValue>{formatUnixTime(authStatus.expiresAt)}</DataValue>}
+            label="过期时间"
+          />
+        </SettingsSection>
       ) : null}
 
       {qrSession ? (
-        <section className="grid grid-cols-[156px_minmax(0,1fr)] items-center gap-3.5 rounded-md border border-[#d1d1d1] bg-[#f2f2f2] p-3.5">
-          <div className="grid size-[156px] place-items-center rounded-md border border-[#cfcfcf] bg-white">
-            {qrSrc ? (
-              <img
-                alt="B 站扫码登录二维码"
-                className="block size-[140px] [image-rendering:pixelated]"
-                src={qrSrc}
-              />
-            ) : (
-              <span className="px-2.5 text-center text-[11px] text-[#b45f06]">
-                二维码生成失败
-              </span>
-            )}
+        <SettingsSection
+          description={pollResult?.message || "请使用 B 站手机客户端扫码"}
+          title="扫码登录"
+        >
+          <div className="grid grid-cols-[156px_minmax(0,1fr)] items-center gap-4 p-3 max-[519px]:grid-cols-1">
+            <div className="qr-scan-surface grid size-[156px] place-items-center rounded-lg bg-white">
+              {qrSrc ? (
+                <img
+                  alt="B 站扫码登录二维码"
+                  className="size-[140px] [image-rendering:pixelated]"
+                  src={qrSrc}
+                />
+              ) : (
+                <span className="text-[10px] text-[var(--control-warning)]">
+                  二维码生成失败
+                </span>
+              )}
+            </div>
+            <StatusDot
+              label={qrStatusText(pollResult, isPolling)}
+              tone={pollResult?.status === "error" ? "danger" : "signal"}
+            />
           </div>
-          <div className="grid min-w-0 gap-1.5">
-            <strong className="overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-[#202124]">
-              {qrStatusText(pollResult, isPolling)}
-            </strong>
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#6f7782]">
-              {pollResult?.message || "请使用 B 站手机客户端扫码"}
-            </span>
-          </div>
-        </section>
+        </SettingsSection>
       ) : null}
 
       {authError || authStatus?.error ? (
-        <p className="m-0 text-[11px] leading-snug text-[#b45f06]">
-          {authError || authStatus?.error}
-        </p>
+        <StatusBanner
+          description={authError || authStatus?.error}
+          title="账号状态异常"
+          tone="danger"
+        />
       ) : null}
-    </div>
+    </SettingsPage>
   );
 }
 

@@ -15,8 +15,9 @@ export function Panel({
 }: PanelProps) {
   return (
     <section
+      aria-label={typeof title === "string" ? title : undefined}
       className={classNames(
-        "grid gap-3 rounded-drift border border-drift-border bg-drift-panel p-4 text-drift-text",
+        "drift-panel grid gap-3 rounded-drift border border-drift-border bg-drift-panel p-4 text-drift-text",
         className,
       )}
       {...props}

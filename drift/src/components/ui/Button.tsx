@@ -39,7 +39,7 @@ export function Button({
   return (
     <button
       className={classNames(
-        "inline-flex cursor-pointer appearance-none items-center justify-center gap-1.5 rounded-drift border font-semibold leading-none transition-colors",
+        "drift-button inline-flex cursor-pointer appearance-none items-center justify-center gap-1.5 rounded-drift border font-semibold leading-none transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-primary/25",
         "disabled:cursor-default disabled:opacity-45",
         SIZE_CLASSES[size],

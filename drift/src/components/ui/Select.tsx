@@ -22,7 +22,7 @@ export function Select({
   return (
     <select
       className={classNames(
-        "box-border w-full cursor-pointer rounded-drift border bg-white text-drift-text shadow-inner outline-none transition-colors",
+        "drift-select box-border w-full cursor-pointer rounded-drift border bg-white text-drift-text shadow-inner outline-none transition-colors",
         "focus:border-drift-primary focus:ring-2 focus:ring-drift-primary/15",
         "disabled:cursor-default disabled:bg-slate-100 disabled:text-slate-400",
         SIZE_CLASSES[selectSize],

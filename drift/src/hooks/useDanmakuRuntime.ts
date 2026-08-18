@@ -24,7 +24,7 @@ import {
   ensureLaneAvailability,
   estimateMessageWidth,
   findAvailableTrack,
-  isPriorityMessage,
+  isProtectedMessage,
   isMessageTypeVisible,
   laneCooldownMs,
   MAX_PENDING_QUEUE,
@@ -222,7 +222,7 @@ export function useDanmakuRuntime({
 
   function enqueueMessages(messages: QueuedLiveMessage[]) {
     for (const message of messages) {
-      if (isPriorityMessage(message)) {
+      if (isProtectedMessage(message)) {
         priorityMessagesRef.current.push(message);
       } else {
         pendingMessagesRef.current.push(message);
@@ -260,7 +260,7 @@ export function useDanmakuRuntime({
     const delayedNormalMessages: QueuedLiveMessage[] = [];
 
     for (const message of messages) {
-      if (isPriorityMessage(message)) {
+      if (isProtectedMessage(message)) {
         delayedPriorityMessages.push(message);
       } else {
         delayedNormalMessages.push(message);
@@ -368,7 +368,7 @@ export function useDanmakuRuntime({
         const track = findAvailableTrack(laneAvailableAtRef.current, messageNow);
         if (track === null) {
           if (
-            isPriorityMessage(message) ||
+            isProtectedMessage(message) ||
             (message.attempts < MAX_REQUEUE_ROUNDS &&
               messageNow - message.queuedAt < MAX_REQUEUE_LATENCY_MS)
           ) {

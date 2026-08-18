@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { FolderPen, FolderPlus, Trash2 } from "lucide-react";
 import {
   ALL_SAVED_ROOM_GROUP_ID,
   type SavedRoomGroup,
 } from "../../types/config";
+import { Button, IconButton, Input, Tooltip, TooltipProvider } from "../ui";
+import { Toolbar } from "./settings-ui";
 
 type SavedRoomGroupControlsProps = {
   groups: SavedRoomGroup[];
@@ -86,153 +89,187 @@ export function SavedRoomGroupControls({
   }
 
   return (
-    <div className="saved-room-group-controls">
-      <div className="saved-room-command-row">
-        <input
-          aria-label="搜索常用直播间"
-          className="saved-room-search-input"
-          onChange={(event) => onSearchQueryChange(event.currentTarget.value)}
-          placeholder="搜索房间号、名称、主播"
-          type="search"
-          value={searchQuery}
-        />
-        <div className="saved-room-inline-actions">
-          <button
-            className={isCreatingGroup ? "is-active" : ""}
-            onClick={startCreate}
-            type="button"
-          >
-            新建
-          </button>
-          {selectedGroup ? (
-            <>
-              <button
-                className={
-                  renamingGroupId === selectedGroup.id ? "is-active" : ""
-                }
-                onClick={() => startRename(selectedGroup)}
-                type="button"
+    <TooltipProvider delayDuration={300}>
+      <div className="grid min-w-0 gap-2">
+        <Toolbar aria-label="常用直播间工具栏">
+          <Input
+            aria-label="搜索常用直播间"
+            inputSize="sm"
+            onChange={(event) =>
+              onSearchQueryChange(event.currentTarget.value)
+            }
+            placeholder="搜索房间号、名称、主播"
+            type="search"
+            value={searchQuery}
+          />
+          <div className="flex items-center gap-1">
+            <Tooltip content="新建分组">
+              <IconButton
+                active={isCreatingGroup}
+                aria-label="新建分组"
+                onClick={startCreate}
+                size="sm"
               >
-                改名
-              </button>
-              <button
-                disabled={groups.length <= 1}
-                onClick={() => requestDelete(selectedGroup)}
-                type="button"
-              >
-                删除
-              </button>
-            </>
-          ) : null}
-        </div>
-      </div>
+                <FolderPlus aria-hidden="true" size={14} />
+              </IconButton>
+            </Tooltip>
+            {selectedGroup ? (
+              <>
+                <Tooltip content="重命名分组">
+                  <IconButton
+                    active={renamingGroupId === selectedGroup.id}
+                    aria-label="重命名分组"
+                    onClick={() => startRename(selectedGroup)}
+                    size="sm"
+                  >
+                    <FolderPen aria-hidden="true" size={14} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip content="删除分组">
+                  <IconButton
+                    aria-label="删除分组"
+                    disabled={groups.length <= 1}
+                    onClick={() => requestDelete(selectedGroup)}
+                    size="sm"
+                    variant="danger"
+                  >
+                    <Trash2 aria-hidden="true" size={14} />
+                  </IconButton>
+                </Tooltip>
+              </>
+            ) : null}
+          </div>
+        </Toolbar>
 
-      <div className="saved-room-group-tabs" role="tablist">
-        <button
-          className={
-            selectedGroupId === ALL_SAVED_ROOM_GROUP_ID ? "is-active" : ""
-          }
-          onClick={() => onSelectedGroupChange(ALL_SAVED_ROOM_GROUP_ID)}
-          type="button"
+        <div
+          aria-label="常用直播间分组"
+          className="settings-scroll-list flex min-w-0 gap-1 overflow-x-auto pb-1"
+          role="tablist"
         >
-          全部
-        </button>
-        {groups.map((group) => (
-          <button
-            className={selectedGroupId === group.id ? "is-active" : ""}
-            key={group.id}
-            onClick={() => onSelectedGroupChange(group.id)}
-            type="button"
+          <Button
+            active={selectedGroupId === ALL_SAVED_ROOM_GROUP_ID}
+            aria-selected={selectedGroupId === ALL_SAVED_ROOM_GROUP_ID}
+            onClick={() => onSelectedGroupChange(ALL_SAVED_ROOM_GROUP_ID)}
+            role="tab"
+            size="sm"
           >
-            {group.name}
-          </button>
-        ))}
-      </div>
-
-      {isCreatingGroup ||
-      (selectedGroup && renamingGroupId === selectedGroup.id) ? (
-        <div className="saved-room-group-editor">
-          {isCreatingGroup ? (
-            <div className="saved-room-group-edit-row">
-              <input
-                aria-label="新分组名称"
-                onChange={(event) => setNewGroupName(event.currentTarget.value)}
-                placeholder="新分组"
-                value={newGroupName}
-              />
-              <button
-                disabled={!newGroupName.trim()}
-                onClick={createGroup}
-                type="button"
-              >
-                添加
-              </button>
-              <button
-                onClick={() => {
-                  setIsCreatingGroup(false);
-                  setNewGroupName("");
-                }}
-                type="button"
-              >
-                取消
-              </button>
-            </div>
-          ) : null}
-
-          {selectedGroup && renamingGroupId === selectedGroup.id ? (
-            <div className="saved-room-group-edit-row">
-              <input
-                aria-label="重命名分组"
-                onChange={(event) => setRenameDraft(event.currentTarget.value)}
-                value={renameDraft}
-              />
-              <button
-                disabled={!renameDraft.trim()}
-                onClick={saveRename}
-                type="button"
-              >
-                保存
-              </button>
-              <button
-                onClick={() => {
-                  setRenamingGroupId(null);
-                  setRenameDraft("");
-                }}
-                type="button"
-              >
-                取消
-              </button>
-            </div>
-          ) : null}
+            全部
+          </Button>
+          {groups.map((group) => (
+            <Button
+              active={selectedGroupId === group.id}
+              aria-selected={selectedGroupId === group.id}
+              key={group.id}
+              onClick={() => onSelectedGroupChange(group.id)}
+              role="tab"
+              size="sm"
+            >
+              {group.name}
+            </Button>
+          ))}
         </div>
-      ) : null}
 
-      {pendingDeleteGroup ? (
-        <div className="saved-room-confirm-backdrop" role="presentation">
+        {isCreatingGroup ||
+        (selectedGroup && renamingGroupId === selectedGroup.id) ? (
+          <div className="grid min-w-0 rounded-lg border border-drift-line bg-[#0d191e] p-2">
+            {isCreatingGroup ? (
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
+                <Input
+                  aria-label="新分组名称"
+                  inputSize="sm"
+                  onChange={(event) =>
+                    setNewGroupName(event.currentTarget.value)
+                  }
+                  placeholder="新分组"
+                  value={newGroupName}
+                />
+                <Button
+                  disabled={!newGroupName.trim()}
+                  onClick={createGroup}
+                  size="sm"
+                  variant="primary"
+                >
+                  添加
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsCreatingGroup(false);
+                    setNewGroupName("");
+                  }}
+                  size="sm"
+                >
+                  取消
+                </Button>
+              </div>
+            ) : null}
+
+            {selectedGroup && renamingGroupId === selectedGroup.id ? (
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
+                <Input
+                  aria-label="重命名分组"
+                  inputSize="sm"
+                  onChange={(event) =>
+                    setRenameDraft(event.currentTarget.value)
+                  }
+                  value={renameDraft}
+                />
+                <Button
+                  disabled={!renameDraft.trim()}
+                  onClick={saveRename}
+                  size="sm"
+                  variant="primary"
+                >
+                  保存
+                </Button>
+                <Button
+                  onClick={() => {
+                    setRenamingGroupId(null);
+                    setRenameDraft("");
+                  }}
+                  size="sm"
+                >
+                  取消
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {pendingDeleteGroup ? (
           <div
-            aria-labelledby="saved-room-delete-title"
-            aria-modal="true"
-            className="saved-room-confirm-dialog"
-            role="dialog"
+            className="fixed inset-0 z-20 grid place-items-center bg-black/45 p-6"
+            role="presentation"
           >
-            <strong id="saved-room-delete-title">删除分组</strong>
-            <p>
-              确认删除“{pendingDeleteGroup.name}”？该分组下的常用直播间将变为未分组，只在“全部”中显示。
-            </p>
-            <div className="saved-room-confirm-actions">
-              <button onClick={confirmDelete} type="button">
-                确认
-              </button>
-              <button
-                onClick={() => setPendingDeleteGroup(null)}
-                type="button"
+            <div
+              aria-labelledby="group-delete-title"
+              aria-modal="true"
+              className="grid w-full max-w-[360px] gap-3 rounded-lg border border-drift-line bg-drift-raised p-4 shadow-2xl"
+              role="dialog"
+            >
+              <strong
+                className="text-xs text-drift-ink"
+                id="group-delete-title"
               >
-                取消
-              </button>
+                删除分组
+              </strong>
+              <p className="m-0 text-[10px] leading-5 text-[#789097]">
+                确认删除“{pendingDeleteGroup.name}”？该分组下的常用直播间将变为未分组，只在“全部”中显示。
+              </p>
+              <div className="flex justify-end gap-1.5">
+                <Button onClick={confirmDelete} size="sm" variant="danger">
+                  确认删除
+                </Button>
+                <Button
+                  onClick={() => setPendingDeleteGroup(null)}
+                  size="sm"
+                >
+                  取消
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </TooltipProvider>
   );
 }

@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import type { LiveMessageKind } from "../types/danmaku";
-import { classNames } from "../utils/classNames";
+import { IconButton, Input, Tooltip, TooltipProvider } from "./ui";
 
 export type HistoryMessage = {
   id: string;
@@ -11,22 +12,24 @@ export type HistoryMessage = {
 };
 
 type DanmakuHistoryDrawerProps = {
+  initialQuery?: string;
   messages: HistoryMessage[];
   onClose: () => void;
 };
 
-const DRAWER_CLASS =
-  "absolute bottom-0 right-0 top-0 z-[2] grid w-[280px] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2 border-l border-[rgba(126,168,196,0.35)] bg-[rgba(15,17,21,0.82)] px-3 py-2.5 text-[rgba(255,255,255,0.92)] backdrop-blur-md [backdrop-filter:blur(12px)] pointer-events-auto select-none";
-
-const DARK_SCROLL_CLASS =
-  "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-[rgba(255,255,255,0.2)] [&::-webkit-scrollbar-thumb]:bg-clip-padding";
+type CopyFeedback = {
+  id: string;
+  status: "success" | "error";
+} | null;
 
 export function DanmakuHistoryDrawer({
+  initialQuery = "",
   messages,
   onClose,
 }: DanmakuHistoryDrawerProps) {
-  const [query, setQuery] = useState("");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
+  const copyTimerRef = useRef<number | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -44,75 +47,107 @@ export function DanmakuHistoryDrawer({
     }
   }, [messages, query]);
 
+  useEffect(
+    () => () => {
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    },
+    [],
+  );
+
   async function copyMessage(msg: HistoryMessage) {
-    await navigator.clipboard.writeText(`${msg.user}: ${msg.text}`);
-    setCopiedId(msg.id);
-    window.setTimeout(() => setCopiedId(null), 1500);
+    try {
+      await navigator.clipboard.writeText(`${msg.user}: ${msg.text}`);
+      setCopyFeedback({ id: msg.id, status: "success" });
+    } catch {
+      setCopyFeedback({ id: msg.id, status: "error" });
+    }
+    if (copyTimerRef.current !== null) {
+      window.clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = window.setTimeout(() => setCopyFeedback(null), 1500);
   }
 
   return (
-    <aside className={DRAWER_CLASS} aria-label="Danmaku history">
-      <header className="flex items-center justify-between">
-        <strong className="text-[11px] font-semibold">弹幕历史</strong>
-        <button
-          className="min-h-6 cursor-pointer rounded-[5px] border border-[rgba(126,168,196,0.48)] bg-[rgba(126,168,196,0.2)] px-2 text-[10px] font-semibold text-[rgba(255,255,255,0.84)] transition-colors hover:bg-[rgba(126,168,196,0.32)]"
-          onClick={onClose}
-          type="button"
-        >
-          关闭
-        </button>
-      </header>
-
-      <input
-        className="box-border min-h-7 w-full rounded-md border border-[rgba(126,168,196,0.3)] bg-[rgba(255,255,255,0.08)] px-2 text-[11px] text-white outline-none placeholder:text-[rgba(255,255,255,0.36)] focus:border-[rgba(126,168,196,0.6)]"
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="搜索弹幕或用户名"
-        type="text"
-        value={query}
-      />
-
-      <div
-        className={classNames(
-          "min-h-0 overflow-y-auto pr-1",
-          DARK_SCROLL_CLASS,
-        )}
+    <TooltipProvider delayDuration={300}>
+      <aside
+        aria-label="弹幕历史"
+        className="overlay-drawer overlay-history-drawer pointer-events-auto absolute bottom-[42px] right-0 top-0 z-[2] box-border grid w-[296px] min-w-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2 overflow-hidden border-l border-[#29414a] bg-[rgba(7,16,20,.95)] px-3 py-2.5 text-[#eaf6f7] backdrop-blur-[20px] select-none"
       >
-        {filtered.length === 0 ? (
-          <p className="m-0 py-6 text-center text-[11px] text-[rgba(255,255,255,0.42)]">
-            {query.trim() ? "没有匹配的弹幕" : "暂无弹幕"}
-          </p>
-        ) : (
-          filtered.map((msg) => (
-            <button
-              className="grid w-full cursor-pointer appearance-none grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-1.5 rounded border-0 bg-transparent px-1.5 py-1 text-left text-inherit transition-colors hover:bg-[rgba(255,255,255,0.06)]"
-              key={msg.id}
-              onClick={() => copyMessage(msg)}
-              type="button"
+        <header className="overlay-drawer-header flex min-w-0 items-center justify-between">
+          <div className="min-w-0">
+            <strong className="text-[11px] font-semibold">弹幕历史</strong>
+            <span className="drift-data-text ml-2 text-[9px] text-[#789097]">
+              最近 {messages.length} 条
+            </span>
+          </div>
+          <Tooltip content="关闭弹幕历史">
+            <IconButton
+              aria-label="关闭弹幕历史"
+              className="text-[#789097] hover:bg-[#14272d] hover:text-[#eaf6f7]"
+              onClick={onClose}
+              size="sm"
+              variant="ghost"
             >
-              <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-[rgba(126,168,196,0.88)]">
-                {msg.user}
-              </span>
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[rgba(255,255,255,0.84)]">
-                {msg.text}
-              </span>
-              {copiedId === msg.id ? (
-                <span className="text-[9px] font-semibold text-[#34c759]">
-                  已复制
+              <X aria-hidden="true" size={14} />
+            </IconButton>
+          </Tooltip>
+        </header>
+        <Input
+          aria-label="搜索弹幕历史"
+          className="overlay-history-search border-[#29414a] bg-[#0e1d22] text-[#eaf6f7] placeholder:text-[#789097] focus:border-[#32c7d9] focus:ring-[#32c7d9]/15"
+          inputSize="sm"
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="搜索弹幕或用户名"
+          role="searchbox"
+          value={query}
+        />
+        <div className="overlay-drawer-scroll min-h-0 overflow-y-auto [scrollbar-color:#36515a_transparent] [scrollbar-width:thin]">
+          {filtered.length === 0 ? (
+            <p className="overlay-empty-copy m-0 py-6 text-center text-[11px] text-[#789097]">
+              {query.trim() ? "没有匹配的弹幕" : "暂无弹幕"}
+            </p>
+          ) : (
+            filtered.map((msg) => (
+              <button
+                aria-label={`复制 ${msg.user} 的弹幕`}
+                className="overlay-history-row grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-1.5 border-0 border-b border-[#14272d] bg-transparent px-1 py-[7px] text-left text-inherit transition-colors hover:bg-[#10252b]"
+                key={msg.id}
+                onClick={() => void copyMessage(msg)}
+                type="button"
+              >
+                <span className="overlay-history-user overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-[#62d7e4]">
+                  {msg.user}
                 </span>
-              ) : null}
-            </button>
-          ))
-        )}
-        <div ref={listEndRef} />
-      </div>
-
-      <footer className="text-[10px] text-[rgba(255,255,255,0.38)]">
-        <span>
+                <span className="overlay-history-text overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#c7dadd]">
+                  {msg.text}
+                </span>
+                {copyFeedback?.id === msg.id ? (
+                  <span
+                    className={
+                      copyFeedback.status === "success"
+                        ? "text-[9px] font-semibold text-[#65d995]"
+                        : "text-[9px] font-semibold text-[#ff7d85]"
+                    }
+                    data-tone={
+                      copyFeedback.status === "success" ? "success" : "danger"
+                    }
+                  >
+                    {copyFeedback.status === "success" ? "已复制" : "复制失败"}
+                  </span>
+                ) : null}
+              </button>
+            ))
+          )}
+          <div ref={listEndRef} />
+        </div>
+        <footer className="overlay-drawer-footer text-[10px] text-[#789097]">
           {query.trim()
             ? `${filtered.length} 条匹配`
             : `最近 ${messages.length} 条`}
-        </span>
-      </footer>
-    </aside>
+        </footer>
+      </aside>
+    </TooltipProvider>
   );
 }
