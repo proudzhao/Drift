@@ -1,15 +1,19 @@
 use super::auth;
 use super::cookies::merge_cookie_headers;
 use super::errors::classify_connection_error;
+use super::filter_runtime::{emit_filter_runtime_status, FilterRuntimeState};
 use super::http;
 use super::protocol;
+use super::recording::{preserve_event_batch, DanmakuRecorder};
+use super::sc_dedup::SuperChatDedupWindow;
 use super::types::{
     ConnectionResult, DanmakuStatus, DanmakuTaskState, DeviceCookie, LiveMessage,
     DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
 };
+use chrono::Local;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::json;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, error, info, warn};
@@ -20,9 +24,12 @@ use tracing::{debug, error, info, warn};
 pub fn start_bilibili_danmaku(
     app: AppHandle,
     state: tauri::State<'_, DanmakuTaskState>,
+    filter_state: tauri::State<'_, FilterRuntimeState>,
     room_id: u64,
 ) -> Result<(), String> {
     stop_existing_task(&state);
+    let filter_status = filter_state.reset(Some(room_id))?;
+    emit_filter_runtime_status(&app, &filter_status)?;
     emit_status(&app, "connecting", format!("正在连接直播间 {}", room_id));
 
     let task_app = app.clone();
@@ -66,8 +73,9 @@ async fn run_with_reconnect(app: AppHandle, room_id: u64) {
     emit_status(&app, "connecting", format!("正在连接直播间 {}", room_id));
 
     let mut attempt = 0usize;
+    let mut super_chat_dedup = SuperChatDedupWindow::default();
     loop {
-        match connect_room(app.clone(), room_id).await {
+        match connect_room(app.clone(), room_id, &mut super_chat_dedup).await {
             Ok(ConnectionResult::NotLive) => {
                 info!(target: "drift::bilibili", room_id, "room is not live; connection task ended");
                 break;
@@ -100,9 +108,19 @@ async fn run_with_reconnect(app: AppHandle, room_id: u64) {
     }
 }
 
-async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, String> {
+async fn connect_room(
+    app: AppHandle,
+    room_id: u64,
+    super_chat_dedup: &mut SuperChatDedupWindow,
+) -> Result<ConnectionResult, String> {
     let room_init = http::fetch_room_init(room_id).await?;
     let room_id = room_init.room_id;
+    let filter_state = app.state::<FilterRuntimeState>();
+    let previous_filter_status = filter_state.snapshot()?;
+    let filter_status = filter_state.set_room_id(room_id)?;
+    if filter_status != previous_filter_status {
+        emit_filter_runtime_status(&app, &filter_status)?;
+    }
     info!(
         target: "drift::bilibili.http",
         room_id,
@@ -191,7 +209,7 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
         "connected",
         format!("已连接直播间 {}", room_id),
         room_id,
-        anchor_name,
+        anchor_name.clone(),
         Some(room_init.live_status),
     );
     let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
@@ -221,22 +239,26 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
                 if !danmaku_buffer.is_empty() {
                     let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();
                     debug!(target: "drift::bilibili.ws", count = batch.len(), "flushing danmaku batch");
-                    if let Err(error) = app.emit("danmaku-messages", batch) {
-                        error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
-                    }
+                    emit_danmaku_batch(&app, room_id, anchor_name.as_deref(), batch);
                 }
             }
             message = reader.next() => {
                 match message {
                     Some(Ok(Message::Binary(bytes))) => {
-                        let messages = protocol::handle_packet(&app, &status_emitter, room_id, self_uid, &bytes)?;
+                        let messages = protocol::handle_packet(
+                            &app,
+                            &status_emitter,
+                            room_id,
+                            room_init.uid,
+                            self_uid,
+                            &bytes,
+                        )?;
+                        let messages = super_chat_dedup.retain_new(room_id, messages);
                         danmaku_buffer.extend(messages);
                         if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
                             let batch: Vec<LiveMessage> = danmaku_buffer.drain(..).collect();
                             warn!(target: "drift::bilibili.ws", count = batch.len(), "danmaku buffer overflow, emergency flush");
-                            if let Err(error) = app.emit("danmaku-messages", batch) {
-                                error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
-                            }
+                            emit_danmaku_batch(&app, room_id, anchor_name.as_deref(), batch);
                         }
                     }
                     Some(Ok(Message::Close(_))) => return Err("服务器关闭连接".to_string()),
@@ -246,6 +268,21 @@ async fn connect_room(app: AppHandle, room_id: u64) -> Result<ConnectionResult, 
                 }
             }
         }
+    }
+}
+
+fn emit_danmaku_batch(
+    app: &AppHandle,
+    room_id: u64,
+    anchor_name: Option<&str>,
+    batch: Vec<LiveMessage>,
+) {
+    let recorder = app.state::<DanmakuRecorder>();
+    let batch = preserve_event_batch(batch, |recording_batch| {
+        recorder.try_record(app, room_id, anchor_name, Local::now(), recording_batch)
+    });
+    if let Err(error) = app.emit("danmaku-messages", batch) {
+        error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
     }
 }
 

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppearanceConfig, MessageDisplayConfig } from "../../types/config";
+import type { VerticalFlowStatus } from "../../types/verticalFlow";
 import { Button, SegmentedControl, Toggle } from "../ui";
 import { ControlSlider } from "./ControlSlider";
 import {
@@ -7,15 +8,35 @@ import {
   SettingsPage,
   SettingsRow,
   SettingsSection,
+  StatusBanner,
+  StatusDot,
 } from "./settings-ui";
 
 type DisplaySettingsProps = {
   appearance: AppearanceConfig;
+  displayConfigError?: string | null;
   messageDisplay: MessageDisplayConfig;
   onResetAppearance: () => void;
   onUpdateAppearance: (appearance: Partial<AppearanceConfig>) => void;
   onUpdateMessageDisplay: (messageDisplay: Partial<MessageDisplayConfig>) => void;
+  verticalFlowStatus: VerticalFlowStatus;
 };
+
+const MESSAGE_FLOW_OPTIONS: Array<{
+  label: string;
+  value: AppearanceConfig["messageFlow"];
+}> = [
+  { label: "横向滚动", value: "horizontal" },
+  { label: "纵向聊天流", value: "vertical" },
+];
+
+const VERTICAL_OVERFLOW_OPTIONS: Array<{
+  label: string;
+  value: AppearanceConfig["verticalOverflowPolicy"];
+}> = [
+  { label: "实时优先", value: "realtime" },
+  { label: "完整优先", value: "complete" },
+];
 
 const DENSITY_LABELS: Record<AppearanceConfig["density"], string> = {
   low: "低",
@@ -34,11 +55,21 @@ const DENSITY_OPTIONS: Array<{
 
 export function DisplaySettings({
   appearance,
+  displayConfigError,
   messageDisplay,
   onResetAppearance,
   onUpdateAppearance,
   onUpdateMessageDisplay,
+  verticalFlowStatus,
 }: DisplaySettingsProps) {
+  const isVerticalFlow = appearance.messageFlow === "vertical";
+  const isVerticalQueueNormal =
+    !verticalFlowStatus.active ||
+    (verticalFlowStatus.backlog === 0 &&
+      verticalFlowStatus.droppedTotal === 0);
+  const verticalQueueLabel = isVerticalQueueNormal
+    ? "纵向队列正常"
+    : `积压 ${verticalFlowStatus.backlog} 条 · ${verticalFlowStatus.speedMultiplier}× 加速`;
   const messageTypeOptions: Array<{
     checked: boolean;
     label: string;
@@ -69,7 +100,23 @@ export function DisplaySettings({
 
   return (
     <SettingsPage>
+      {displayConfigError ? (
+        <StatusBanner title={displayConfigError} tone="danger" />
+      ) : null}
+
       <SettingsSection title="外观">
+        <SettingsRow
+          control={
+            <SegmentedControl
+              ariaLabel="消息流模式"
+              className="w-full grid-cols-2"
+              onChange={(messageFlow) => onUpdateAppearance({ messageFlow })}
+              options={MESSAGE_FLOW_OPTIONS}
+              value={appearance.messageFlow}
+            />
+          }
+          label="消息流模式"
+        />
         <ControlSlider
           label="字号"
           max={32}
@@ -87,6 +134,8 @@ export function DisplaySettings({
           value={Math.round(appearance.opacity * 100)}
         />
         <ControlSlider
+          description={isVerticalFlow ? "仅横向模式生效" : undefined}
+          disabled={isVerticalFlow}
           label="滚动速度"
           max={24}
           min={6}
@@ -107,10 +156,14 @@ export function DisplaySettings({
           label="显示密度"
         />
         <SettingsRow
+          description={
+            isVerticalFlow ? "纵向聊天流始终显示用户名" : undefined
+          }
           control={
             <Toggle
               aria-label="显示用户名"
-              checked={appearance.showUsername}
+              checked={isVerticalFlow || appearance.showUsername}
+              disabled={isVerticalFlow}
               onCheckedChange={(checked) =>
                 onUpdateAppearance({ showUsername: checked })
               }
@@ -118,6 +171,41 @@ export function DisplaySettings({
           }
           label="显示用户名"
         />
+        {isVerticalFlow ? (
+          <>
+            <SettingsRow
+              control={
+                <SegmentedControl
+                  ariaLabel="过载策略"
+                  className="w-full grid-cols-2"
+                  onChange={(verticalOverflowPolicy) =>
+                    onUpdateAppearance({ verticalOverflowPolicy })
+                  }
+                  options={VERTICAL_OVERFLOW_OPTIONS}
+                  value={appearance.verticalOverflowPolicy}
+                />
+              }
+              label="过载策略"
+            />
+            <SettingsRow
+              control={
+                <div className="grid justify-items-end gap-1">
+                  <StatusDot
+                    label={verticalQueueLabel}
+                    tone={isVerticalQueueNormal ? "success" : "signal"}
+                  />
+                  {verticalFlowStatus.droppedTotal > 0 ? (
+                    <StatusDot
+                      label={`本次运行已丢弃 ${verticalFlowStatus.droppedTotal} 条`}
+                      tone="warning"
+                    />
+                  ) : null}
+                </div>
+              }
+              label="队列状态"
+            />
+          </>
+        ) : null}
         <SettingsRow
           control={<DataValue>统一白色</DataValue>}
           label="弹幕颜色"

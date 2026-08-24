@@ -31,14 +31,14 @@ export function DanmakuStatsDrawer({
     <TooltipProvider delayDuration={300}>
       <aside
         aria-label="弹幕统计"
-        className="overlay-drawer overlay-stats-drawer pointer-events-auto absolute bottom-[42px] right-0 top-0 z-[2] box-border grid w-[296px] min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden border-l border-[#29414a] bg-[rgba(7,16,20,.95)] px-3 py-2.5 text-[#eaf6f7] backdrop-blur-[20px] select-none"
+        className="drift-theme-transition overlay-drawer overlay-stats-drawer pointer-events-auto absolute bottom-[42px] right-0 top-0 z-[2] box-border grid w-[296px] min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden border-l border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-drawer)] px-3 py-2.5 text-[var(--drift-ui-ink)] backdrop-blur-[20px] select-none"
       >
         <header className="overlay-drawer-header flex min-w-0 items-center justify-between">
-          <strong className="text-[11px] font-semibold">弹幕统计</strong>
+          <strong className="drift-theme-transition text-[11px] font-semibold">弹幕统计</strong>
           <Tooltip content="关闭弹幕统计">
             <IconButton
               aria-label="关闭弹幕统计"
-              className="text-[#789097] hover:bg-[#14272d] hover:text-[#eaf6f7]"
+              className="text-[var(--drift-ui-muted)] hover:bg-[var(--drift-ui-overlay-control-hover)] hover:text-[var(--drift-ui-ink)]"
               onClick={onClose}
               size="sm"
               variant="ghost"
@@ -48,7 +48,7 @@ export function DanmakuStatsDrawer({
           </Tooltip>
         </header>
 
-        <div className="overlay-stats-scroll overlay-drawer-scroll grid min-h-0 content-start gap-2 overflow-y-auto pr-0.5 [scrollbar-color:#36515a_transparent] [scrollbar-width:thin]">
+        <div className="overlay-stats-scroll overlay-drawer-scroll grid min-h-0 content-start gap-2 overflow-y-auto pr-0.5 [scrollbar-color:var(--drift-ui-overlay-scrollbar)_transparent] [scrollbar-width:thin]">
           <section className="grid grid-cols-4 gap-1.5" aria-label="消息概览">
             <StatTile label="总消息" value={stats.totalMessages} />
             <StatTile label="近 1 分钟" value={stats.lastMinuteMessages} />
@@ -60,7 +60,7 @@ export function DanmakuStatsDrawer({
             aria-label="消息类型"
             className="overlay-stats-section grid min-w-0 content-start gap-1.5"
           >
-            <h2 className="m-0 text-[11px] font-bold text-[#62d7e4]">
+            <h2 className="drift-theme-transition m-0 text-[11px] font-bold text-[var(--drift-ui-signal-text)]">
               消息类型
             </h2>
             <div className="grid gap-1.5">
@@ -72,7 +72,7 @@ export function DanmakuStatsDrawer({
                     className="overlay-kind-row grid min-w-0 grid-cols-[40px_minmax(0,1fr)_24px] items-center gap-2 text-[10px]"
                     key={kind}
                   >
-                    <span className="truncate text-[#9db3b8]">
+                    <span className="drift-theme-transition truncate text-[var(--drift-ui-overlay-auxiliary)]">
                       {KIND_LABELS[kind]}
                     </span>
                     <span
@@ -80,15 +80,15 @@ export function DanmakuStatsDrawer({
                       aria-valuemax={100}
                       aria-valuemin={0}
                       aria-valuenow={share}
-                      className="overlay-kind-track h-1.5 overflow-hidden rounded-full bg-[#14272d]"
+                      className="drift-theme-transition overlay-kind-track h-1.5 overflow-hidden rounded-full bg-[var(--drift-ui-overlay-track)]"
                       role="progressbar"
                     >
                       <span
-                        className="overlay-kind-fill block h-full rounded-full bg-[#32c7d9]"
+                        className="overlay-kind-fill block h-full rounded-full bg-[var(--drift-ui-signal)]"
                         style={{ width: `${share}%` }}
                       />
                     </span>
-                    <strong className="drift-data-text text-right text-[#c7dadd]">
+                    <strong className="drift-data-text drift-theme-transition text-right text-[var(--drift-ui-ink-soft)]">
                       {count}
                     </strong>
                   </div>
@@ -116,7 +116,7 @@ export function DanmakuStatsDrawer({
             />
           </div>
 
-          <footer className="overlay-drawer-footer text-[10px] text-[#789097]">
+          <footer className="drift-theme-transition overlay-drawer-footer text-[10px] text-[var(--drift-ui-muted)]">
             <span>最近 5 分钟窗口 · 连接新房后清空</span>
           </footer>
         </div>
@@ -132,11 +132,11 @@ type StatTileProps = {
 
 function StatTile({ label, value }: StatTileProps) {
   return (
-    <div className="grid min-w-0 gap-1 rounded-md border border-[#29414a] bg-[#0e1d22] p-1.5">
-      <strong className="drift-data-text truncate text-sm font-bold leading-none text-[#eaf6f7]">
+    <div className="drift-theme-transition grid min-w-0 gap-1 rounded-md border border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-surface)] p-1.5">
+      <strong className="drift-data-text drift-theme-transition truncate text-sm font-bold leading-none text-[var(--drift-ui-ink)]">
         {value}
       </strong>
-      <span className="truncate text-[9px] text-[#789097]">
+      <span className="drift-theme-transition truncate text-[9px] text-[var(--drift-ui-muted)]">
         {label}
       </span>
     </div>
@@ -152,25 +152,25 @@ type StatsRankingProps = {
 function StatsRanking({ emptyText, items, title }: StatsRankingProps) {
   return (
     <section className="grid min-w-0 content-start gap-1.5">
-      <h2 className="m-0 text-[11px] font-bold text-[#62d7e4]">
+      <h2 className="drift-theme-transition m-0 text-[11px] font-bold text-[var(--drift-ui-signal-text)]">
         {title}
       </h2>
       <ol className="m-0 grid content-start gap-0.5 p-0">
         {items.length === 0 ? (
-          <li className="grid grid-cols-1 rounded px-1 py-1 text-[10px] text-[#789097]">
+          <li className="drift-theme-transition grid grid-cols-1 rounded px-1 py-1 text-[10px] text-[var(--drift-ui-muted)]">
             {emptyText}
           </li>
         ) : (
           items.map((item, index) => (
             <li
               className={classNames(
-                "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1 py-1 text-[10px] text-[#c7dadd]",
-                index % 2 === 0 && "bg-[#0e1d22]",
+                "drift-theme-transition grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1 py-1 text-[10px] text-[var(--drift-ui-ink-soft)]",
+                index % 2 === 0 && "bg-[var(--drift-ui-overlay-surface)]",
               )}
               key={item.label}
             >
               <span className="min-w-0 truncate">{item.label}</span>
-              <strong className="drift-data-text text-[#62d7e4]">
+              <strong className="drift-data-text drift-theme-transition text-[var(--drift-ui-signal-text)]">
                 {item.count}
               </strong>
             </li>

@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppConfig, SavedRoom } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
-import { Button, Input, IconButton } from "../ui";
+import type { DanmakuRecordingStatus } from "../../types/recording";
+import { Button, Input, IconButton, Toggle } from "../ui";
 import { SavedRoomGroupControls } from "./SavedRoomGroupControls";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
 import {
@@ -27,7 +28,10 @@ type RoomSettingsProps = {
   onDisconnect: () => void;
   onEditRoomChange: (room: EditingSavedRoom) => void;
   onGroupChange: (groupId: string) => void;
+  onOpenRecordingDir: () => void | Promise<void>;
+  onRecordingEnabledChange: (enabled: boolean) => void | Promise<void>;
   onRenameGroup: (groupId: string, name: string) => Promise<boolean>;
+  onRetryRecording: () => void | Promise<void>;
   onRoomIdChange: (roomId: string) => void;
   onSaveCurrentRoom: () => void;
   onSaveEditedRoom: () => void;
@@ -35,6 +39,8 @@ type RoomSettingsProps = {
   onSelectRoom: (room: SavedRoom) => void;
   onStartEditRoom: (room: SavedRoom) => void;
   onStopEditRoom: () => void;
+  recordingCommandError: string;
+  recordingStatus: DanmakuRecordingStatus;
   savedRoomError: string;
   savedRoomSearchQuery: string;
   selectedGroupId: string;
@@ -54,7 +60,10 @@ export function RoomSettings({
   onDisconnect,
   onEditRoomChange,
   onGroupChange,
+  onOpenRecordingDir,
+  onRecordingEnabledChange,
   onRenameGroup,
+  onRetryRecording,
   onRoomIdChange,
   onSaveCurrentRoom,
   onSaveEditedRoom,
@@ -62,6 +71,8 @@ export function RoomSettings({
   onSelectRoom,
   onStartEditRoom,
   onStopEditRoom,
+  recordingCommandError,
+  recordingStatus,
   savedRoomError,
   savedRoomSearchQuery,
   selectedGroupId,
@@ -127,6 +138,61 @@ export function RoomSettings({
 
       <SettingsSection
         actions={
+          <Button onClick={onOpenRecordingDir} size="sm">
+            打开记录目录
+          </Button>
+        }
+        description="按本机日期和真实房间号保存四类直播消息"
+        title="本地记录"
+      >
+        <SettingsRow
+          control={
+            <Toggle
+              aria-label="记录弹幕"
+              checked={recordingStatus.enabled}
+              onCheckedChange={onRecordingEnabledChange}
+            />
+          }
+          description="开启状态会持久化，连接直播间后自动开始记录"
+          label="记录弹幕"
+        />
+        <SettingsRow
+          control={
+            <StatusDot
+              label={recordingStatusText(recordingStatus)}
+              tone={recordingStatusTone(recordingStatus)}
+            />
+          }
+          description={
+            recordingStatus.currentFileName
+              ? recordingStatus.currentFileName
+              : "尚未生成记录文件"
+          }
+          label="状态"
+        />
+        {recordingStatus.state === "error" ? (
+          <div className="border-t border-drift-line p-3">
+            <StatusBanner
+              actions={<Button onClick={onRetryRecording}>重试记录</Button>}
+              description={`${recordingStatus.errorMessage || "记录服务暂不可用"}；暂停期间的消息不会补写`}
+              title="记录已暂停"
+              tone="danger"
+            />
+          </div>
+        ) : null}
+        {recordingCommandError ? (
+          <div className="border-t border-drift-line p-3">
+            <StatusBanner
+              description={recordingCommandError}
+              title="本地记录操作失败"
+              tone="danger"
+            />
+          </div>
+        ) : null}
+      </SettingsSection>
+
+      <SettingsSection
+        actions={
           <Button
             disabled={!draftRoomId.trim()}
             onClick={onSaveCurrentRoom}
@@ -172,6 +238,34 @@ export function RoomSettings({
       </SettingsSection>
     </SettingsPage>
   );
+}
+
+function recordingStatusText(status: DanmakuRecordingStatus) {
+  switch (status.state) {
+    case "waiting":
+      return "等待连接";
+    case "recording":
+      return "记录中";
+    case "error":
+      return "记录已暂停";
+    case "disabled":
+    default:
+      return "关闭";
+  }
+}
+
+function recordingStatusTone(status: DanmakuRecordingStatus): StatusTone {
+  switch (status.state) {
+    case "waiting":
+      return "signal";
+    case "recording":
+      return "success";
+    case "error":
+      return "danger";
+    case "disabled":
+    default:
+      return "neutral";
+  }
 }
 
 function roomStatusText(status: DanmakuStatus) {

@@ -39,7 +39,19 @@ test("composes the grouped workbench with accessible status", () => {
   );
 
   expect(screen.getByRole("status")).toHaveTextContent("连接失败");
+  expect(screen.getByRole("status")).toHaveClass(
+    "drift-status-banner",
+    "border-[var(--drift-ui-warning-border)]",
+    "bg-[var(--drift-ui-warning-soft)]",
+    "text-[var(--drift-ui-warning)]",
+  );
   expect(screen.getByRole("region", { name: "外观" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "外观" }).querySelector(".rounded-lg"),
+  ).toHaveClass(
+    "drift-theme-transition",
+    "bg-[var(--drift-ui-raised)]",
+  );
   expect(
     screen.getByRole("toolbar", { name: "常用直播间工具栏" }),
   ).toBeVisible();

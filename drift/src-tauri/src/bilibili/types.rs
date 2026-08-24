@@ -76,6 +76,12 @@ pub struct LiveMessage {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub room_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender_uid: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_room_fan_medal: Option<CurrentRoomFanMedal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_room_fan_medal_level: Option<u32>,
     pub kind: LiveMessageKind,
     pub user: String,
     pub text: String,
@@ -99,6 +105,18 @@ pub struct LiveMessage {
     pub super_chat_duration: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub super_chat_color: Option<String>,
+    #[serde(skip_serializing)]
+    pub(crate) source_command: Option<String>,
+    #[serde(skip_serializing)]
+    pub(crate) source_message_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CurrentRoomFanMedal {
+    Yes,
+    No,
+    Unknown,
 }
 
 fn is_false(value: &bool) -> bool {

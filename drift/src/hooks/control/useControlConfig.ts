@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppConfig,
@@ -11,57 +12,74 @@ type UseControlConfigParams = {
   onConfigChange: (config: AppConfig) => void;
 };
 
+export type AppConfigUpdater = (current: AppConfig) => AppConfig;
+
 export function useControlConfig({
   config,
   onConfigChange,
 }: UseControlConfigParams) {
-  async function saveConfig(nextConfig: AppConfig) {
-    const savedConfig = await invoke<AppConfig>("save_app_config", {
-      config: nextConfig,
+  const latestConfigRef = useRef(config);
+  const onConfigChangeRef = useRef(onConfigChange);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useLayoutEffect(() => {
+    latestConfigRef.current = config;
+    onConfigChangeRef.current = onConfigChange;
+  }, [config, onConfigChange]);
+
+  function saveConfig(updater: AppConfigUpdater) {
+    const operation = saveQueueRef.current.then(async () => {
+      const nextConfig = updater(latestConfigRef.current);
+      const savedConfig = await invoke<AppConfig>("save_app_config", {
+        config: nextConfig,
+      });
+      latestConfigRef.current = savedConfig;
+      onConfigChangeRef.current(savedConfig);
     });
-    onConfigChange(savedConfig);
+    saveQueueRef.current = operation.catch(() => undefined);
+    return operation;
   }
 
   async function updateAppearance(nextAppearance: Partial<AppearanceConfig>) {
-    await saveConfig({
-      ...config,
+    await saveConfig((current) => ({
+      ...current,
       appearance: {
-        ...config.appearance,
+        ...current.appearance,
         ...nextAppearance,
       },
-    });
+    }));
   }
 
   async function updateMessageDisplay(
     nextMessageDisplay: Partial<MessageDisplayConfig>,
   ) {
-    await saveConfig({
-      ...config,
+    await saveConfig((current) => ({
+      ...current,
       messageDisplay: {
-        ...config.messageDisplay,
+        ...current.messageDisplay,
         ...nextMessageDisplay,
       },
-    });
+    }));
   }
 
   async function updateFilter(nextFilter: Partial<FilterConfig>) {
-    await saveConfig({
-      ...config,
+    await saveConfig((current) => ({
+      ...current,
       filter: {
-        ...config.filter,
+        ...current.filter,
         ...nextFilter,
       },
-    });
+    }));
   }
 
   async function updateUpdateConfig(nextUpdate: Partial<AppConfig["update"]>) {
-    await saveConfig({
-      ...config,
+    await saveConfig((current) => ({
+      ...current,
       update: {
-        ...config.update,
+        ...current.update,
         ...nextUpdate,
       },
-    });
+    }));
   }
 
   async function saveFilterRules(rules: FilterConfig["rules"]) {
@@ -77,6 +95,8 @@ export function useControlConfig({
       density: "high",
       showUsername: false,
       color: "white",
+      messageFlow: "horizontal",
+      verticalOverflowPolicy: "realtime",
     });
   }
 

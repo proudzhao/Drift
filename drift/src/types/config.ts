@@ -4,6 +4,7 @@ export type AppConfig = {
   savedRooms: SavedRoom[];
   auth: AuthConfig;
   update: UpdateConfig;
+  recording: RecordingConfig;
   appearance: AppearanceConfig;
   messageDisplay: MessageDisplayConfig;
   filter: FilterConfig;
@@ -32,6 +33,10 @@ export type UpdateConfig = {
   checkOnStartup: boolean;
 };
 
+export type RecordingConfig = {
+  enabled: boolean;
+};
+
 export type SavedRoom = {
   id: string;
   roomId: string;
@@ -44,12 +49,19 @@ export type SavedRoom = {
 export type AppearanceConfig = {
   fontSize: number;
   fontFamily: string;
+  theme: UiTheme;
   opacity: number;
   scrollDuration: number;
   density: "low" | "medium" | "high";
   showUsername: boolean;
   color: "white";
+  messageFlow: MessageFlow;
+  verticalOverflowPolicy: VerticalOverflowPolicy;
 };
+
+export type UiTheme = "dark" | "light";
+export type MessageFlow = "horizontal" | "vertical";
+export type VerticalOverflowPolicy = "realtime" | "complete";
 
 export type MessageDisplayConfig = {
   showDanmaku: boolean;
@@ -67,9 +79,8 @@ export type FilterConfig = {
 export type FilterTarget =
   | "text"
   | "user"
-  | "messageType"
-  | "giftName"
-  | "guardLevel";
+  | "senderUid"
+  | "currentRoomFanMedal";
 
 export type FilterOperator =
   | "contains"
@@ -135,14 +146,20 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   update: {
     checkOnStartup: true,
   },
+  recording: {
+    enabled: false,
+  },
   appearance: {
     fontSize: 20,
     fontFamily: "system",
+    theme: "dark",
     opacity: 0.94,
     scrollDuration: 12,
     density: "high",
     showUsername: false,
     color: "white",
+    messageFlow: "horizontal",
+    verticalOverflowPolicy: "realtime",
   },
   messageDisplay: {
     showDanmaku: true,
@@ -186,6 +203,18 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     appearance: {
       ...DEFAULT_APP_CONFIG.appearance,
       ...config.appearance,
+      theme:
+        config.appearance?.theme === "light"
+          ? "light"
+          : DEFAULT_APP_CONFIG.appearance.theme,
+      messageFlow:
+        config.appearance?.messageFlow === "vertical"
+          ? "vertical"
+          : DEFAULT_APP_CONFIG.appearance.messageFlow,
+      verticalOverflowPolicy:
+        config.appearance?.verticalOverflowPolicy === "complete"
+          ? "complete"
+          : DEFAULT_APP_CONFIG.appearance.verticalOverflowPolicy,
     },
     messageDisplay: {
       ...DEFAULT_APP_CONFIG.messageDisplay,
@@ -198,6 +227,10 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     update: {
       ...DEFAULT_APP_CONFIG.update,
       ...config.update,
+    },
+    recording: {
+      ...DEFAULT_APP_CONFIG.recording,
+      ...config.recording,
     },
     filter: {
       ...DEFAULT_APP_CONFIG.filter,

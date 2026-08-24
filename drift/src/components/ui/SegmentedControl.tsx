@@ -34,6 +34,7 @@ export function SegmentedControl<T extends string>({
       {options.map((option) => (
         <Button
           active={value === option.value}
+          aria-pressed={value === option.value}
           disabled={option.disabled}
           key={option.value}
           onClick={() => onChange(option.value)}

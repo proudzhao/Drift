@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
+import sidebarSource from "./SettingsSidebar.tsx?raw";
 import { SettingsSidebar } from "./SettingsSidebar";
 
 test("keeps existing tab ids while switching sidebar pages", async () => {
@@ -51,5 +52,20 @@ test("uses border-box sizing for the target sidebar width", () => {
     />,
   );
 
-  expect(screen.getByRole("complementary")).toHaveClass("box-border");
+  expect(screen.getByRole("complementary")).toHaveClass(
+    "box-border",
+    "drift-settings-sidebar",
+    "bg-[var(--drift-ui-sidebar)]",
+  );
+  expect(screen.getByRole("button", { name: "直播间" })).toHaveClass(
+    "bg-[var(--drift-ui-selected)]",
+  );
+  expect(
+    screen.getByRole("button", { name: "直播间" }).querySelector("span"),
+  ).toHaveClass(
+    "shadow-[0_0_9px_color-mix(in_srgb,var(--drift-ui-signal)_55%,transparent)]",
+  );
+  expect(sidebarSource).not.toMatch(
+    /rgba?\(\s*50(?:\s*,\s*|\s+)199(?:\s*,\s*|\s+)217/i,
+  );
 });

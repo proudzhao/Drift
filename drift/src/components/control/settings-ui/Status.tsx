@@ -9,19 +9,19 @@ export type StatusTone =
   | "danger";
 
 const DOT_CLASSES: Record<StatusTone, string> = {
-  neutral: "bg-[#65777d]",
-  signal: "bg-drift-signal shadow-[0_0_8px_rgba(50,199,217,0.5)]",
-  success: "bg-[var(--control-success)]",
-  warning: "bg-[var(--control-warning)]",
-  danger: "bg-[var(--control-danger)]",
+  neutral: "bg-[var(--drift-ui-disabled)]",
+  signal: "bg-[var(--drift-ui-signal)]",
+  success: "bg-[var(--drift-ui-success)]",
+  warning: "bg-[var(--drift-ui-warning)]",
+  danger: "bg-[var(--drift-ui-danger)]",
 };
 
 const BANNER_CLASSES: Record<StatusTone, string> = {
-  neutral: "border-[#29414a] bg-[#101c21]",
-  signal: "border-[#28505b] bg-[#0b1a1f]",
-  success: "border-[rgba(66,201,131,0.4)] bg-[rgba(66,201,131,0.08)]",
-  warning: "border-[rgba(230,161,90,0.45)] bg-[rgba(230,161,90,0.08)]",
-  danger: "border-[rgba(224,108,117,0.45)] bg-[rgba(224,108,117,0.09)]",
+  neutral: "border-[var(--drift-ui-border)] bg-[var(--drift-ui-raised)] text-[var(--drift-ui-ink-soft)]",
+  signal: "border-[var(--drift-ui-signal)] bg-[var(--drift-ui-selected)] text-[var(--drift-ui-signal-text)]",
+  success: "border-[var(--drift-ui-success-border)] bg-[var(--drift-ui-success-soft)] text-[var(--drift-ui-success)]",
+  warning: "border-[var(--drift-ui-warning-border)] bg-[var(--drift-ui-warning-soft)] text-[var(--drift-ui-warning)]",
+  danger: "border-[var(--drift-ui-danger-border)] bg-[var(--drift-ui-danger-soft)] text-[var(--drift-ui-danger)]",
 };
 
 type StatusDotProps = HTMLAttributes<HTMLSpanElement> & {
@@ -38,7 +38,7 @@ export function StatusDot({
   return (
     <span
       className={classNames(
-        "inline-flex min-w-0 items-center gap-2 text-[10px] text-[#9db4ba]",
+        "drift-theme-transition inline-flex min-w-0 items-center gap-2 text-[10px] text-[var(--drift-ui-ink-soft)]",
         className,
       )}
       {...props}
@@ -46,7 +46,7 @@ export function StatusDot({
       <span
         aria-hidden="true"
         className={classNames(
-          "size-2 shrink-0 rounded-full",
+          "drift-theme-transition size-2 shrink-0 rounded-full",
           DOT_CLASSES[tone],
         )}
       />
@@ -73,7 +73,7 @@ export function StatusBanner({
   return (
     <div
       className={classNames(
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border px-3 py-2 max-[519px]:grid-cols-1",
+        "drift-status-banner grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border px-3 py-2 max-[519px]:grid-cols-1",
         BANNER_CLASSES[tone],
         className,
       )}
@@ -81,11 +81,11 @@ export function StatusBanner({
       {...props}
     >
       <div className="grid min-w-0 gap-0.5">
-        <strong className="truncate text-[10px] text-[#bdeff5]">
+        <strong className="drift-theme-transition truncate text-[10px]">
           {title}
         </strong>
         {description ? (
-          <span className="text-[9px] leading-4 text-[#789097]">
+          <span className="drift-theme-transition text-[9px] leading-4">
             {description}
           </span>
         ) : null}

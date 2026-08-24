@@ -118,7 +118,7 @@ export function DiagnosticsSettings({
 
               return (
                 <button
-                  className="grid w-full min-w-0 cursor-pointer appearance-none grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-drift-line bg-[#0d191e] p-2 text-left font-[inherit] text-inherit transition-colors hover:border-[#36515a] hover:bg-drift-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/30"
+                  className="grid w-full min-w-0 cursor-pointer appearance-none grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md border border-drift-line bg-[var(--drift-ui-surface)] p-2 text-left font-[inherit] text-inherit transition-colors hover:border-[var(--drift-ui-border-strong)] hover:bg-drift-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/30"
                   key={step.key}
                   onClick={() =>
                     onExpandedApiStepChange(isExpanded ? null : step.key)
@@ -126,15 +126,15 @@ export function DiagnosticsSettings({
                   type="button"
                 >
                   <div className="min-w-0">
-                    <strong className="text-[11px] font-semibold text-drift-ink">
+                    <strong className="drift-theme-transition text-[11px] font-semibold text-drift-ink">
                       {step.label}
                     </strong>
-                    <p className="mb-0.5 mt-1 text-[10px] text-[#9db4ba]">
+                    <p className="drift-theme-transition mb-0.5 mt-1 text-[10px] text-[var(--drift-ui-ink-soft)]">
                       {step.message}
                     </p>
                     <small
                       className={classNames(
-                        "block text-[9px] leading-4 text-[#6f878e]",
+                        "drift-theme-transition block text-[9px] leading-4 text-[var(--drift-ui-subtle)]",
                         isExpanded
                           ? "whitespace-pre-wrap break-words"
                           : "overflow-hidden text-ellipsis whitespace-nowrap",

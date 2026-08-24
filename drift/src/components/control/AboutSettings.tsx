@@ -90,12 +90,12 @@ export function AboutSettings({
             className="mb-2 size-[72px] rounded-2xl"
             src={iconUrl}
           />
-          <strong className="text-base font-bold text-drift-ink">Drift</strong>
-          <p className="m-0 text-[10px] text-[#789097]">
+          <strong className="drift-theme-transition text-base font-bold text-drift-ink">Drift</strong>
+          <p className="drift-theme-transition m-0 text-[10px] text-[var(--drift-ui-muted)]">
             桌面弹幕悬浮工具
           </p>
           <div className="mt-1 inline-flex min-w-0 items-center gap-1.5">
-            <span className="text-[9px] text-[#60777e]">版本</span>
+            <span className="drift-theme-transition text-[9px] text-[var(--drift-ui-subtle)]">版本</span>
             <DataValue>{appVersion || "未知"}</DataValue>
           </div>
           <Button
@@ -182,7 +182,7 @@ export function AboutSettings({
             </div>
           ) : null}
           {updateState.notes ? (
-            <p className="m-0 line-clamp-2 border-t border-drift-line px-3 py-2 text-[9px] leading-4 text-[#789097] first:border-t-0">
+            <p className="drift-theme-transition m-0 line-clamp-2 border-t border-drift-line px-3 py-2 text-[9px] leading-4 text-[var(--drift-ui-muted)] first:border-t-0">
               {updateState.notes}
             </p>
           ) : null}

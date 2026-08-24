@@ -8,11 +8,12 @@ import {
   type SavedRoom,
 } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
+import type { AppConfigUpdater } from "./useControlConfig";
 
 type UseSavedRoomsParams = {
   config: AppConfig;
   draftRoomId: string;
-  saveConfig: (config: AppConfig) => Promise<void>;
+  saveConfig: (updater: AppConfigUpdater) => Promise<void>;
   setDraftRoomId: (roomId: string) => void;
   status: DanmakuStatus;
 };
@@ -53,24 +54,6 @@ export function useSavedRooms({
     }
   }, [config.savedRoomGroups, selectedSavedRoomGroupId]);
 
-  async function saveRooms(savedRooms: SavedRoom[]) {
-    await saveConfig({
-      ...config,
-      savedRooms,
-    });
-  }
-
-  async function saveRoomGroups(
-    savedRoomGroups: SavedRoomGroup[],
-    savedRooms = config.savedRooms,
-  ) {
-    await saveConfig({
-      ...config,
-      savedRoomGroups,
-      savedRooms,
-    });
-  }
-
   async function saveCurrentRoom() {
     const roomId = draftRoomId.trim();
     if (!isValidRoomId(roomId)) {
@@ -83,35 +66,39 @@ export function useSavedRooms({
     const roomName = status.anchorName?.trim();
     const displayName =
       roomName && roomName !== "未知" ? roomName : `房间 ${roomId}`;
-    const existingRoom = config.savedRooms.find((room) => room.roomId === roomId);
-    const targetGroupId = resolveDefaultSaveGroupId(
-      config,
-      selectedSavedRoomGroupId,
-    );
-    const savedRooms = existingRoom
-      ? config.savedRooms.map((room) =>
-          room.id === existingRoom.id
-            ? {
-                ...room,
-                anchorName: roomName || room.anchorName,
-                displayName: room.displayName || displayName,
-                updatedAt: now,
-              }
-            : room,
-        )
-      : [
-          {
-            id: createSavedRoomId(),
-            roomId,
-            displayName,
-            anchorName: roomName,
-            groupId: targetGroupId,
-            updatedAt: now,
-          },
-          ...config.savedRooms,
-        ];
+    await saveConfig((current) => {
+      const existingRoom = current.savedRooms.find(
+        (room) => room.roomId === roomId,
+      );
+      const targetGroupId = resolveDefaultSaveGroupId(
+        current,
+        selectedSavedRoomGroupId,
+      );
+      const savedRooms = existingRoom
+        ? current.savedRooms.map((room) =>
+            room.id === existingRoom.id
+              ? {
+                  ...room,
+                  anchorName: roomName || room.anchorName,
+                  displayName: room.displayName || displayName,
+                  updatedAt: now,
+                }
+              : room,
+          )
+        : [
+            {
+              id: createSavedRoomId(),
+              roomId,
+              displayName,
+              anchorName: roomName,
+              groupId: targetGroupId,
+              updatedAt: now,
+            },
+            ...current.savedRooms,
+          ];
 
-    await saveRooms(savedRooms);
+      return { ...current, savedRooms };
+    });
   }
 
   function selectSavedRoom(room: SavedRoom) {
@@ -124,7 +111,10 @@ export function useSavedRooms({
       setEditingSavedRoom(null);
     }
     setSavedRoomError("");
-    await saveRooms(config.savedRooms.filter((room) => room.id !== savedRoomId));
+    await saveConfig((current) => ({
+      ...current,
+      savedRooms: current.savedRooms.filter((room) => room.id !== savedRoomId),
+    }));
   }
 
   function startEditSavedRoom(room: SavedRoom) {
@@ -162,19 +152,20 @@ export function useSavedRooms({
     }
 
     setSavedRoomError("");
-    await saveRooms(
-      config.savedRooms.map((room) =>
+    await saveConfig((current) => ({
+      ...current,
+      savedRooms: current.savedRooms.map((room) =>
         room.id === editingSavedRoom.id
           ? {
               ...room,
               roomId,
               displayName,
-              groupId: resolveTargetGroupId(config, editingSavedRoom.groupId),
+              groupId: resolveTargetGroupId(current, editingSavedRoom.groupId),
               updatedAt: new Date().toISOString(),
             }
           : room,
       ),
-    );
+    }));
     setEditingSavedRoom(null);
   }
 
@@ -198,7 +189,10 @@ export function useSavedRooms({
     };
 
     setSavedRoomError("");
-    await saveRoomGroups([...config.savedRoomGroups, group]);
+    await saveConfig((current) => ({
+      ...current,
+      savedRoomGroups: [...current.savedRoomGroups, group],
+    }));
     setSelectedSavedRoomGroupId(group.id);
     return true;
   }
@@ -220,13 +214,14 @@ export function useSavedRooms({
 
     const now = new Date().toISOString();
     setSavedRoomError("");
-    await saveRoomGroups(
-      config.savedRoomGroups.map((group) =>
+    await saveConfig((current) => ({
+      ...current,
+      savedRoomGroups: current.savedRoomGroups.map((group) =>
         group.id === groupId
           ? { ...group, name: trimmedName, updatedAt: now }
           : group,
       ),
-    );
+    }));
     return true;
   }
 
@@ -243,17 +238,18 @@ export function useSavedRooms({
       return false;
     }
 
-    const nextGroups = config.savedRoomGroups.filter(
-      (group) => group.id !== groupId,
-    );
-    const nextRooms = config.savedRooms.map((room) =>
-      room.groupId === groupId
-        ? { ...room, groupId: UNGROUPED_SAVED_ROOM_GROUP_ID }
-        : room,
-    );
-
     setSavedRoomError("");
-    await saveRoomGroups(nextGroups, nextRooms);
+    await saveConfig((current) => ({
+      ...current,
+      savedRoomGroups: current.savedRoomGroups.filter(
+        (group) => group.id !== groupId,
+      ),
+      savedRooms: current.savedRooms.map((room) =>
+        room.groupId === groupId
+          ? { ...room, groupId: UNGROUPED_SAVED_ROOM_GROUP_ID }
+          : room,
+      ),
+    }));
     if (selectedSavedRoomGroupId === groupId) {
       setSelectedSavedRoomGroupId(ALL_SAVED_ROOM_GROUP_ID);
     }

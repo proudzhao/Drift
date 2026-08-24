@@ -11,15 +11,17 @@ import {
   PreviewScenarioPicker,
   type PreviewScenarioId,
 } from "./previewScenarios";
+import { ThemeScenarioScope } from "./ThemeScenarioScope";
 import "../styles/tailwind.css";
 import "../App.css";
 
 mockIPC((command, payload) => {
+  if (command === "plugin:app|set_app_theme") return null;
   if (command === "auth_get_status") return { isLoggedIn: false };
   if (command === "save_app_config") {
     return (payload as { config: AppConfig }).config;
   }
-  if (command === "get_app_version") return { version: "0.7.0" };
+  if (command === "get_app_version") return { version: "0.8.0" };
   if (
     ["open_help_window", "show_window", "hide_window", "open_log_dir"].includes(
       command,
@@ -73,7 +75,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         selectedScenarioId={selectedScenario.id}
       />
       {selectedScenario.id === "default" ? (
-        <ControlPanelPreview />
+        <ThemeScenarioScope theme="dark">
+          <ControlPanelPreview />
+        </ThemeScenarioScope>
       ) : (
         <PreviewScenario scenarioId={selectedScenario.id} />
       )}

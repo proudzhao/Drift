@@ -13,16 +13,14 @@ export type LiveMessageSegment =
       height?: number;
     };
 
-export type DanmakuItem = {
+export type DisplayMessageItem = {
   id: string;
   kind: LiveMessageKind;
   user?: string;
   text: string;
   segments?: LiveMessageSegment[];
-  track: number;
-  duration: number;
-  delay: number;
-  createdAt: number;
+  currentRoomFanMedalLevel?: number;
+  followedUser?: boolean;
   highlighted?: boolean;
   isSelf?: boolean;
   superChatPrice?: number;
@@ -30,9 +28,23 @@ export type DanmakuItem = {
   superChatColor?: string;
 };
 
+export type DanmakuItem = DisplayMessageItem & {
+  track: number;
+  duration: number;
+  delay: number;
+  createdAt: number;
+};
+
+export type VerticalChatItem = DisplayMessageItem & {
+  createdAt: number;
+};
+
 export type LiveMessage = {
   id: string;
   roomId?: number;
+  senderUid?: number;
+  currentRoomFanMedal?: "yes" | "no" | "unknown";
+  currentRoomFanMedalLevel?: number;
   kind: LiveMessageKind;
   user: string;
   text: string;
@@ -46,6 +58,13 @@ export type LiveMessage = {
   superChatPrice?: number;
   superChatDuration?: number;
   superChatColor?: string;
+};
+
+export type QueuedLiveMessage = LiveMessage & {
+  attempts: number;
+  followedUser?: boolean;
+  highlighted?: boolean;
+  queuedAt: number;
 };
 
 export type DanmakuStatus = {

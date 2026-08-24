@@ -35,6 +35,28 @@ test("keeps the drawer positioned before the workspace stylesheet lands", () => 
   );
 });
 
+test("uses shared drawer, KPI, progress and ranking theme tokens", () => {
+  render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
+
+  expect(screen.getByLabelText("弹幕统计")).toHaveClass(
+    "drift-theme-transition",
+    "border-[var(--drift-ui-border)]",
+    "bg-[var(--drift-ui-overlay-drawer)]",
+  );
+  expect(screen.getByText("100").parentElement).toHaveClass(
+    "drift-theme-transition",
+    "border-[var(--drift-ui-border)]",
+    "bg-[var(--drift-ui-overlay-surface)]",
+  );
+  expect(screen.getByRole("progressbar", { name: "弹幕占比" })).toHaveClass(
+    "drift-theme-transition",
+    "bg-[var(--drift-ui-overlay-track)]",
+  );
+  expect(screen.getByText("这是一个用于检查截断的超长用户名_Official").parentElement).toHaveClass(
+    "drift-theme-transition",
+  );
+});
+
 test("keeps the header fixed and puts all statistics in one scroll area", () => {
   render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
 

@@ -59,6 +59,11 @@ test("keeps select, edit, and delete callbacks", async () => {
   const user = userEvent.setup();
   const callbacks = renderSavedRoomList([ROOM]);
 
+  expect(screen.getByText("深夜电台").closest(".rounded-lg")).toHaveClass(
+    "drift-theme-transition",
+    "bg-[var(--drift-ui-surface)]",
+  );
+
   await user.click(screen.getByRole("button", { name: "选择" }));
   await user.click(screen.getByRole("button", { name: "修改" }));
   await user.click(screen.getByRole("button", { name: "删除" }));

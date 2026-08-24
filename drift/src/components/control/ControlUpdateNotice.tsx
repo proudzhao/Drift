@@ -16,16 +16,16 @@ export function ControlUpdateNotice(props: ControlUpdateNoticeProps) {
   const text = getUpdateNoticeText(updateState, progressPercent);
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3 border-b border-[#20404a] bg-[#0d1c21] px-4 py-2" role="status">
+    <div className="drift-theme-transition grid grid-cols-[minmax(0,1fr)_max-content] items-center gap-3 border-b border-[var(--drift-ui-border)] bg-[var(--drift-ui-surface)] px-4 py-2" role="status">
       <div className="grid min-w-0 gap-1">
-        <strong className="truncate text-[10px] text-[#bdeff5]">
+        <strong className="drift-theme-transition truncate text-[10px] text-[var(--drift-ui-ink-soft)]">
           {text.title}
         </strong>
-        <span className="truncate text-[9px] text-[#789097]">
+        <span className="drift-theme-transition truncate text-[9px] text-[var(--drift-ui-muted)]">
           {text.description}
         </span>
         {updateState.status === "downloading" ? (
-          <div className="h-1 overflow-hidden rounded-full bg-drift-line">
+          <div className="drift-theme-transition h-1 overflow-hidden rounded-full bg-drift-line">
             <div
               className="h-full rounded-full bg-drift-signal transition-[width] duration-[160ms]"
               style={{ width: progressPercent === null ? "35%" : `${progressPercent}%` }}

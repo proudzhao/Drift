@@ -64,8 +64,8 @@ export function SavedRoomList({
             <div
               className={
                 isEditing
-                  ? "grid min-w-0 grid-cols-[minmax(0,1fr)_88px_96px_auto] items-center gap-2 rounded-lg border border-drift-line bg-[#0d191e] p-2 max-[619px]:grid-cols-2 max-[519px]:grid-cols-1"
-                  : "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-drift-line bg-[#0d191e] px-3 py-2"
+                  ? "drift-theme-transition grid min-w-0 grid-cols-[minmax(0,1fr)_88px_96px_auto] items-center gap-2 rounded-lg border border-drift-line bg-[var(--drift-ui-surface)] p-2 max-[619px]:grid-cols-2 max-[519px]:grid-cols-1"
+                  : "drift-theme-transition grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-drift-line bg-[var(--drift-ui-surface)] px-3 py-2"
               }
               key={room.id}
             >
@@ -137,10 +137,10 @@ export function SavedRoomList({
               ) : (
                 <>
                   <div className="grid min-w-0 gap-0.5">
-                    <strong className="truncate text-[11px] text-drift-ink">
+                    <strong className="drift-theme-transition truncate text-[11px] text-drift-ink">
                       {room.displayName}
                     </strong>
-                    <span className="drift-data-text truncate text-[9px] text-[#789097]">
+                    <span className="drift-data-text drift-theme-transition truncate text-[9px] text-[var(--drift-ui-muted)]">
                       {formatRoomMeta(groups, room)}
                       {room.anchorName ? ` · ${room.anchorName}` : ""}
                     </span>

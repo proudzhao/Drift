@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { DEFAULT_APP_CONFIG } from "../../types/config";
+import { EMPTY_VERTICAL_FLOW_STATUS } from "../../types/verticalFlow";
 import { DisplaySettings } from "./DisplaySettings";
 
 afterEach(clearMocks);
@@ -24,8 +25,22 @@ test("keeps display patches and window commands", async () => {
       onResetAppearance={onResetAppearance}
       onUpdateAppearance={onUpdateAppearance}
       onUpdateMessageDisplay={onUpdateMessageDisplay}
+      verticalFlowStatus={EMPTY_VERTICAL_FLOW_STATUS}
     />,
   );
+
+  expect(screen.getByRole("button", { name: "横向滚动" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "纵向聊天流" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  expect(screen.getByRole("slider", { name: "滚动速度" })).toBeEnabled();
+  expect(screen.getByRole("switch", { name: "显示用户名" })).toBeEnabled();
+  expect(screen.queryByText("过载策略")).not.toBeInTheDocument();
+  expect(screen.queryByText(/纵向队列/)).not.toBeInTheDocument();
 
   fireEvent.change(screen.getByRole("slider", { name: "字号" }), {
     target: { value: "24" },
@@ -72,4 +87,82 @@ test("keeps display patches and window commands", async () => {
   expect(screen.getByRole("region", { name: "内容" })).toBeVisible();
   expect(screen.getByRole("region", { name: "弹幕窗口" })).toBeVisible();
   expect(screen.getByRole("region", { name: "重置" })).toBeVisible();
+});
+
+test("shows vertical-only controls and forces username semantics", async () => {
+  const onUpdateAppearance = vi.fn();
+  const user = userEvent.setup();
+  render(
+    <DisplaySettings
+      appearance={{
+        ...DEFAULT_APP_CONFIG.appearance,
+        messageFlow: "vertical",
+        verticalOverflowPolicy: "complete",
+      }}
+      messageDisplay={DEFAULT_APP_CONFIG.messageDisplay}
+      onResetAppearance={vi.fn()}
+      onUpdateAppearance={onUpdateAppearance}
+      onUpdateMessageDisplay={vi.fn()}
+      verticalFlowStatus={{
+        active: true,
+        policy: "complete",
+        backlog: 42,
+        speedMultiplier: 4,
+        droppedTotal: 3,
+      }}
+    />,
+  );
+
+  expect(screen.getByRole("slider", { name: "滚动速度" })).toBeDisabled();
+  expect(screen.getByText("仅横向模式生效")).toBeVisible();
+  expect(screen.getByRole("switch", { name: "显示用户名" })).toBeDisabled();
+  expect(screen.getByText("纵向聊天流始终显示用户名")).toBeVisible();
+  expect(screen.getByText("积压 42 条 · 4× 加速")).toBeVisible();
+  expect(screen.getByText("本次运行已丢弃 3 条")).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "实时优先" }));
+  expect(onUpdateAppearance).toHaveBeenCalledWith({
+    verticalOverflowPolicy: "realtime",
+  });
+});
+
+test("shows the normal vertical queue state without a drop notice", () => {
+  render(
+    <DisplaySettings
+      appearance={{
+        ...DEFAULT_APP_CONFIG.appearance,
+        messageFlow: "vertical",
+      }}
+      messageDisplay={DEFAULT_APP_CONFIG.messageDisplay}
+      onResetAppearance={vi.fn()}
+      onUpdateAppearance={vi.fn()}
+      onUpdateMessageDisplay={vi.fn()}
+      verticalFlowStatus={EMPTY_VERTICAL_FLOW_STATUS}
+    />,
+  );
+
+  expect(screen.getByText("纵向队列正常")).toBeVisible();
+  expect(screen.queryByText(/本次运行已丢弃/)).not.toBeInTheDocument();
+});
+
+test("renders a display config error at the top of the page", () => {
+  render(
+    <DisplaySettings
+      appearance={DEFAULT_APP_CONFIG.appearance}
+      displayConfigError="显示设置保存失败，已保留原设置"
+      messageDisplay={DEFAULT_APP_CONFIG.messageDisplay}
+      onResetAppearance={vi.fn()}
+      onUpdateAppearance={vi.fn()}
+      onUpdateMessageDisplay={vi.fn()}
+      verticalFlowStatus={EMPTY_VERTICAL_FLOW_STATUS}
+    />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "显示设置保存失败，已保留原设置",
+  );
+  expect(screen.getByRole("alert").nextElementSibling).toHaveAttribute(
+    "aria-label",
+    "外观",
+  );
 });

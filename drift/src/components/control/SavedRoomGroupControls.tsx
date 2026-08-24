@@ -171,7 +171,7 @@ export function SavedRoomGroupControls({
 
         {isCreatingGroup ||
         (selectedGroup && renamingGroupId === selectedGroup.id) ? (
-          <div className="grid min-w-0 rounded-lg border border-drift-line bg-[#0d191e] p-2">
+          <div className="drift-theme-transition grid min-w-0 rounded-lg border border-drift-line bg-[var(--drift-ui-surface)] p-2">
             {isCreatingGroup ? (
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
                 <Input
@@ -243,16 +243,16 @@ export function SavedRoomGroupControls({
             <div
               aria-labelledby="group-delete-title"
               aria-modal="true"
-              className="grid w-full max-w-[360px] gap-3 rounded-lg border border-drift-line bg-drift-raised p-4 shadow-2xl"
+              className="drift-theme-transition grid w-full max-w-[360px] gap-3 rounded-lg border border-drift-line bg-drift-raised p-4 shadow-2xl"
               role="dialog"
             >
               <strong
-                className="text-xs text-drift-ink"
+                className="drift-theme-transition text-xs text-drift-ink"
                 id="group-delete-title"
               >
                 删除分组
               </strong>
-              <p className="m-0 text-[10px] leading-5 text-[#789097]">
+              <p className="drift-theme-transition m-0 text-[10px] leading-5 text-[var(--drift-ui-muted)]">
                 确认删除“{pendingDeleteGroup.name}”？该分组下的常用直播间将变为未分组，只在“全部”中显示。
               </p>
               <div className="flex justify-end gap-1.5">

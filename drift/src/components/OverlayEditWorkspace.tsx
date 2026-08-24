@@ -80,7 +80,9 @@ export function OverlayEditWorkspace(props: OverlayEditWorkspaceProps) {
           data-tauri-drag-region
           onMouseDown={props.onDragStart}
         >
-          <span className="overlay-drag-label">拖动调整弹幕区域位置</span>
+          <span className="drift-theme-transition overlay-drag-label">
+            拖动调整弹幕区域位置
+          </span>
         </section>
 
         <OverlayControlDock
@@ -118,7 +120,7 @@ export function OverlayEditWorkspace(props: OverlayEditWorkspaceProps) {
         {drawerOpen ? (
           <nav
             aria-label="窄屏工作台模式"
-            className="overlay-narrow-rail pointer-events-auto"
+            className="drift-theme-transition overlay-narrow-rail pointer-events-auto"
           >
             {props.mock ? (
               <Tooltip content="Mock 控制">

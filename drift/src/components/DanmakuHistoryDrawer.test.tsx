@@ -49,6 +49,26 @@ test("keeps the drawer positioned before the workspace stylesheet lands", () => 
   );
 });
 
+test("uses shared drawer, search, row and feedback theme tokens", () => {
+  render(<DanmakuHistoryDrawer messages={MESSAGES} onClose={vi.fn()} />);
+
+  const drawer = screen.getByLabelText("弹幕历史");
+  expect(drawer).toHaveClass(
+    "drift-theme-transition",
+    "border-[var(--drift-ui-border)]",
+    "bg-[var(--drift-ui-overlay-drawer)]",
+    "text-[var(--drift-ui-ink)]",
+  );
+  expect(screen.getByRole("searchbox", { name: "搜索弹幕历史" })).toHaveClass(
+    "border-[var(--drift-ui-border)]",
+    "bg-[var(--drift-ui-overlay-surface)]",
+  );
+  expect(screen.getByRole("button", { name: "复制 观众 A 的弹幕" })).toHaveClass(
+    "drift-theme-transition",
+    "border-[var(--drift-ui-overlay-divider)]",
+  );
+});
+
 test("filters by username or text and preserves empty-result copy", async () => {
   const user = userEvent.setup();
   render(<DanmakuHistoryDrawer messages={MESSAGES} onClose={vi.fn()} />);

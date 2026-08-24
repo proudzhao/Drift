@@ -7,11 +7,21 @@ import type {
   SendDanmakuStatus,
 } from "../types/danmaku";
 import {
+  applyDocumentUiTheme,
+  normalizeUiTheme,
+} from "../utils/uiTheme";
+import {
   SendDanmakuView,
   type SendFeedbackTone,
 } from "./SendDanmakuView";
 
 const TEXT_LIMIT = 60;
+
+type ThemeConfigSnapshot = {
+  appearance?: {
+    theme?: unknown;
+  };
+};
 
 export function SendDanmakuWindow() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -184,8 +194,28 @@ export function SendDanmakuWindow() {
   }
 
   useEffect(() => {
+    let disposed = false;
+    let themeSyncVersion = 0;
+
+    async function refreshThemeFromAuthority() {
+      const requestVersion = ++themeSyncVersion;
+      try {
+        const loadedConfig = await invoke<ThemeConfigSnapshot>(
+          "load_app_config",
+        );
+        if (!disposed && requestVersion === themeSyncVersion) {
+          applyDocumentUiTheme(
+            normalizeUiTheme(loadedConfig.appearance?.theme),
+          );
+        }
+      } catch {
+        // A theme refresh is best effort; status and send behavior remain usable.
+      }
+    }
+
     focusInput();
     void refreshStatus();
+    void refreshThemeFromAuthority();
 
     function handleWindowKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
@@ -220,6 +250,7 @@ export function SendDanmakuWindow() {
     window.addEventListener("mouseleave", stopManualDrag);
     const unlistenOpened = listen("send-window-opened", () => {
       refreshVisibleWindow();
+      void refreshThemeFromAuthority();
     });
     const unlistenStatus = listen("danmaku-status", () => {
       void refreshStatus();
@@ -234,6 +265,8 @@ export function SendDanmakuWindow() {
       window.removeEventListener("mouseup", stopManualDrag);
       window.removeEventListener("mouseleave", stopManualDrag);
       stopManualDrag();
+      disposed = true;
+      themeSyncVersion += 1;
       void unlistenOpened.then((unlisten) => unlisten());
       void unlistenStatus.then((unlisten) => unlisten());
     };

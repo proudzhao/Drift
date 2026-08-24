@@ -17,13 +17,13 @@ export function EmptyState({
   return (
     <div
       className={classNames(
-        "grid min-h-28 place-items-center content-center gap-1.5 rounded-lg border border-dashed border-[#29414a] bg-[#0d191e] px-4 text-center",
+        "drift-theme-transition grid min-h-28 place-items-center content-center gap-1.5 rounded-lg border border-dashed border-[var(--drift-ui-border)] bg-[var(--drift-ui-surface)] px-4 text-center",
         className,
       )}
       {...props}
     >
-      <strong className="text-[11px] text-[#b9cdd1]">{title}</strong>
-      <span className="text-[9px] leading-4 text-[#657d84]">{description}</span>
+      <strong className="drift-theme-transition text-[11px] text-[var(--drift-ui-ink-soft)]">{title}</strong>
+      <span className="drift-theme-transition text-[9px] leading-4 text-[var(--drift-ui-subtle)]">{description}</span>
       {action ? <div className="mt-1">{action}</div> : null}
     </div>
   );

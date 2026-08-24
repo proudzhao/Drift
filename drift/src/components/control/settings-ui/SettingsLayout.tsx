@@ -8,7 +8,7 @@ export function SettingsPage({
   return (
     <div
       className={classNames(
-        "settings-scroll-list box-border grid h-full min-h-0 content-start gap-3 overflow-y-auto px-5 py-4 text-drift-ink max-[619px]:px-4",
+        "drift-theme-transition settings-scroll-list box-border grid h-full min-h-0 content-start gap-3 overflow-y-auto px-5 py-4 text-drift-ink max-[619px]:px-4",
         className,
       )}
       {...props}
@@ -39,18 +39,18 @@ export function SettingsSection({
     >
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 px-1">
         <div className="grid gap-0.5">
-          <h2 className="m-0 text-[9px] font-bold uppercase tracking-[0.1em] text-[#789097]">
+          <h2 className="drift-theme-transition m-0 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--drift-ui-muted)]">
             {title}
           </h2>
           {description ? (
-            <p className="m-0 text-[9px] leading-4 text-[#60777e]">
+            <p className="drift-theme-transition m-0 text-[9px] leading-4 text-[var(--drift-ui-subtle)]">
               {description}
             </p>
           ) : null}
         </div>
         {actions ? <div>{actions}</div> : null}
       </header>
-      <div className="overflow-hidden rounded-lg border border-drift-line bg-[#101c21]">
+      <div className="drift-theme-transition overflow-hidden rounded-lg border border-drift-line bg-[var(--drift-ui-raised)]">
         {children}
       </div>
     </section>
@@ -75,7 +75,7 @@ export function SettingsRow({
   ...props
 }: SettingsRowProps) {
   const labelNode = (
-    <span className="text-[11px] font-semibold text-drift-ink">{label}</span>
+    <span className="drift-theme-transition text-[11px] font-semibold text-drift-ink">{label}</span>
   );
   const labelElement = htmlFor ? (
     <label htmlFor={htmlFor}>{labelNode}</label>
@@ -83,7 +83,7 @@ export function SettingsRow({
     labelNode
   );
   const descriptionNode = (
-    <span className="min-w-0 text-[9px] leading-4 text-[#6f878e] max-[519px]:col-span-2 max-[519px]:row-start-2">
+    <span className="drift-theme-transition min-w-0 text-[9px] leading-4 text-[var(--drift-ui-subtle)] max-[519px]:col-span-2 max-[519px]:row-start-2">
       {description}
     </span>
   );
@@ -91,7 +91,7 @@ export function SettingsRow({
   return (
     <div
       className={classNames(
-        "grid min-h-10 items-center gap-3 border-t border-drift-line px-3 first:border-t-0 max-[519px]:grid-cols-[minmax(0,1fr)_max-content] max-[519px]:gap-x-2 max-[519px]:py-2",
+        "drift-theme-transition grid min-h-10 items-center gap-3 border-t border-drift-line px-3 first:border-t-0 max-[519px]:grid-cols-[minmax(0,1fr)_max-content] max-[519px]:gap-x-2 max-[519px]:py-2",
         descriptionLayout === "inline"
           ? "grid-cols-[minmax(0,1fr)_max-content]"
           : "grid-cols-[88px_minmax(0,1fr)_max-content]",
@@ -141,7 +141,7 @@ export function DataValue({
   return (
     <span
       className={classNames(
-        "drift-data-text min-w-0 truncate text-[10px] text-[#9db4ba]",
+        "drift-data-text drift-theme-transition min-w-0 truncate text-[10px] text-[var(--drift-ui-ink-soft)]",
         className,
       )}
       {...props}

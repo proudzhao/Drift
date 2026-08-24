@@ -1,16 +1,27 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   OverlayEditWorkspace,
   type OverlayMockProps,
 } from "../components/OverlayEditWorkspace";
+import { DanmakuOverlay } from "../components/DanmakuOverlay";
+import { VerticalChatOverlay } from "../components/VerticalChatOverlay";
 import type { HistoryMessage } from "../components/DanmakuHistoryDrawer";
+import type { VerticalChatItem } from "../types/danmaku";
+import { createFollowedUserPreviewItems } from "../data/mockDanmaku";
 import {
   createEmptyStatsSnapshot,
   type DanmakuStatsSnapshot,
 } from "../utils/danmakuStats";
+import { ThemeScenarioScope } from "./ThemeScenarioScope";
+import {
+  PREVIEW_VERTICAL_BACKLOG_ITEMS,
+  PREVIEW_VERTICAL_LONG_ITEMS,
+  PREVIEW_VERTICAL_MIXED_ITEMS,
+} from "./fixtures";
 
 export type OverlayScenarioId =
   | "overlay-edit-basic"
+  | "overlay-followed-messages"
   | "overlay-mock-idle"
   | "overlay-mock-active"
   | "overlay-history-empty"
@@ -19,10 +30,15 @@ export type OverlayScenarioId =
   | "overlay-stats-empty"
   | "overlay-stats-filled"
   | "overlay-narrow-history"
-  | "overlay-narrow-stats";
+  | "overlay-narrow-stats"
+  | "overlay-theme-light"
+  | "overlay-vertical-mixed"
+  | "overlay-vertical-backlog"
+  | "overlay-vertical-long";
 
 export const OVERLAY_SCENARIOS = [
   { id: "overlay-edit-basic", label: "悬浮层 / 基础编辑" },
+  { id: "overlay-followed-messages", label: "悬浮层 / 关注高亮" },
   { id: "overlay-mock-idle", label: "悬浮层 / Mock 已停止" },
   { id: "overlay-mock-active", label: "悬浮层 / Mock 运行中" },
   { id: "overlay-history-empty", label: "悬浮层 / 历史空列表" },
@@ -32,6 +48,10 @@ export const OVERLAY_SCENARIOS = [
   { id: "overlay-stats-filled", label: "悬浮层 / 统计完整数据" },
   { id: "overlay-narrow-history", label: "悬浮层 / 窄屏历史" },
   { id: "overlay-narrow-stats", label: "悬浮层 / 窄屏统计" },
+  { id: "overlay-theme-light", label: "悬浮层 / 亮色主题" },
+  { id: "overlay-vertical-mixed", label: "悬浮层 / 纵向混合消息" },
+  { id: "overlay-vertical-backlog", label: "悬浮层 / 纵向积压" },
+  { id: "overlay-vertical-long", label: "悬浮层 / 纵向长消息" },
 ] as const;
 
 const OVERLAY_SCENARIO_IDS = new Set<string>(
@@ -88,12 +108,24 @@ type OverlayFixture = {
   showHistory: boolean;
   showStats: boolean;
   stats: DanmakuStatsSnapshot;
+  verticalItems?: VerticalChatItem[];
+  verticalFontSize?: number;
+  viewportHeight?: number;
+  viewportWidth?: number;
 };
 
 const EMPTY_STATS = createEmptyStatsSnapshot(1);
 
 const FIXTURES: Record<OverlayScenarioId, OverlayFixture> = {
   "overlay-edit-basic": {
+    historyMessages: [],
+    mockActive: null,
+    narrow: false,
+    showHistory: false,
+    showStats: false,
+    stats: EMPTY_STATS,
+  },
+  "overlay-followed-messages": {
     historyMessages: [],
     mockActive: null,
     narrow: false,
@@ -174,6 +206,49 @@ const FIXTURES: Record<OverlayScenarioId, OverlayFixture> = {
     showStats: true,
     stats: PREVIEW_STATS,
   },
+  "overlay-theme-light": {
+    historyMessages: [],
+    mockActive: null,
+    narrow: false,
+    showHistory: false,
+    showStats: false,
+    stats: EMPTY_STATS,
+  },
+  "overlay-vertical-mixed": {
+    historyMessages: [],
+    mockActive: null,
+    narrow: false,
+    showHistory: false,
+    showStats: false,
+    stats: EMPTY_STATS,
+    verticalItems: PREVIEW_VERTICAL_MIXED_ITEMS,
+    verticalFontSize: 14,
+    viewportHeight: 220,
+    viewportWidth: 1280,
+  },
+  "overlay-vertical-backlog": {
+    historyMessages: [],
+    mockActive: null,
+    narrow: false,
+    showHistory: false,
+    showStats: false,
+    stats: EMPTY_STATS,
+    verticalItems: PREVIEW_VERTICAL_BACKLOG_ITEMS,
+    viewportHeight: 220,
+    viewportWidth: 560,
+  },
+  "overlay-vertical-long": {
+    historyMessages: [],
+    mockActive: null,
+    narrow: false,
+    showHistory: false,
+    showStats: false,
+    stats: EMPTY_STATS,
+    verticalItems: PREVIEW_VERTICAL_LONG_ITEMS,
+    verticalFontSize: 14,
+    viewportHeight: 160,
+    viewportWidth: 320,
+  },
 };
 
 export function OverlayScenarioPreview({
@@ -187,6 +262,14 @@ export function OverlayScenarioPreview({
   const [mockActive, setMockActive] = useState(fixture.mockActive ?? false);
   const [rate, setRate] = useState(50);
   const [generated, setGenerated] = useState(fixture.mockActive ? 1248 : 0);
+  const theme =
+    scenarioId === "overlay-theme-light" ||
+    scenarioId === "overlay-vertical-long"
+      ? "light"
+      : "dark";
+  const showRealMessages =
+    scenarioId === "overlay-followed-messages" ||
+    scenarioId === "overlay-theme-light";
 
   function toggleHistory() {
     setShowHistory((current) => {
@@ -218,39 +301,71 @@ export function OverlayScenarioPreview({
         };
 
   return (
-    <div className="grid h-screen w-screen place-items-center overflow-hidden bg-[#263a43]">
+    <ThemeScenarioScope theme={theme}>
       <div
-        className="relative max-h-[100vh] max-w-[100vw] shrink-0 overflow-hidden bg-[rgba(9,14,20,.16)]"
-        style={{
-          height: fixture.narrow ? 160 : 220,
-          width: fixture.narrow ? 320 : 1280,
-        }}
+        className={
+          theme === "light"
+            ? "grid h-screen w-screen place-items-center overflow-hidden bg-[var(--drift-ui-workspace)]"
+            : "grid h-screen w-screen place-items-center overflow-hidden bg-[#263a43]"
+        }
       >
         <div
-          aria-hidden="true"
-          className="absolute right-8 top-10 text-sm text-white"
+          className={
+            theme === "light"
+              ? "relative max-h-[100vh] max-w-[100vw] shrink-0 overflow-hidden bg-[var(--drift-ui-edit-backdrop)]"
+              : "relative max-h-[100vh] max-w-[100vw] shrink-0 overflow-hidden bg-[rgba(9,14,20,.16)]"
+          }
+          style={
+            {
+              "--danmaku-font-size": fixture.verticalFontSize
+                ? `${fixture.verticalFontSize}px`
+                : undefined,
+              height: fixture.viewportHeight ?? (fixture.narrow ? 160 : 220),
+              width: fixture.viewportWidth ?? (fixture.narrow ? 320 : 1280),
+            } as CSSProperties
+          }
         >
-          示例用户：这是一条运行态弹幕背景
+          {fixture.verticalItems ? (
+            <VerticalChatOverlay
+              items={fixture.verticalItems}
+              onItemsPruned={() => undefined}
+              showEmotes
+            />
+          ) : showRealMessages ? (
+            <DanmakuOverlay
+              items={createFollowedUserPreviewItems()}
+              showEmotes
+              showUsername={false}
+              trackCount={5}
+            />
+          ) : (
+            <div
+              aria-hidden="true"
+              className="absolute right-8 top-10 text-sm text-white"
+            >
+              示例用户：这是一条运行态弹幕背景
+            </div>
+          )}
+          <OverlayEditWorkspace
+            historyInitialQuery={fixture.historyInitialQuery}
+            historyMessages={fixture.historyMessages}
+            mock={mock}
+            onDragStart={() => undefined}
+            onExit={() => undefined}
+            onResizeStart={() => undefined}
+            onShowMock={() => {
+              setShowHistory(false);
+              setShowStats(false);
+            }}
+            onToggleHistory={toggleHistory}
+            onToggleStats={toggleStats}
+            shortcut="Command+Option+K"
+            showHistory={showHistory}
+            showStats={showStats}
+            stats={fixture.stats}
+          />
         </div>
-        <OverlayEditWorkspace
-          historyInitialQuery={fixture.historyInitialQuery}
-          historyMessages={fixture.historyMessages}
-          mock={mock}
-          onDragStart={() => undefined}
-          onExit={() => undefined}
-          onResizeStart={() => undefined}
-          onShowMock={() => {
-            setShowHistory(false);
-            setShowStats(false);
-          }}
-          onToggleHistory={toggleHistory}
-          onToggleStats={toggleStats}
-          shortcut="Command+Option+K"
-          showHistory={showHistory}
-          showStats={showStats}
-          stats={fixture.stats}
-        />
       </div>
-    </div>
+    </ThemeScenarioScope>
   );
 }

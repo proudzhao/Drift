@@ -2,6 +2,7 @@ import { createRef, type ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
+import css from "../styles/tailwind.css?raw";
 import { SendDanmakuView } from "./SendDanmakuView";
 
 function renderView(
@@ -41,6 +42,24 @@ test("renders the Signal Cyan send surface and status rail", () => {
   expect(screen.getByText("60 字可用")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "弹幕内容" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+});
+
+test("uses semantic theme colors without changing send state semantics", () => {
+  renderView({ tone: "warning", remaining: 4 });
+  const shell = screen.getByRole("main");
+
+  expect(shell).toHaveClass("drift-send-shell");
+  expect(shell.outerHTML).toContain("var(--drift-ui-");
+  expect(screen.getByRole("status")).toHaveAttribute("data-tone", "warning");
+  expect(screen.getByText("4 字可用")).toBeVisible();
+
+  const sendRule = css.slice(css.indexOf(".drift-send-shell {"));
+  expect(sendRule).toContain("color-scheme: inherit;");
+  expect(sendRule).toContain("background-color: var(--drift-ui-glass);");
+  expect(sendRule).toContain("background: var(--drift-ui-send-background);");
+  expect(sendRule).toContain("border-color: var(--drift-ui-send-border);");
+  expect(sendRule).toContain("box-shadow:");
+  expect(sendRule).toContain("backdrop-filter: blur(22px);");
 });
 
 test("shows sending and remaining-count states", () => {

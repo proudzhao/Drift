@@ -14,33 +14,35 @@ type OverlayControlDockProps = {
 };
 
 const DOCK_BUTTON_CLASS =
-  "shrink-0 !border-[#29414a] !bg-[rgba(14,29,34,.88)] !text-[#c7dadd] !shadow-none hover:!border-[#3a5964] hover:!bg-[#14272d] hover:!text-[#eaf6f7] focus-visible:!ring-[#32c7d9]/25";
+  "shrink-0 !border-[var(--drift-ui-border)] !bg-[var(--drift-ui-overlay-control)] !text-[var(--drift-ui-ink-soft)] !shadow-none hover:!border-[var(--drift-ui-border-strong)] hover:!bg-[var(--drift-ui-overlay-control-hover)] hover:!text-[var(--drift-ui-ink)] focus-visible:!ring-[color-mix(in_srgb,var(--drift-ui-signal)_25%,transparent)]";
 
 export function OverlayControlDock(props: OverlayControlDockProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <nav
         aria-label="编辑工作台"
-        className="overlay-control-dock pointer-events-auto absolute bottom-3 left-3 right-3 z-[3] box-border flex min-w-0 select-none items-center gap-2 overflow-hidden rounded-drift border border-[#29414a] bg-[rgba(7,16,20,.92)] px-2 py-1.5 text-[#eaf6f7] shadow-[0_12px_32px_rgba(0,0,0,.32)] backdrop-blur-[20px]"
+        className="drift-theme-transition overlay-control-dock pointer-events-auto absolute bottom-3 left-3 right-3 z-[3] box-border flex min-w-0 select-none items-center gap-2 overflow-hidden rounded-drift border border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-glass)] px-2 py-1.5 text-[var(--drift-ui-ink)] shadow-[0_12px_32px_var(--drift-ui-overlay-shadow)] backdrop-blur-[20px]"
         data-drawer-open={props.drawerOpen}
       >
-        <strong className="overlay-dock-title shrink-0 text-[11px] font-semibold">
+        <strong className="drift-theme-transition overlay-dock-title shrink-0 text-[11px] font-semibold">
           编辑模式
         </strong>
-        <span className="drift-data-text overlay-dock-shortcut min-w-0 truncate text-[9px] text-[#789097]">
+        <span className="drift-data-text drift-theme-transition overlay-dock-shortcut min-w-0 truncate text-[9px] text-[var(--drift-ui-muted)]">
           {props.shortcut}
         </span>
         <span className="min-w-0 flex-1" />
         {props.mockActive !== null ? (
           <span
-            className="overlay-mock-status flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] text-[#9db3b8]"
+            className="drift-theme-transition overlay-mock-status flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] text-[var(--drift-ui-overlay-auxiliary)]"
             data-active={props.mockActive}
           >
             <span
               aria-hidden="true"
               className={classNames(
-                "overlay-status-dot size-1.5 shrink-0 rounded-full",
-                props.mockActive ? "bg-[#42c983]" : "bg-[#506970]",
+                "drift-theme-transition overlay-status-dot size-1.5 shrink-0 rounded-full",
+                props.mockActive
+                  ? "bg-[var(--drift-ui-success)]"
+                  : "bg-[var(--drift-ui-disabled)]",
               )}
             />
             Mock · {props.mockActive ? "运行中" : "已停止"}
@@ -54,7 +56,7 @@ export function OverlayControlDock(props: OverlayControlDockProps) {
             className={classNames(
               DOCK_BUTTON_CLASS,
               props.showHistory &&
-                "!border-[#32c7d9] !bg-[rgba(50,199,217,.16)] !text-[#62d7e4]",
+                "!border-[var(--drift-ui-signal)] !bg-[var(--drift-ui-overlay-selected)] !text-[var(--drift-ui-signal-text)]",
             )}
             onClick={props.onToggleHistory}
             size="sm"
@@ -72,7 +74,7 @@ export function OverlayControlDock(props: OverlayControlDockProps) {
             className={classNames(
               DOCK_BUTTON_CLASS,
               props.showStats &&
-                "!border-[#32c7d9] !bg-[rgba(50,199,217,.16)] !text-[#62d7e4]",
+                "!border-[var(--drift-ui-signal)] !bg-[var(--drift-ui-overlay-selected)] !text-[var(--drift-ui-signal-text)]",
             )}
             onClick={props.onToggleStats}
             size="sm"
@@ -85,7 +87,7 @@ export function OverlayControlDock(props: OverlayControlDockProps) {
         <Tooltip content="完成编辑">
           <Button
             aria-label="完成编辑"
-            className="shrink-0 !border-[#32c7d9] !bg-[#32c7d9] !text-[#071014] !shadow-none hover:!bg-[#62d7e4] focus-visible:!ring-[#32c7d9]/30"
+            className="shrink-0 !border-[var(--drift-ui-signal)] !bg-[var(--drift-ui-signal)] !text-[var(--drift-ui-on-signal)] !shadow-none hover:!bg-[var(--drift-ui-signal-text)] focus-visible:!ring-[color-mix(in_srgb,var(--drift-ui-signal)_30%,transparent)]"
             onClick={props.onExit}
             size="sm"
             variant="primary"

@@ -22,8 +22,8 @@ function updateState(
 ): AppUpdateState {
   return {
     status,
-    currentVersion: "0.7.0",
-    latestVersion: "0.7.1",
+    currentVersion: "0.8.0",
+    latestVersion: "0.8.1",
     releaseUrl: RELEASE_URL,
     notes: "",
     downloadedBytes: 0,
@@ -106,7 +106,7 @@ test("keeps updater actions, progress, notes, and release links", async () => {
   expect(
     screen.getByText(new Date(1_700_000_000_000).toLocaleString()),
   ).toHaveClass("drift-data-text");
-  expect(screen.getByText("0.7.0")).toHaveClass("drift-data-text");
+  expect(screen.getByText("0.8.0")).toHaveClass("drift-data-text");
   expect(screen.getByRole("region", { name: "产品" })).toBeVisible();
   expect(screen.getByRole("region", { name: "更新设置" })).toBeVisible();
 });
@@ -133,4 +133,10 @@ test("keeps localized updater errors in a persistent danger banner", () => {
   expect(
     screen.getByRole("button", { name: "前往 GitHub 下载" }),
   ).toBeVisible();
+  expect(screen.getByRole("alert")).toHaveClass(
+    "drift-status-banner",
+    "border-[var(--drift-ui-danger-border)]",
+    "bg-[var(--drift-ui-danger-soft)]",
+    "text-[var(--drift-ui-danger)]",
+  );
 });

@@ -59,6 +59,12 @@ test("closes create and rename editors after successful promises", async () => {
   const callbacks = renderGroupControls();
 
   await user.click(screen.getByRole("button", { name: "新建分组" }));
+  expect(
+    screen.getByRole("textbox", { name: "新分组名称" }).closest(".rounded-lg"),
+  ).toHaveClass(
+    "drift-theme-transition",
+    "bg-[var(--drift-ui-surface)]",
+  );
   await user.type(screen.getByRole("textbox", { name: "新分组名称" }), "赛事");
   await user.click(screen.getByRole("button", { name: "添加" }));
   expect(callbacks.onCreateGroup).toHaveBeenCalledWith("赛事");

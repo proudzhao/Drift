@@ -25,17 +25,17 @@ export function SettingsSidebar({
     <TooltipProvider delayDuration={300}>
       <aside
         className={classNames(
-          "box-border flex min-h-0 shrink-0 flex-col border-r border-drift-line bg-[#0b1418] py-2.5 transition-[width] duration-[180ms] max-[619px]:w-11 max-[619px]:px-1.5",
+          "drift-settings-sidebar box-border flex min-h-0 shrink-0 flex-col border-r border-drift-line bg-[var(--drift-ui-sidebar)] py-2.5 max-[619px]:w-11 max-[619px]:px-1.5",
           hideLabels ? "w-11 px-1.5" : "w-[152px] px-2",
         )}
       >
         <div className="flex min-h-8 items-center gap-2 px-1.5">
-          <span className="grid size-5 shrink-0 place-items-center rounded-md bg-drift-signal text-[11px] font-black text-drift-void">
+          <span className="drift-theme-transition grid size-5 shrink-0 place-items-center rounded-md bg-drift-signal text-[11px] font-black text-[var(--drift-ui-on-signal)]">
             D
           </span>
           <strong
             className={classNames(
-              "text-xs text-drift-ink max-[619px]:sr-only",
+              "drift-theme-transition text-xs text-drift-ink max-[619px]:sr-only",
               hideLabels && "sr-only",
             )}
           >
@@ -48,7 +48,7 @@ export function SettingsSidebar({
             <div className="mb-2" key={group.label}>
               <p
                 className={classNames(
-                  "mb-1 mt-0 px-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[#50676e] max-[619px]:sr-only",
+                  "drift-theme-transition mb-1 mt-0 px-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-[var(--drift-ui-disabled)] max-[619px]:sr-only",
                   hideLabels && "sr-only",
                 )}
               >
@@ -64,14 +64,14 @@ export function SettingsSidebar({
                         aria-current={active ? "page" : undefined}
                         aria-label={item.label}
                         className={classNames(
-                          "relative flex min-h-7 w-full items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-[10px] text-[#789097] transition-colors duration-[160ms] hover:bg-[#132027] hover:text-drift-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/45 max-[619px]:justify-center max-[619px]:px-0",
-                          active && "bg-[#17282f] text-drift-ink",
+                          "drift-theme-transition relative flex min-h-7 w-full items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-[10px] text-[var(--drift-ui-muted)] hover:bg-[var(--drift-ui-hover)] hover:text-drift-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/45 max-[619px]:justify-center max-[619px]:px-0",
+                          active && "bg-[var(--drift-ui-selected)] text-drift-ink",
                         )}
                         onClick={() => onTabChange(item.id)}
                         type="button"
                       >
                         {active ? (
-                          <span className="absolute -left-2 h-4 w-0.5 rounded-full bg-drift-signal shadow-[0_0_9px_rgba(50,199,217,0.55)] max-[619px]:-left-1.5" />
+                          <span className="drift-theme-transition absolute -left-2 h-4 w-0.5 rounded-full bg-drift-signal shadow-[0_0_9px_color-mix(in_srgb,var(--drift-ui-signal)_55%,transparent)] max-[619px]:-left-1.5" />
                         ) : null}
                         <Icon aria-hidden="true" size={14} strokeWidth={1.7} />
                         <span
@@ -93,7 +93,7 @@ export function SettingsSidebar({
 
         <button
           aria-label={hideLabels ? "展开侧边栏" : "收起侧边栏"}
-          className="mt-2 flex min-h-7 items-center justify-center rounded-md border-0 bg-transparent text-[#657c83] hover:bg-[#132027] hover:text-drift-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/45 max-[619px]:hidden"
+          className="drift-theme-transition mt-2 flex min-h-7 items-center justify-center rounded-md border-0 bg-transparent text-[var(--drift-ui-subtle)] hover:bg-[var(--drift-ui-hover)] hover:text-drift-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-drift-signal/45 max-[619px]:hidden"
           onClick={() => onCollapsedChange(!hideLabels)}
           type="button"
         >

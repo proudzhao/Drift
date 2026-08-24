@@ -57,6 +57,10 @@ test("keeps diagnostics commands and expandable steps", async () => {
   expect(screen.getByRole("region", { name: "API 诊断" })).toBeVisible();
   expect(screen.getByText("12 ms")).toHaveClass("drift-data-text");
   expect(screen.getByText("成功")).toBeVisible();
+  expect(screen.getByRole("button", { name: /room_init/ })).toHaveClass(
+    "bg-[var(--drift-ui-surface)]",
+    "hover:border-[var(--drift-ui-border-strong)]",
+  );
 });
 
 test("keeps export failure visible and restores the export action", async () => {

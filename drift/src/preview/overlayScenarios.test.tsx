@@ -13,6 +13,7 @@ beforeAll(() => {
 test("provides all stable overlay workspace scenarios", () => {
   expect(OVERLAY_SCENARIOS.map((scenario) => scenario.id)).toEqual([
     "overlay-edit-basic",
+    "overlay-followed-messages",
     "overlay-mock-idle",
     "overlay-mock-active",
     "overlay-history-empty",
@@ -22,7 +23,147 @@ test("provides all stable overlay workspace scenarios", () => {
     "overlay-stats-filled",
     "overlay-narrow-history",
     "overlay-narrow-stats",
+    "overlay-theme-light",
+    "overlay-vertical-mixed",
+    "overlay-vertical-backlog",
+    "overlay-vertical-long",
   ]);
+});
+
+test("renders the mixed vertical fixture through the real overlay", () => {
+  const { container } = render(
+    <OverlayScenarioPreview scenarioId="overlay-vertical-mixed" />,
+  );
+
+  expect(container.querySelector(".vertical-chat-danmaku")).toBeInTheDocument();
+  expect(container.querySelector(".vertical-chat-super_chat")).toHaveStyle({
+    "--super-chat-color": "#e2b52b",
+  });
+  expect(container.querySelector(".vertical-chat-gift")).toBeInTheDocument();
+  expect(container.querySelector(".vertical-chat-guard")).toBeInTheDocument();
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-default"]'),
+  ).toHaveStyle({ "--username-color": "#c7d0d9" });
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-medal"]'),
+  ).toHaveStyle({ "--username-color": "#bd6686" });
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-combined"]'),
+  ).toHaveStyle({ "--username-color": "#ff6fbe" });
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-gift"]'),
+  ).toHaveTextContent("giftUser: 送出 小花 × 5");
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-guard"]'),
+  ).toHaveTextContent("guardUser: 开通 舰长");
+  expect(screen.getByText("SC ¥100")).toBeInTheDocument();
+  expect(screen.getAllByText(/followedUser/)).toHaveLength(2);
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-super-chat"]'),
+  ).toHaveClass("is-followed");
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-super-chat"]'),
+  ).not.toHaveClass("is-highlighted", "is-self");
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-combined"]'),
+  ).toHaveTextContent("普通弹幕 文本结尾");
+  expect(
+    container.querySelector('[data-message-id="vertical-mixed-combined"]'),
+  ).toHaveClass(
+    "is-followed",
+    "is-highlighted",
+    "is-self",
+  );
+  expect(screen.getByAltText("[微笑]")).toBeInTheDocument();
+  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+    "--danmaku-font-size": "14px",
+    height: "220px",
+    width: "1280px",
+  });
+  expect(
+    [...container.querySelectorAll(".vertical-chat-message")].map((row) =>
+      row.getAttribute("data-message-id"),
+    ),
+  ).toEqual([
+    "vertical-mixed-default",
+    "vertical-mixed-medal",
+    "vertical-mixed-combined",
+    "vertical-mixed-super-chat",
+    "vertical-mixed-gift",
+    "vertical-mixed-guard",
+  ]);
+});
+
+test("keeps the complete long vertical message in the narrow fixture", () => {
+  render(<OverlayScenarioPreview scenarioId="overlay-vertical-long" />);
+
+  expect(
+    screen.getByText(
+      "这是一条需要完整换行的中文消息 EnglishLongTokenWithoutSpaces https://example.com/very/long/path",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+    "--danmaku-font-size": "14px",
+    height: "160px",
+    width: "320px",
+  });
+  expect(document.documentElement.dataset.driftTheme).toBe("light");
+});
+
+test("combines the edit workspace and real vertical overlay in backlog", () => {
+  render(<OverlayScenarioPreview scenarioId="overlay-vertical-backlog" />);
+
+  expect(screen.getByLabelText("弹幕编辑工作台")).toBeInTheDocument();
+  expect(screen.getByLabelText("Drift vertical chat")).toBeInTheDocument();
+  expect(screen.getByText("积压消息 18")).toBeInTheDocument();
+  expect(
+    [...document.querySelectorAll(".vertical-chat-message")].map((row) =>
+      row.getAttribute("data-message-id"),
+    ),
+  ).toEqual(
+    Array.from({ length: 18 }, (_, index) => `vertical-backlog-${index + 1}`),
+  );
+  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+    height: "220px",
+    width: "560px",
+  });
+});
+
+test("renders followed messages through the real overlay", () => {
+  const { container } = render(
+    <OverlayScenarioPreview scenarioId="overlay-followed-messages" />,
+  );
+
+  expect(container.querySelectorAll(".danmaku.is-followed")).toHaveLength(5);
+  expect(container.querySelectorAll(".danmaku.is-self")).toHaveLength(1);
+  expect(screen.getByText("SC ¥100")).toBeInTheDocument();
+  expect(screen.getByText("本人、关注和普通高亮组合").closest(".danmaku")).toHaveClass(
+    "is-followed",
+    "is-highlighted",
+    "is-self",
+  );
+});
+
+test("keeps all real message classes in the light workspace scenario", () => {
+  const { container } = render(
+    <OverlayScenarioPreview scenarioId="overlay-theme-light" />,
+  );
+
+  expect(document.documentElement.dataset.driftTheme).toBe("light");
+  expect(screen.getByLabelText("弹幕编辑工作台")).toHaveClass(
+    "drift-overlay-workspace",
+  );
+  expect(container.querySelectorAll(".danmaku.is-followed")).toHaveLength(5);
+  expect(container.querySelector(".danmaku-danmaku")).toBeInTheDocument();
+  expect(container.querySelector(".danmaku-super_chat")).toHaveStyle({
+    "--super-chat-color": "#e2b52b",
+  });
+  expect(container.querySelector(".danmaku-gift")).toBeInTheDocument();
+  expect(container.querySelector(".danmaku-guard")).toBeInTheDocument();
+  expect(container.querySelector(".danmaku.is-self")).toHaveClass(
+    "is-followed",
+    "is-highlighted",
+  );
 });
 
 test.each<OverlayScenarioId>(OVERLAY_SCENARIOS.map((scenario) => scenario.id))(

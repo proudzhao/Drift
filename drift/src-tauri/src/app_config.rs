@@ -5,6 +5,8 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const APP_CONFIG_FILE: &str = "app-config.json";
 const UNGROUPED_SAVED_ROOM_GROUP_ID: &str = "uncategorized";
+const DEPRECATED_FILTER_TARGETS: [&str; 4] =
+    ["commentText", "messageType", "giftName", "guardLevel"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -14,6 +16,7 @@ pub struct AppConfig {
     pub saved_rooms: Vec<SavedRoom>,
     pub auth: AuthConfig,
     pub update: UpdateConfig,
+    pub recording: RecordingConfig,
     pub appearance: AppearanceConfig,
     pub message_display: MessageDisplayConfig,
     pub filter: FilterConfig,
@@ -58,15 +61,25 @@ pub struct UpdateConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+pub struct RecordingConfig {
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct AppearanceConfig {
     pub font_size: u32,
     #[serde(default = "default_font_family")]
     pub font_family: String,
+    #[serde(default = "default_ui_theme")]
+    pub theme: String,
     pub opacity: f64,
     pub scroll_duration: f64,
     pub density: String,
     pub show_username: bool,
     pub color: String,
+    pub message_flow: String,
+    pub vertical_overflow_policy: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,11 +140,14 @@ impl Default for AppearanceConfig {
         Self {
             font_size: 20,
             font_family: default_font_family(),
+            theme: default_ui_theme(),
             opacity: 0.94,
             scroll_duration: 12.0,
             density: "high".to_string(),
             show_username: false,
             color: "white".to_string(),
+            message_flow: "horizontal".to_string(),
+            vertical_overflow_policy: "realtime".to_string(),
         }
     }
 }
@@ -156,11 +172,21 @@ fn default_font_family() -> String {
     "system".to_string()
 }
 
+fn default_ui_theme() -> String {
+    "dark".to_string()
+}
+
 impl Default for UpdateConfig {
     fn default() -> Self {
         Self {
             check_on_startup: true,
         }
+    }
+}
+
+impl Default for RecordingConfig {
+    fn default() -> Self {
+        Self { enabled: false }
     }
 }
 
@@ -259,6 +285,7 @@ impl Default for AppConfig {
             saved_rooms: Vec::new(),
             auth: AuthConfig::default(),
             update: UpdateConfig::default(),
+            recording: RecordingConfig::default(),
             appearance: AppearanceConfig::default(),
             message_display: MessageDisplayConfig::default(),
             filter: FilterConfig::default(),
@@ -275,7 +302,7 @@ pub fn load_app_config(app: AppHandle) -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<AppConfig, String> {
-    normalize_app_config(&mut config);
+    let _ = normalize_app_config(&mut config);
     write_app_config(&app, &config)?;
     app.emit("app-config-changed", &config)
         .map_err(|error| error.to_string())?;
@@ -296,7 +323,7 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     let path = app_config_path(app)?;
     if !path.exists() {
         let mut config = AppConfig::default();
-        normalize_app_config(&mut config);
+        let _ = normalize_app_config(&mut config);
         return Ok(config);
     }
 
@@ -312,7 +339,17 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     if config.shortcuts.open_send_danmaku.is_empty() {
         config.shortcuts.open_send_danmaku = send_danmaku_shortcut_label().to_string();
     }
-    normalize_app_config(&mut config);
+    let removed_filter_rule_count = normalize_app_config(&mut config);
+    if removed_filter_rule_count > 0 {
+        if let Err(error) = write_app_config(app, &config) {
+            tracing::warn!(
+                target: "drift::config",
+                removed_filter_rule_count,
+                error = %error,
+                "failed to persist deprecated filter rule removal; using normalized in-memory config"
+            );
+        }
+    }
     Ok(config)
 }
 
@@ -342,9 +379,27 @@ fn app_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
         .map_err(|error| error.to_string())
 }
 
-fn normalize_app_config(config: &mut AppConfig) {
+fn normalize_app_config(config: &mut AppConfig) -> usize {
     if config.appearance.font_family.trim().is_empty() {
         config.appearance.font_family = default_font_family();
+    }
+
+    if !matches!(config.appearance.theme.as_str(), "dark" | "light") {
+        config.appearance.theme = default_ui_theme();
+    }
+
+    if !matches!(
+        config.appearance.message_flow.as_str(),
+        "horizontal" | "vertical"
+    ) {
+        config.appearance.message_flow = "horizontal".to_string();
+    }
+
+    if !matches!(
+        config.appearance.vertical_overflow_policy.as_str(),
+        "realtime" | "complete"
+    ) {
+        config.appearance.vertical_overflow_policy = "realtime".to_string();
     }
 
     normalize_saved_room_groups(&mut config.saved_room_groups);
@@ -362,6 +417,13 @@ fn normalize_app_config(config: &mut AppConfig) {
             UNGROUPED_SAVED_ROOM_GROUP_ID.to_string()
         };
     }
+
+    let original_rule_count = config.filter.rules.len();
+    config
+        .filter
+        .rules
+        .retain(|rule| !DEPRECATED_FILTER_TARGETS.contains(&rule.target.as_str()));
+    original_rule_count - config.filter.rules.len()
 }
 
 fn normalize_saved_room_groups(saved_room_groups: &mut Vec<SavedRoomGroup>) {
@@ -437,6 +499,23 @@ fn send_danmaku_shortcut_label() -> &'static str {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn old_config_defaults_recording_to_disabled() {
+        let config: AppConfig = serde_json::from_value(json!({ "roomId": "6" })).expect("config");
+
+        assert!(!config.recording.enabled);
+    }
+
+    #[test]
+    fn explicit_recording_enabled_is_preserved() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "recording": { "enabled": true }
+        }))
+        .expect("config");
+
+        assert!(config.recording.enabled);
+    }
 
     #[test]
     fn old_message_display_config_defaults_show_emotes_to_true() {
@@ -516,13 +595,112 @@ mod tests {
     }
 
     #[test]
+    fn old_config_defaults_theme_to_dark() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "appearance": { "fontSize": 20 }
+        }))
+        .expect("config");
+
+        assert_eq!(config.appearance.theme, "dark");
+    }
+
+    #[test]
+    fn explicit_light_theme_is_preserved() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "appearance": { "theme": "light" }
+        }))
+        .expect("config");
+
+        assert_eq!(config.appearance.theme, "light");
+    }
+
+    #[test]
+    fn normalize_app_config_resets_invalid_theme_to_dark() {
+        let mut config = AppConfig::default();
+        config.appearance.theme = "system".to_string();
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(config.appearance.theme, "dark");
+    }
+
+    #[test]
+    fn old_config_defaults_message_flow_to_horizontal_realtime() {
+        let config: AppConfig = serde_json::from_value(json!({
+            "appearance": { "fontSize": 20 }
+        }))
+        .expect("legacy config");
+
+        assert_eq!(config.appearance.message_flow, "horizontal");
+        assert_eq!(config.appearance.vertical_overflow_policy, "realtime");
+    }
+
+    #[test]
+    fn normalize_app_config_resets_invalid_message_flow_values() {
+        let mut config = AppConfig::default();
+        config.appearance.message_flow = "diagonal".to_string();
+        config.appearance.vertical_overflow_policy = "unbounded".to_string();
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(config.appearance.message_flow, "horizontal");
+        assert_eq!(config.appearance.vertical_overflow_policy, "realtime");
+    }
+
+    #[test]
+    fn explicit_vertical_complete_mode_is_preserved() {
+        let mut config: AppConfig = serde_json::from_value(json!({
+            "appearance": {
+                "messageFlow": "vertical",
+                "verticalOverflowPolicy": "complete"
+            }
+        }))
+        .expect("vertical config");
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(config.appearance.message_flow, "vertical");
+        assert_eq!(config.appearance.vertical_overflow_policy, "complete");
+    }
+
+    #[test]
     fn normalize_app_config_resets_empty_font_family_to_system() {
         let mut config = AppConfig::default();
         config.appearance.font_family = "   ".to_string();
 
-        normalize_app_config(&mut config);
+        let _ = normalize_app_config(&mut config);
 
         assert_eq!(config.appearance.font_family, "system");
+    }
+
+    #[test]
+    fn removes_deprecated_filter_targets_and_keeps_supported_rules() {
+        let mut config: AppConfig = serde_json::from_value(json!({
+            "filter": { "blockedWords": ["旧词"], "rules": [
+                { "id": "text", "target": "text", "operator": "contains", "value": "a", "action": "hide" },
+                { "id": "user", "target": "user", "operator": "equals", "value": "A", "action": "hide" },
+                { "id": "uid", "target": "senderUid", "operator": "equals", "value": "42", "action": "highlight" },
+                { "id": "fan", "target": "currentRoomFanMedal", "operator": "equals", "value": "no", "action": "hide" },
+                { "id": "comment", "target": "commentText", "operator": "contains", "value": "b", "action": "hide" },
+                { "id": "type", "enabled": false, "target": "messageType", "operator": "equals", "value": "gift", "action": "hide" },
+                { "id": "gift", "target": "giftName", "operator": "equals", "value": "花", "action": "highlight" },
+                { "id": "guard", "target": "guardLevel", "operator": "equals", "value": "3", "action": "hide" }
+            ]}
+        }))
+        .expect("config");
+
+        assert_eq!(normalize_app_config(&mut config), 4);
+        assert_eq!(
+            config
+                .filter
+                .rules
+                .iter()
+                .map(|rule| rule.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["text", "user", "uid", "fan"]
+        );
+        assert_eq!(config.filter.blocked_words, vec!["旧词"]);
+        assert_eq!(normalize_app_config(&mut config), 0);
     }
 
     #[test]
@@ -635,7 +813,7 @@ mod tests {
         }))
         .expect("config with invalid group should deserialize");
 
-        normalize_app_config(&mut config);
+        let _ = normalize_app_config(&mut config);
 
         assert_eq!(config.saved_room_groups.len(), 4);
         assert_eq!(
@@ -673,7 +851,7 @@ mod tests {
         }))
         .expect("old default group config should deserialize");
 
-        normalize_app_config(&mut config);
+        let _ = normalize_app_config(&mut config);
 
         assert_eq!(config.saved_room_groups.len(), 1);
         assert_eq!(config.saved_room_groups[0].id, "game");
@@ -699,7 +877,7 @@ mod tests {
         }))
         .expect("deprecated saved room status fields should be ignored");
 
-        normalize_app_config(&mut config);
+        let _ = normalize_app_config(&mut config);
 
         let saved_room =
             serde_json::to_value(&config.saved_rooms[0]).expect("saved room should serialize");

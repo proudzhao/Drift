@@ -6,10 +6,11 @@ import {
   defaultShortcutLabel,
   type AppConfig,
 } from "../../types/config";
+import type { AppConfigUpdater } from "./useControlConfig";
 
 type UseShortcutSettingsParams = {
   config: AppConfig;
-  saveConfig: (config: AppConfig) => Promise<void>;
+  saveConfig: (updater: AppConfigUpdater) => Promise<void>;
 };
 
 export function useShortcutSettings({
@@ -45,13 +46,13 @@ export function useShortcutSettings({
       const result = await invoke<{ shortcut: string }>("set_edit_mode_shortcut", {
         shortcut: draftShortcut,
       });
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           toggleEditMode: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }
@@ -66,13 +67,13 @@ export function useShortcutSettings({
           shortcut: draftOverlayShortcut,
         },
       );
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           toggleOverlayWindow: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }
@@ -87,13 +88,13 @@ export function useShortcutSettings({
           shortcut: draftSendShortcut,
         },
       );
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           openSendDanmaku: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }
@@ -106,13 +107,13 @@ export function useShortcutSettings({
       const result = await invoke<{ shortcut: string }>("set_edit_mode_shortcut", {
         shortcut: defaultShortcutLabel(),
       });
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           toggleEditMode: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }
@@ -128,13 +129,13 @@ export function useShortcutSettings({
           shortcut: defaultOverlayShortcutLabel(),
         },
       );
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           toggleOverlayWindow: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }
@@ -150,13 +151,13 @@ export function useShortcutSettings({
           shortcut: defaultSendDanmakuShortcutLabel(),
         },
       );
-      await saveConfig({
-        ...config,
+      await saveConfig((current) => ({
+        ...current,
         shortcuts: {
-          ...config.shortcuts,
+          ...current.shortcuts,
           openSendDanmaku: result.shortcut,
         },
-      });
+      }));
     } catch (error) {
       setShortcutError(String(error));
     }

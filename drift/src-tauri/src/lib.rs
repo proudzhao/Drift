@@ -33,7 +33,9 @@ async fn open_help_window(app: tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(bilibili::DanmakuTaskState::default())
+        .manage(bilibili::filter_runtime::FilterRuntimeState::default())
         .manage(bilibili::send::SendDanmakuState::default())
+        .manage(bilibili::recording::DanmakuRecorder::default())
         .manage(window_control::EditModeState::default())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -41,6 +43,7 @@ pub fn run() {
         .setup(|app| {
             logging::init(app.handle())?;
             tracing::debug!(target: "drift::update", "tauri updater plugin initialized");
+            bilibili::recording::setup(app)?;
             window_control::setup(app)?;
             tray::setup(app)?;
             Ok(())
@@ -88,6 +91,12 @@ pub fn run() {
             window_control::load_window_layout,
             bilibili::ws::start_bilibili_danmaku,
             bilibili::ws::stop_bilibili_danmaku,
+            bilibili::filter_runtime::get_filter_runtime_status,
+            bilibili::filter_runtime::pause_fan_medal_rules_for_session,
+            bilibili::recording::get_danmaku_recording_status,
+            bilibili::recording::set_danmaku_recording_enabled,
+            bilibili::recording::retry_danmaku_recording,
+            bilibili::recording::open_danmaku_record_dir,
             bilibili::send::send_bilibili_danmaku,
             bilibili::send::get_send_danmaku_status,
             bilibili::diagnostics::test_bilibili_api,

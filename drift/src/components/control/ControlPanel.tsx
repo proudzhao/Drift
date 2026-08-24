@@ -4,8 +4,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuthPanel } from "../../hooks/control/useAuthPanel";
 import { useControlConfig } from "../../hooks/control/useControlConfig";
 import { useDiagnosticsPanel } from "../../hooks/control/useDiagnosticsPanel";
+import { useDanmakuRecordingStatus } from "../../hooks/control/useDanmakuRecordingStatus";
+import { useFilterRuntimeStatus } from "../../hooks/control/useFilterRuntimeStatus";
 import { useSavedRooms } from "../../hooks/control/useSavedRooms";
 import { useShortcutSettings } from "../../hooks/control/useShortcutSettings";
+import { useThemePreference } from "../../hooks/control/useThemePreference";
+import { useVerticalFlowStatus } from "../../hooks/control/useVerticalFlowStatus";
 import { useAppUpdate } from "../../hooks/control/useAppUpdate";
 import type { AppConfig } from "../../types/config";
 import type { DanmakuStatus } from "../../types/danmaku";
@@ -41,6 +45,12 @@ export function ControlPanel({
   const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<
     string | null
   >(null);
+  const [displayConfigError, setDisplayConfigError] = useState<string | null>(
+    null,
+  );
+  const filterRuntimeStatus = useFilterRuntimeStatus();
+  const danmakuRecording = useDanmakuRecordingStatus();
+  const verticalFlowStatus = useVerticalFlowStatus();
 
   const {
     resetAppearance,
@@ -50,6 +60,10 @@ export function ControlPanel({
     updateMessageDisplay,
     updateUpdateConfig,
   } = useControlConfig({ config, onConfigChange });
+  const themePreference = useThemePreference({
+    theme: config.appearance.theme,
+    saveTheme: (theme) => updateAppearance({ theme }),
+  });
   const {
     authError,
     authStatus,
@@ -147,7 +161,10 @@ export function ControlPanel({
     });
 
     try {
-      await saveConfig({ ...config, roomId: roomId.trim() });
+      await saveConfig((current) => ({
+        ...current,
+        roomId: roomId.trim(),
+      }));
       await invoke("start_bilibili_danmaku", { roomId: numericRoomId });
     } catch (error) {
       onStatusChange({ status: "disconnected", message: String(error) });
@@ -157,6 +174,31 @@ export function ControlPanel({
   async function disconnectRoom() {
     await invoke("stop_bilibili_danmaku");
     onStatusChange({ status: "disconnected", message: "已手动断开" });
+  }
+
+  async function persistDisplayConfig(save: () => Promise<void>) {
+    try {
+      await save();
+      setDisplayConfigError(null);
+    } catch {
+      setDisplayConfigError("显示设置保存失败，已保留原设置");
+    }
+  }
+
+  async function updateDisplayAppearance(
+    appearance: Parameters<typeof updateAppearance>[0],
+  ) {
+    await persistDisplayConfig(() => updateAppearance(appearance));
+  }
+
+  async function updateDisplayMessageConfig(
+    messageDisplay: Parameters<typeof updateMessageDisplay>[0],
+  ) {
+    await persistDisplayConfig(() => updateMessageDisplay(messageDisplay));
+  }
+
+  async function resetDisplayAppearance() {
+    await persistDisplayConfig(resetAppearance);
   }
 
   return (
@@ -170,9 +212,13 @@ export function ControlPanel({
           {config.shortcuts.openSendDanmaku} 发送弹幕
         </span>
       }
+      isThemeSaving={themePreference.isThemeSaving}
       onCollapsedChange={setIsSidebarCollapsed}
       onTabChange={setActiveTab}
+      onThemeToggle={themePreference.toggleTheme}
       status={<span>{status.message}</span>}
+      theme={themePreference.theme}
+      themeError={themePreference.themeError}
       updateNotice={
         shouldShowUpdateNotice ? (
           <ControlUpdateNotice
@@ -203,7 +249,10 @@ export function ControlPanel({
             onDisconnect={disconnectRoom}
             onEditRoomChange={setEditingSavedRoom}
             onGroupChange={setSelectedSavedRoomGroupId}
+            onOpenRecordingDir={danmakuRecording.openDirectory}
+            onRecordingEnabledChange={danmakuRecording.setEnabled}
             onRenameGroup={renameSavedRoomGroup}
+            onRetryRecording={danmakuRecording.retry}
             onRoomIdChange={setDraftRoomId}
             onSaveCurrentRoom={saveCurrentRoom}
             onSaveEditedRoom={saveEditedRoom}
@@ -214,6 +263,8 @@ export function ControlPanel({
             savedRoomError={savedRoomError}
             savedRoomSearchQuery={savedRoomSearchQuery}
             selectedGroupId={selectedSavedRoomGroupId}
+            recordingCommandError={danmakuRecording.commandError}
+            recordingStatus={danmakuRecording.status}
             status={status}
           />
         ) : null}
@@ -221,10 +272,12 @@ export function ControlPanel({
         {activeTab === "display" ? (
           <DisplaySettings
             appearance={config.appearance}
+            displayConfigError={displayConfigError}
             messageDisplay={config.messageDisplay}
-            onResetAppearance={resetAppearance}
-            onUpdateAppearance={updateAppearance}
-            onUpdateMessageDisplay={updateMessageDisplay}
+            onResetAppearance={resetDisplayAppearance}
+            onUpdateAppearance={updateDisplayAppearance}
+            onUpdateMessageDisplay={updateDisplayMessageConfig}
+            verticalFlowStatus={verticalFlowStatus}
           />
         ) : null}
 
@@ -246,6 +299,7 @@ export function ControlPanel({
           <FilterSettings
             onRulesChange={saveFilterRules}
             rules={config.filter.rules}
+            runtimeStatus={filterRuntimeStatus}
           />
         ) : null}
 
@@ -277,7 +331,10 @@ export function ControlPanel({
             mockPanelEnabled={config.mockPanelEnabled}
             onExpandedApiStepChange={setExpandedApiStepKey}
             onMockPanelToggle={(enabled) =>
-              saveConfig({ ...config, mockPanelEnabled: enabled })
+              saveConfig((current) => ({
+                ...current,
+                mockPanelEnabled: enabled,
+              }))
             }
             onTestApi={testApi}
           />

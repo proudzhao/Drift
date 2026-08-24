@@ -24,28 +24,159 @@
   --shadow-drift-control: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px rgba(255, 255, 255, 0.72);
 }
 
-.drift-control-shell {
-  --control-success: #42c983;
-  --control-warning: #e6a15a;
-  --control-danger: #e06c75;
-  --control-muted: #789097;
+html[data-drift-theme="dark"] {
   color-scheme: dark;
+  --drift-ui-workspace: #071014;
+  --drift-ui-sidebar: #0b1418;
+  --drift-ui-surface: #0e171c;
+  --drift-ui-raised: #132027;
+  --drift-ui-input: #0a1519;
+  --drift-ui-hover: #14272d;
+  --drift-ui-selected: #17282f;
+  --drift-ui-border: #29414a;
+  --drift-ui-border-strong: #3a5964;
+  --drift-ui-line: #20343c;
+  --drift-ui-ink: #eaf6f7;
+  --drift-ui-ink-soft: #c7dadd;
+  --drift-ui-muted: #789097;
+  --drift-ui-subtle: #60777e;
+  --drift-ui-disabled: #506970;
+  --drift-ui-signal: #32c7d9;
+  --drift-ui-signal-text: #62d7e4;
+  --drift-ui-on-signal: #071014;
+  --drift-ui-success: #42c983;
+  --drift-ui-warning: #e6a15a;
+  --drift-ui-danger: #e06c75;
+  --drift-ui-success-soft: rgba(66, 201, 131, 0.08);
+  --drift-ui-warning-soft: rgba(230, 161, 90, 0.08);
+  --drift-ui-danger-soft: rgba(224, 108, 117, 0.09);
+  --drift-ui-success-border: rgba(66, 201, 131, 0.4);
+  --drift-ui-warning-border: rgba(230, 161, 90, 0.45);
+  --drift-ui-danger-border: rgba(224, 108, 117, 0.45);
+  --drift-ui-followed: #ff9ad1;
+  --drift-ui-followed-soft: rgba(255, 111, 190, 0.1);
+  --drift-ui-followed-border: rgba(255, 111, 190, 0.5);
+  --drift-ui-glass: rgba(7, 16, 20, 0.92);
+  --drift-ui-drawer: rgba(7, 16, 20, 0.95);
+  --drift-ui-shadow: rgba(0, 0, 0, 0.3);
+  --drift-ui-send-background: linear-gradient(145deg, rgba(7,16,20,.78), rgba(14,23,28,.74));
+  --drift-ui-send-border: rgba(67, 102, 112, 0.72);
+  --drift-ui-send-shadow: rgba(2, 10, 13, 0.34);
+  --drift-ui-inset-highlight: rgba(255, 255, 255, 0.05);
+  --drift-ui-edit-backdrop: rgba(9, 14, 20, 0.16);
+  --drift-ui-edit-outline: rgba(126, 168, 196, 0.82);
+  --drift-ui-overlay-control: rgba(14, 29, 34, 0.88);
+  --drift-ui-overlay-selected: rgba(50, 199, 217, 0.16);
+  --drift-ui-overlay-auxiliary: #9db3b8;
+  --drift-ui-overlay-button-hover: #182a31;
+  --drift-ui-overlay-control-hover: #14272d;
+  --drift-ui-overlay-surface: #0e1d22;
+  --drift-ui-overlay-divider: #14272d;
+  --drift-ui-overlay-row-hover: #10252b;
+  --drift-ui-overlay-copy-success: #65d995;
+  --drift-ui-overlay-copy-danger: #ff7d85;
+  --drift-ui-overlay-drag-glass: rgba(7, 16, 20, 0.76);
+  --drift-ui-overlay-glass: rgba(7, 16, 20, 0.92);
+  --drift-ui-overlay-drawer: rgba(7, 16, 20, 0.95);
+  --drift-ui-overlay-rail: rgba(7, 16, 20, 0.97);
+  --drift-ui-overlay-shadow: rgba(0, 0, 0, 0.32);
+  --drift-ui-overlay-dock-shadow: rgba(0, 0, 0, 0.3);
+  --drift-ui-overlay-scrollbar: #36515a;
+  --drift-ui-overlay-track: #162a31;
+}
+
+html[data-drift-theme="light"] {
+  color-scheme: light;
+  --drift-ui-workspace: #edf4f6;
+  --drift-ui-sidebar: #dfeaed;
+  --drift-ui-surface: #f8fbfc;
+  --drift-ui-raised: #ffffff;
+  --drift-ui-input: #f8fbfc;
+  --drift-ui-hover: #e8f1f3;
+  --drift-ui-selected: #d5e9ed;
+  --drift-ui-border: #c8d9dd;
+  --drift-ui-border-strong: #9fb9c0;
+  --drift-ui-line: #d6e3e6;
+  --drift-ui-ink: #132a31;
+  --drift-ui-ink-soft: #29434b;
+  --drift-ui-muted: #60777e;
+  --drift-ui-subtle: #6f858c;
+  --drift-ui-disabled: #9aabb0;
+  --drift-ui-signal: #0e99ad;
+  --drift-ui-signal-text: #087f8f;
+  --drift-ui-on-signal: #071014;
+  --drift-ui-success: #167d50;
+  --drift-ui-warning: #9a5d16;
+  --drift-ui-danger: #b23f4d;
+  --drift-ui-success-soft: rgba(22, 125, 80, 0.09);
+  --drift-ui-warning-soft: rgba(154, 93, 22, 0.09);
+  --drift-ui-danger-soft: rgba(178, 63, 77, 0.09);
+  --drift-ui-success-border: rgba(22, 125, 80, 0.35);
+  --drift-ui-warning-border: rgba(154, 93, 22, 0.38);
+  --drift-ui-danger-border: rgba(178, 63, 77, 0.38);
+  --drift-ui-followed: #b92875;
+  --drift-ui-followed-soft: rgba(185, 40, 117, 0.09);
+  --drift-ui-followed-border: rgba(185, 40, 117, 0.35);
+  --drift-ui-glass: rgba(248, 251, 252, 0.92);
+  --drift-ui-drawer: rgba(255, 255, 255, 0.95);
+  --drift-ui-shadow: rgba(30, 67, 77, 0.14);
+  --drift-ui-send-background: linear-gradient(145deg, rgba(248,251,252,.94), rgba(255,255,255,.88));
+  --drift-ui-send-border: rgba(159, 185, 192, 0.78);
+  --drift-ui-send-shadow: rgba(30, 67, 77, 0.16);
+  --drift-ui-inset-highlight: rgba(255, 255, 255, 0.55);
+  --drift-ui-edit-backdrop: rgba(237, 244, 246, 0.18);
+  --drift-ui-edit-outline: rgba(14, 153, 173, 0.55);
+  --drift-ui-overlay-control: rgba(248, 251, 252, 0.88);
+  --drift-ui-overlay-selected: rgba(14, 153, 173, 0.16);
+  --drift-ui-overlay-auxiliary: #60777e;
+  --drift-ui-overlay-button-hover: #e8f1f3;
+  --drift-ui-overlay-control-hover: #e8f1f3;
+  --drift-ui-overlay-surface: #f8fbfc;
+  --drift-ui-overlay-divider: #d6e3e6;
+  --drift-ui-overlay-row-hover: #e8f1f3;
+  --drift-ui-overlay-copy-success: #167d50;
+  --drift-ui-overlay-copy-danger: #b23f4d;
+  --drift-ui-overlay-drag-glass: rgba(248, 251, 252, 0.76);
+  --drift-ui-overlay-glass: rgba(248, 251, 252, 0.92);
+  --drift-ui-overlay-drawer: rgba(255, 255, 255, 0.95);
+  --drift-ui-overlay-rail: rgba(255, 255, 255, 0.97);
+  --drift-ui-overlay-shadow: rgba(30, 67, 77, 0.16);
+  --drift-ui-overlay-dock-shadow: rgba(30, 67, 77, 0.14);
+  --drift-ui-overlay-scrollbar: #9fb9c0;
+  --drift-ui-overlay-track: #d5e9ed;
+}
+
+.drift-control-shell,
+.drift-send-shell,
+.drift-overlay-workspace {
+  --color-drift-surface-dark: var(--drift-ui-surface);
+  --color-drift-raised: var(--drift-ui-raised);
+  --color-drift-line: var(--drift-ui-line);
+  --color-drift-ink: var(--drift-ui-ink);
+  --color-drift-signal: var(--drift-ui-signal);
+}
+
+.drift-control-shell {
+  --control-success: var(--drift-ui-success);
+  --control-warning: var(--drift-ui-warning);
+  --control-danger: var(--drift-ui-danger);
+  --control-muted: var(--drift-ui-muted);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI",
     sans-serif;
 }
 
 .drift-control-shell .drift-button {
-  border-color: #29414a;
-  background: #132027;
-  color: #c9dadd;
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-raised);
+  color: var(--drift-ui-ink-soft);
   box-shadow: none;
 }
 
 .drift-control-shell .drift-button:hover:not(:disabled) {
-  border-color: #3a5964;
-  background: #182a31;
-  color: #eaf6f7;
+  border-color: var(--drift-ui-border-strong);
+  background: var(--drift-ui-hover);
+  color: var(--drift-ui-ink);
 }
 
 .drift-control-shell .drift-button:focus-visible,
@@ -53,104 +184,103 @@
 .drift-control-shell .drift-select:focus,
 .drift-control-shell .drift-toggle:focus-visible {
   outline: none;
-  border-color: #32c7d9;
-  box-shadow: 0 0 0 2px rgba(50, 199, 217, 0.18);
+  border-color: var(--drift-ui-signal);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--drift-ui-signal) 18%, transparent);
 }
 
 .drift-control-shell .drift-button.bg-drift-primary {
-  border-color: #32c7d9;
-  background: #32c7d9;
-  color: #071014;
+  border-color: var(--drift-ui-signal);
+  background: var(--drift-ui-signal);
+  color: var(--drift-ui-on-signal);
 }
 
 .drift-control-shell .drift-button.bg-drift-danger-bg {
-  border-color: rgba(224, 108, 117, 0.5);
-  background: rgba(224, 108, 117, 0.12);
-  color: #f2a7ad;
+  border-color: var(--drift-ui-danger-border);
+  background: var(--drift-ui-danger-soft);
+  color: var(--drift-ui-danger);
 }
 
 .drift-control-shell .drift-button.bg-transparent {
   border-color: transparent;
   background: transparent;
-  color: #789097;
+  color: var(--drift-ui-muted);
 }
 
 .drift-control-shell .drift-input,
 .drift-control-shell .drift-select {
-  border-color: #29414a;
-  background: #0a1519;
-  color: #eaf6f7;
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-input);
+  color: var(--drift-ui-ink);
   box-shadow: inset 0 1px rgba(0, 0, 0, 0.24);
 }
 
 .drift-control-shell .drift-input::placeholder {
-  color: #506970;
+  color: var(--drift-ui-disabled);
 }
 
 .drift-control-shell .drift-input:disabled,
 .drift-control-shell .drift-select:disabled {
-  background: #0d181c;
-  color: #53686e;
+  background: var(--drift-ui-surface);
+  color: var(--drift-ui-disabled);
 }
 
 .drift-control-shell .drift-toggle {
-  border-color: #29414a;
-  background: #20343c;
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-line);
 }
 
 .drift-control-shell .drift-toggle[aria-checked="true"] {
-  border-color: #32c7d9;
-  background: #32c7d9;
+  border-color: var(--drift-ui-signal);
+  background: var(--drift-ui-signal);
 }
 
 .drift-control-shell .drift-toggle-thumb {
-  background: #eaf6f7;
+  background: var(--drift-ui-ink);
 }
 
 .drift-control-shell .drift-toggle[aria-checked="true"] .drift-toggle-thumb {
-  background: #071014;
+  background: var(--drift-ui-on-signal);
 }
 
 .drift-control-shell .drift-panel {
-  border-color: #20343c;
-  background: #101c21;
-  color: #eaf6f7;
+  border-color: var(--drift-ui-line);
+  background: var(--drift-ui-raised);
+  color: var(--drift-ui-ink);
   box-shadow: none;
 }
 
 .drift-control-shell .drift-panel h2,
 .drift-control-shell .drift-section-header h2,
 .drift-control-shell .drift-form-row > div:first-child > span {
-  color: #eaf6f7;
+  color: var(--drift-ui-ink);
 }
 
 .drift-control-shell .drift-panel p,
 .drift-control-shell .drift-section-header p,
 .drift-control-shell .drift-form-row-description {
-  color: #789097;
+  color: var(--drift-ui-muted);
 }
 
 .drift-control-shell .settings-scroll-list {
-  scrollbar-color: #36515a transparent;
+  scrollbar-color: var(--drift-ui-border-strong) transparent;
   scrollbar-width: thin;
 }
 
 .drift-control-shell .settings-scroll-list::-webkit-scrollbar-thumb {
-  border-color: #0e171c;
-  background: #36515a;
+  border-color: var(--drift-ui-surface);
+  background: var(--drift-ui-border-strong);
 }
 
 .drift-send-shell {
-  color-scheme: dark;
-  border-color: rgba(67, 102, 112, 0.72);
-  background: linear-gradient(
-    145deg,
-    rgba(7, 16, 20, 0.78),
-    rgba(14, 23, 28, 0.74)
-  );
+  color-scheme: inherit;
+  border-color: var(--drift-ui-send-border);
+  background: var(--drift-ui-send-background);
+  background-color: var(--drift-ui-glass);
+  color: var(--drift-ui-ink);
   box-shadow:
-    0 16px 42px rgba(2, 10, 13, 0.34),
-    inset 0 1px rgba(255, 255, 255, 0.05);
+    0 16px 42px var(--drift-ui-send-shadow),
+    inset 0 1px var(--drift-ui-inset-highlight);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
   font-family:
@@ -159,47 +289,50 @@
 }
 
 .drift-send-shell .drift-input {
-  border-color: #29414a;
-  background: rgba(10, 21, 25, 0.92);
-  color: #eaf6f7;
-  box-shadow: inset 0 1px rgba(0, 0, 0, 0.28);
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-input);
+  color: var(--drift-ui-ink);
+  box-shadow: inset 0 1px var(--drift-ui-shadow);
 }
 
 .drift-send-shell .drift-input::placeholder {
-  color: #506970;
+  color: var(--drift-ui-disabled);
 }
 
 .drift-send-shell .drift-input:focus {
-  border-color: #32c7d9;
-  box-shadow: 0 0 0 2px rgba(50, 199, 217, 0.2);
+  border-color: var(--drift-ui-signal);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--drift-ui-signal) 20%, transparent);
 }
 
 .drift-send-shell .drift-input[aria-invalid="true"] {
-  border-color: rgba(224, 108, 117, 0.8);
-  box-shadow: 0 0 0 2px rgba(224, 108, 117, 0.14);
+  border-color: var(--drift-ui-danger);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--drift-ui-danger) 14%, transparent);
 }
 
 .drift-send-shell .drift-button.bg-drift-primary {
-  border-color: #32c7d9;
-  background: #32c7d9;
-  color: #071014;
+  border-color: var(--drift-ui-signal);
+  background: var(--drift-ui-signal);
+  color: var(--drift-ui-on-signal);
   box-shadow: none;
 }
 
 .drift-send-shell .drift-button.bg-drift-primary:hover:not(:disabled) {
-  background: #62d7e4;
+  background: var(--drift-ui-signal-text);
 }
 
 .drift-send-shell .drift-button.bg-transparent {
-  border-color: #29414a;
-  background: rgba(16, 28, 33, 0.88);
-  color: #789097;
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-input);
+  color: var(--drift-ui-muted);
 }
 
 .drift-send-shell .drift-button:focus-visible,
 .drift-send-shell .drift-input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(50, 199, 217, 0.2);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--drift-ui-signal) 20%, transparent);
 }
 
 .drift-overlay-workspace,
@@ -213,8 +346,8 @@
 }
 
 .drift-overlay-workspace {
-  color-scheme: dark;
-  color: #eaf6f7;
+  color-scheme: inherit;
+  color: var(--drift-ui-ink);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI",
     sans-serif;
@@ -225,17 +358,18 @@
   inset: 12px 12px 50px;
   display: grid;
   place-items: center;
-  border: 1px dashed rgba(50, 199, 217, 0.5);
+  border: 1px dashed
+    color-mix(in srgb, var(--drift-ui-signal) 50%, transparent);
   border-radius: 8px;
   cursor: move;
 }
 
 .drift-overlay-workspace .overlay-drag-label {
-  border: 1px solid #29414a;
+  border: 1px solid var(--drift-ui-border);
   border-radius: 6px;
-  background: rgba(7, 16, 20, 0.76);
+  background: var(--drift-ui-overlay-drag-glass);
   padding: 6px 9px;
-  color: #789097;
+  color: var(--drift-ui-muted);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -250,11 +384,11 @@
   height: 32px;
   align-items: center;
   gap: 6px;
-  border: 1px solid #29414a;
+  border: 1px solid var(--drift-ui-border);
   border-radius: 9px;
-  background: rgba(7, 16, 20, 0.92);
+  background: var(--drift-ui-overlay-glass);
   padding: 0 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px var(--drift-ui-overlay-dock-shadow);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -266,9 +400,9 @@
   display: grid;
   width: 225px;
   gap: 8px;
-  border: 1px solid #29414a;
+  border: 1px solid var(--drift-ui-border);
   border-radius: 9px;
-  background: rgba(7, 16, 20, 0.92);
+  background: var(--drift-ui-overlay-glass);
   padding: 10px;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -284,8 +418,8 @@
   width: 296px;
   min-width: 0;
   overflow: hidden;
-  border-left: 1px solid #29414a;
-  background: rgba(7, 16, 20, 0.95);
+  border-left: 1px solid var(--drift-ui-border);
+  background: var(--drift-ui-overlay-drawer);
   padding: 10px 12px;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -317,7 +451,7 @@
 }
 
 .drift-overlay-workspace .overlay-drawer-scroll {
-  scrollbar-color: #36515a transparent;
+  scrollbar-color: var(--drift-ui-overlay-scrollbar) transparent;
   scrollbar-width: thin;
 }
 
@@ -328,11 +462,15 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px;
   border: 0;
-  border-bottom: 1px solid #14272d;
+  border-bottom: 1px solid var(--drift-ui-overlay-divider);
   background: transparent;
   padding: 7px 3px;
   color: inherit;
   text-align: left;
+}
+
+.drift-overlay-workspace .overlay-history-row:hover {
+  background: var(--drift-ui-overlay-row-hover);
 }
 
 .drift-overlay-workspace .overlay-history-user,
@@ -343,7 +481,7 @@
 }
 
 .drift-overlay-workspace .overlay-history-user {
-  color: #62d7e4;
+  color: var(--drift-ui-signal-text);
   font-weight: 700;
 }
 
@@ -358,14 +496,14 @@
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: #162a31;
+  background: var(--drift-ui-overlay-track);
 }
 
 .drift-overlay-workspace .overlay-kind-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #32c7d9;
+  background: var(--drift-ui-signal);
 }
 
 .drift-overlay-workspace .overlay-stats-rankings {
@@ -388,12 +526,12 @@
   content: "";
   position: absolute;
   inset: 3px;
-  border-color: #32c7d9;
+  border-color: var(--drift-ui-signal);
   opacity: 0.8;
 }
 
 .drift-overlay-workspace .overlay-resize-handle:focus-visible {
-  outline: 2px solid #32c7d9;
+  outline: 2px solid var(--drift-ui-signal);
   outline-offset: 1px;
 }
 
@@ -448,44 +586,45 @@
 .drift-overlay-workspace .overlay-narrow-rail .drift-button {
   border-color: transparent;
   background: transparent;
-  color: #789097;
+  color: var(--drift-ui-muted);
   box-shadow: none;
 }
 
 .drift-overlay-workspace
   .overlay-narrow-rail
   .drift-button:hover:not(:disabled) {
-  border-color: #29414a;
-  background: #14272d;
-  color: #eaf6f7;
+  border-color: var(--drift-ui-border);
+  background: var(--drift-ui-overlay-control-hover);
+  color: var(--drift-ui-ink);
 }
 
 .drift-overlay-workspace .overlay-narrow-rail .drift-button:focus-visible {
-  outline: 2px solid #32c7d9;
+  outline: 2px solid var(--drift-ui-signal);
   outline-offset: 1px;
-  border-color: #32c7d9;
-  box-shadow: 0 0 0 2px rgba(50, 199, 217, 0.2);
+  border-color: var(--drift-ui-signal);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--drift-ui-signal) 20%, transparent);
 }
 
 .drift-overlay-workspace .overlay-narrow-rail .drift-button[aria-pressed="true"] {
-  border-color: #32c7d9;
-  background: rgba(50, 199, 217, 0.16);
-  color: #62d7e4;
+  border-color: var(--drift-ui-signal);
+  background: var(--drift-ui-overlay-selected);
+  color: var(--drift-ui-signal-text);
 }
 
 .drift-overlay-workspace
   .overlay-narrow-rail
   .drift-button.bg-drift-primary {
-  border-color: #32c7d9;
-  background: #32c7d9;
-  color: #071014;
+  border-color: var(--drift-ui-signal);
+  background: var(--drift-ui-signal);
+  color: var(--drift-ui-on-signal);
 }
 
 .drift-overlay-workspace
   .overlay-narrow-rail
   .drift-button.bg-drift-primary:hover:not(:disabled) {
-  background: #62d7e4;
-  color: #071014;
+  background: var(--drift-ui-signal-text);
+  color: var(--drift-ui-on-signal);
 }
 
 @media (max-width: 559px) {
@@ -530,8 +669,8 @@
     width: 42px;
     flex-direction: column;
     gap: 6px;
-    border-right: 1px solid #29414a;
-    background: rgba(7, 16, 20, 0.97);
+    border-right: 1px solid var(--drift-ui-border);
+    background: var(--drift-ui-overlay-rail);
     padding: 8px 6px;
   }
 
@@ -545,17 +684,37 @@
     "SFMono-Regular", "Cascadia Code", "JetBrains Mono", monospace;
 }
 
+.drift-theme-transition,
+.drift-button,
+.drift-input,
+.drift-select,
+.drift-toggle,
+.drift-panel,
+.drift-status-banner,
+.drift-tooltip {
+  transition-duration: 150ms;
+  transition-property: color, background-color, border-color, box-shadow, fill;
+  transition-timing-function: ease;
+}
+
+.drift-settings-sidebar {
+  transition:
+    width 180ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .drift-control-shell *,
-  .drift-control-shell *::before,
-  .drift-control-shell *::after,
-  .drift-send-shell *,
-  .drift-send-shell *::before,
-  .drift-send-shell *::after,
-  .drift-overlay-workspace *,
-  .drift-overlay-workspace *::before,
-  .drift-overlay-workspace *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+  .drift-theme-transition,
+  .drift-button,
+  .drift-input,
+  .drift-select,
+  .drift-toggle,
+  .drift-panel,
+  .drift-status-banner,
+  .drift-tooltip,
+  .drift-settings-sidebar {
+    transition-duration: 0ms !important;
   }
 }

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -7,6 +8,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { HistoryMessage } from "../components/DanmakuHistoryDrawer";
 import {
   generateMockBatch,
@@ -17,7 +19,10 @@ import type {
   DanmakuItem,
   DanmakuStatus,
   LiveMessage,
+  QueuedLiveMessage,
+  VerticalChatItem,
 } from "../types/danmaku";
+import type { VerticalFlowStatus } from "../types/verticalFlow";
 import {
   calcDensityLimits,
   DANMAKU_FLUSH_INTERVAL_MS,
@@ -31,7 +36,6 @@ import {
   MAX_REQUEUE_LATENCY_MS,
   MAX_REQUEUE_ROUNDS,
   resolveMessageDuration,
-  type QueuedLiveMessage,
 } from "../utils/danmakuRuntime";
 import {
   appendStatsEntries,
@@ -42,6 +46,7 @@ import {
   type DanmakuStatsSnapshot,
 } from "../utils/danmakuStats";
 import { applyFilterConfig } from "../utils/filterRules";
+import { useVerticalChatRuntime } from "./useVerticalChatRuntime";
 
 const HISTORY_MAX = 300;
 const STATS_REFRESH_INTERVAL_MS = 1000;
@@ -66,7 +71,9 @@ export type UseDanmakuRuntimeResult = {
   handleMockRateChange: (rate: number) => void;
   historySnapshot: HistoryMessage[];
   items: DanmakuItem[];
+  messageFlow: AppConfig["appearance"]["messageFlow"];
   mock: MockState;
+  pruneVerticalItems: (itemIds: string[]) => void;
   removeDanmakuItem: (itemId: string) => void;
   setShowStats: Dispatch<SetStateAction<boolean>>;
   setShowHistory: Dispatch<SetStateAction<boolean>>;
@@ -76,6 +83,8 @@ export type UseDanmakuRuntimeResult = {
   statsSnapshot: DanmakuStatsSnapshot;
   stopMockDanmaku: () => void;
   triggerMockBurst: () => void;
+  verticalFlowStatus: VerticalFlowStatus;
+  verticalItems: VerticalChatItem[];
 };
 
 export function useDanmakuRuntime({
@@ -91,6 +100,7 @@ export function useDanmakuRuntime({
   const priorityMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
   const activeRoomIdRef = useRef<number | null>(null);
+  const pausedFanMedalRuleIdsRef = useRef(new Set<string>());
   const sequenceRef = useRef(0);
   const historyRef = useRef<HistoryMessage[]>([]);
   const statsStartedAtRef = useRef(Date.now());
@@ -104,11 +114,13 @@ export function useDanmakuRuntime({
   );
   const [showHistory, setShowHistory] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const showHistoryRef = useRef(showHistory);
   const [mock, setMock] = useState<MockState>({
     active: false,
     rate: 50,
     totalGenerated: 0,
   });
+  showHistoryRef.current = showHistory;
 
   const densityLimits = useMemo(
     () => calcDensityLimits(config.appearance.density, trackCount),
@@ -119,17 +131,33 @@ export function useDanmakuRuntime({
     status.status === "connected" ||
     status.status === "reconnecting";
   const items = isConnected || mock.active ? liveItems : [];
+  const messageFlow = config.appearance.messageFlow;
+  const verticalRuntime = useVerticalChatRuntime({
+    active:
+      windowLabel === "main" &&
+      messageFlow === "vertical" &&
+      (isConnected || mock.active),
+    density: config.appearance.density,
+    policy: config.appearance.verticalOverflowPolicy,
+  });
+  const verticalItems = isConnected || mock.active ? verticalRuntime.items : [];
 
-  function clearLiveMessageState() {
+  function clearHorizontalDisplayState() {
     pendingMessagesRef.current = [];
     priorityMessagesRef.current = [];
     laneAvailableAtRef.current = [];
     sequenceRef.current = 0;
+    liveItemsRef.current = [];
+    setLiveItems([]);
+  }
+
+  function clearLiveMessageState() {
+    clearHorizontalDisplayState();
+    verticalRuntime.clear();
+    pausedFanMedalRuleIdsRef.current.clear();
     historyRef.current = [];
     resetStats();
     setHistorySnapshot([]);
-    liveItemsRef.current = [];
-    setLiveItems([]);
   }
 
   function resetStats() {
@@ -149,6 +177,7 @@ export function useDanmakuRuntime({
 
   function filterMessages(messages: LiveMessage[]) {
     const accepted: QueuedLiveMessage[] = [];
+    const newlyPausedRuleIds = new Set<string>();
     const now = Date.now();
 
     for (const message of messages) {
@@ -157,7 +186,15 @@ export function useDanmakuRuntime({
         continue;
       }
 
-      const decision = applyFilterConfig(message, currentConfig.filter);
+      const decision = applyFilterConfig(message, currentConfig.filter, {
+        pausedFanMedalRuleIds: pausedFanMedalRuleIdsRef.current,
+      });
+      for (const ruleId of decision.pauseFanMedalRuleIds) {
+        if (!pausedFanMedalRuleIdsRef.current.has(ruleId)) {
+          pausedFanMedalRuleIdsRef.current.add(ruleId);
+          newlyPausedRuleIds.add(ruleId);
+        }
+      }
       if (!decision.visible) {
         continue;
       }
@@ -165,8 +202,23 @@ export function useDanmakuRuntime({
       accepted.push({
         ...message,
         attempts: 0,
+        followedUser: decision.followedUser,
         highlighted: decision.highlighted,
         queuedAt: now,
+      });
+    }
+
+    const activeRoomId = activeRoomIdRef.current;
+    if (
+      Number.isInteger(activeRoomId) &&
+      (activeRoomId ?? 0) > 0 &&
+      newlyPausedRuleIds.size > 0
+    ) {
+      void invoke("pause_fan_medal_rules_for_session", {
+        roomId: activeRoomId,
+        ruleIds: [...newlyPausedRuleIds],
+      }).catch(() => {
+        console.warn("Failed to report paused fan medal filter rules.");
       });
     }
 
@@ -188,6 +240,9 @@ export function useDanmakuRuntime({
         0,
         historyRef.current.length - HISTORY_MAX,
       );
+    }
+    if (showHistoryRef.current) {
+      setHistorySnapshot([...historyRef.current]);
     }
   }
 
@@ -277,17 +332,29 @@ export function useDanmakuRuntime({
   }
 
   function enqueueLiveMessages(messages: LiveMessage[]) {
-    const acceptedMessages = filterMessages(messages);
-    const currentRoomMessages = acceptedMessages.filter(
-      acceptsCurrentRoomMessage,
-    );
-    if (currentRoomMessages.length === 0) {
+    acceptMessages(messages, true);
+  }
+
+  function routeToDisplayScheduler(messages: QueuedLiveMessage[]) {
+    if (configRef.current.appearance.messageFlow === "vertical") {
+      verticalRuntime.enqueue(messages);
+      return;
+    }
+    enqueueMessages(messages);
+  }
+
+  function acceptMessages(messages: LiveMessage[], requireCurrentRoom: boolean) {
+    const currentRoomMessages = requireCurrentRoom
+      ? messages.filter(acceptsCurrentRoomMessage)
+      : messages;
+    const displayMessages = filterMessages(currentRoomMessages);
+    if (displayMessages.length === 0) {
       return;
     }
 
-    enqueueMessages(currentRoomMessages);
-    pushToHistory(currentRoomMessages);
-    pushToStats(currentRoomMessages);
+    pushToHistory(displayMessages);
+    pushToStats(displayMessages);
+    routeToDisplayScheduler(displayMessages);
   }
 
   function removeDanmakuItem(itemId: string) {
@@ -311,22 +378,30 @@ export function useDanmakuRuntime({
 
   function triggerMockBurst() {
     const batch = generateMockBatch(80);
-    const acceptedMessages = filterMessages(batch);
-    enqueueMessages(acceptedMessages);
-    pushToHistory(acceptedMessages);
-    pushToStats(acceptedMessages);
+    acceptMessages(batch, false);
     setMock((prev) => ({
       ...prev,
       totalGenerated: prev.totalGenerated + batch.length,
     }));
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     configRef.current = config;
   }, [config]);
 
+  const previousMessageFlowRef = useRef(messageFlow);
+  useLayoutEffect(() => {
+    if (previousMessageFlowRef.current === messageFlow) {
+      return;
+    }
+
+    previousMessageFlowRef.current = messageFlow;
+    clearHorizontalDisplayState();
+    verticalRuntime.clear();
+  }, [messageFlow]);
+
   useEffect(() => {
-    if (windowLabel !== "main") {
+    if (windowLabel !== "main" || messageFlow !== "horizontal") {
       return;
     }
 
@@ -396,10 +471,12 @@ export function useDanmakuRuntime({
           user: message.user,
           text: message.text,
           segments: message.segments,
+          currentRoomFanMedalLevel: message.currentRoomFanMedalLevel,
           track,
           duration,
           delay: 0,
           createdAt: messageNow,
+          followedUser: message.followedUser,
           highlighted: message.highlighted,
           isSelf: message.isSelf,
           superChatPrice: message.superChatPrice,
@@ -438,6 +515,7 @@ export function useDanmakuRuntime({
     showHistory,
     trackCount,
     windowLabel,
+    messageFlow,
   ]);
 
   useEffect(() => {
@@ -479,10 +557,7 @@ export function useDanmakuRuntime({
     const intervalMs = Math.max(5, Math.floor(1000 / mock.rate));
     const timer = window.setInterval(() => {
       const message = generateMockMessage();
-      const acceptedMessages = filterMessages([message]);
-      enqueueMessages(acceptedMessages);
-      pushToHistory(acceptedMessages);
-      pushToStats(acceptedMessages);
+      acceptMessages([message], false);
       setMock((prev) => ({
         ...prev,
         totalGenerated: prev.totalGenerated + 1,
@@ -499,7 +574,9 @@ export function useDanmakuRuntime({
     handleMockRateChange,
     historySnapshot,
     items,
+    messageFlow,
     mock,
+    pruneVerticalItems: verticalRuntime.prune,
     removeDanmakuItem,
     setShowStats,
     setShowHistory,
@@ -509,5 +586,7 @@ export function useDanmakuRuntime({
     statsSnapshot,
     stopMockDanmaku,
     triggerMockBurst,
+    verticalFlowStatus: verticalRuntime.status,
+    verticalItems,
   };
 }

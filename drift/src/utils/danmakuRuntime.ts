@@ -1,5 +1,9 @@
 import type { AppConfig } from "../types/config";
-import type { LiveMessage, LiveMessageSegment } from "../types/danmaku";
+import type {
+  LiveMessage,
+  LiveMessageSegment,
+  QueuedLiveMessage,
+} from "../types/danmaku";
 
 export const DANMAKU_FLUSH_INTERVAL_MS = 500;
 export const MIN_TRACK_COUNT = 3;
@@ -7,7 +11,6 @@ export const TRACK_HEIGHT = 38;
 export const MAX_PENDING_QUEUE = 200;
 export const MAX_REQUEUE_ROUNDS = 6;
 export const MAX_REQUEUE_LATENCY_MS = 3000;
-export const SUPER_CHAT_SCROLL_DURATION_RATIO = 1.2;
 
 const MIN_LANE_GAP_PX = 120;
 const EMOTE_RENDER_HEIGHT_RATIO = 1.55;
@@ -16,14 +19,10 @@ const EMOTE_FALLBACK_WIDTH_RATIO = 1.8;
 const SEGMENT_GAP_PX = 2;
 const SUPER_CHAT_HORIZONTAL_CHROME_PX = 44;
 const SUPER_CHAT_BADGE_GAP_PX = 6;
+const SUPER_CHAT_DEFAULT_SCROLL_DURATION_RATIO = 1.2;
+const SUPER_CHAT_MAX_SCROLL_DURATION_SECONDS = 45;
 
 type Density = AppConfig["appearance"]["density"];
-
-export type QueuedLiveMessage = LiveMessage & {
-  attempts: number;
-  highlighted?: boolean;
-  queuedAt: number;
-};
 
 export type DensityLimits = {
   maxItems: number;
@@ -135,6 +134,18 @@ export function laneCooldownMs(width: number, durationSeconds: number) {
   return Math.ceil((width + MIN_LANE_GAP_PX) / pixelsPerMs);
 }
 
+export function resolveSuperChatDurationMultiplier(price?: number) {
+  if (price === undefined || !Number.isFinite(price) || price < 30) {
+    return SUPER_CHAT_DEFAULT_SCROLL_DURATION_RATIO;
+  }
+  if (price >= 2000) return 2.25;
+  if (price >= 1000) return 2;
+  if (price >= 500) return 1.75;
+  if (price >= 100) return 1.55;
+  if (price >= 50) return 1.4;
+  return 1.3;
+}
+
 export function resolveMessageDuration(
   message: LiveMessage,
   scrollDuration: number,
@@ -145,7 +156,11 @@ export function resolveMessageDuration(
     return baseDuration;
   }
 
-  return baseDuration * SUPER_CHAT_SCROLL_DURATION_RATIO;
+  return Math.min(
+    baseDuration *
+      resolveSuperChatDurationMultiplier(message.superChatPrice),
+    SUPER_CHAT_MAX_SCROLL_DURATION_SECONDS,
+  );
 }
 
 export function ensureLaneAvailability(lanes: number[], trackCount: number) {
@@ -187,9 +202,13 @@ export function isMessageTypeVisible(message: LiveMessage, config: AppConfig) {
 }
 
 export function isProtectedMessage(
-  message: Pick<LiveMessage, "kind" | "isSelf">,
+  message: Pick<
+    QueuedLiveMessage,
+    "kind" | "isSelf" | "followedUser" | "highlighted"
+  >,
 ) {
   return (
+    message.followedUser === true ||
     message.isSelf === true ||
     message.kind === "super_chat" ||
     message.kind === "guard" ||

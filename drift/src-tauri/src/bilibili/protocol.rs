@@ -1,7 +1,8 @@
 use super::types::{
-    LiveMessage, LiveMessageKind, LiveMessageSegment, LiveMessageSegmentKind, Packet, HEADER_SIZE,
+    CurrentRoomFanMedal, LiveMessage, LiveMessageKind, LiveMessageSegment, LiveMessageSegmentKind,
+    Packet, HEADER_SIZE,
 };
-use super::{emote_probe, sc_probe};
+use super::{emote_probe, medal_probe, sc_probe};
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use std::io::Read;
@@ -91,6 +92,7 @@ pub(crate) fn handle_packet(
     app: &tauri::AppHandle,
     status_emitter: impl Fn(&tauri::AppHandle, &str, &str),
     room_id: u64,
+    anchor_uid: u64,
     self_uid: Option<u64>,
     bytes: &[u8],
 ) -> Result<Vec<LiveMessage>, String> {
@@ -110,7 +112,9 @@ pub(crate) fn handle_packet(
                 }
             }
             5 => {
-                if let Some(mut msg) = try_extract_live_message(&packet.payload, self_uid) {
+                if let Some(mut msg) =
+                    try_extract_live_message(&packet.payload, anchor_uid, self_uid)
+                {
                     msg.room_id = Some(room_id);
                     messages.push(msg);
                 }
@@ -127,17 +131,22 @@ pub(crate) fn handle_packet(
     Ok(messages)
 }
 
-fn try_extract_live_message(payload: &[u8], self_uid: Option<u64>) -> Option<LiveMessage> {
+fn try_extract_live_message(
+    payload: &[u8],
+    anchor_uid: u64,
+    self_uid: Option<u64>,
+) -> Option<LiveMessage> {
     let value = serde_json::from_slice::<Value>(payload).ok()?;
     let command = value.get("cmd").and_then(Value::as_str)?;
     match command {
         "DANMU_MSG" => {
+            medal_probe::maybe_log_danmaku_sample(&value, anchor_uid);
             emote_probe::maybe_log_danmaku_sample(&value);
-            try_extract_danmaku_message(&value, self_uid)
+            try_extract_danmaku_message(&value, anchor_uid, self_uid)
         }
         "SUPER_CHAT_MESSAGE" | "SUPER_CHAT_MESSAGE_JPN" => {
             sc_probe::maybe_log_super_chat_sample(&value);
-            try_extract_super_chat_message(&value, self_uid)
+            try_extract_super_chat_message(&value, self_uid, command)
         }
         "SEND_GIFT" => try_extract_gift_message(&value),
         "GUARD_BUY" => try_extract_guard_message(&value),
@@ -155,6 +164,9 @@ fn empty_live_message(
     LiveMessage {
         id,
         room_id: None,
+        sender_uid: None,
+        current_room_fan_medal: None,
+        current_room_fan_medal_level: None,
         kind,
         user,
         text,
@@ -168,10 +180,16 @@ fn empty_live_message(
         super_chat_price: None,
         super_chat_duration: None,
         super_chat_color: None,
+        source_command: None,
+        source_message_id: None,
     }
 }
 
-fn try_extract_danmaku_message(value: &Value, self_uid: Option<u64>) -> Option<LiveMessage> {
+fn try_extract_danmaku_message(
+    value: &Value,
+    anchor_uid: u64,
+    self_uid: Option<u64>,
+) -> Option<LiveMessage> {
     let info = value.get("info").and_then(Value::as_array)?;
     let text = info.get(1).and_then(Value::as_str)?;
     let user_info = info.get(2).and_then(Value::as_array)?;
@@ -196,9 +214,171 @@ fn try_extract_danmaku_message(value: &Value, self_uid: Option<u64>) -> Option<L
         text.to_string(),
         Some(timestamp),
     );
+    message.sender_uid = (uid > 0).then_some(uid);
+    let current_room_fan_medal = resolve_current_room_fan_medal(info, anchor_uid);
+    message.current_room_fan_medal = Some(current_room_fan_medal);
+    message.current_room_fan_medal_level =
+        resolve_current_room_fan_medal_level(info, current_room_fan_medal);
     message.is_self = self_uid.is_some_and(|current_uid| current_uid != 0 && current_uid == uid);
     message.segments = extract_danmaku_segments(info, text);
     Some(message)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MedalCandidate {
+    Missing,
+    None,
+    Anchor(u64),
+    Malformed,
+}
+
+fn resolve_current_room_fan_medal(info: &[Value], anchor_uid: u64) -> CurrentRoomFanMedal {
+    let new_candidate = new_medal_candidate(info);
+    let legacy_candidate = legacy_medal_candidate(info);
+
+    match (new_candidate, legacy_candidate) {
+        (MedalCandidate::Anchor(new_uid), MedalCandidate::Anchor(legacy_uid))
+            if new_uid != legacy_uid =>
+        {
+            CurrentRoomFanMedal::Unknown
+        }
+        (MedalCandidate::Anchor(uid), _) | (_, MedalCandidate::Anchor(uid)) => {
+            if uid == anchor_uid {
+                CurrentRoomFanMedal::Yes
+            } else {
+                CurrentRoomFanMedal::No
+            }
+        }
+        (MedalCandidate::Malformed, _) | (_, MedalCandidate::Malformed) => {
+            CurrentRoomFanMedal::Unknown
+        }
+        (MedalCandidate::None, _) | (_, MedalCandidate::None) => CurrentRoomFanMedal::No,
+        (MedalCandidate::Missing, MedalCandidate::Missing) => CurrentRoomFanMedal::Unknown,
+    }
+}
+
+fn new_medal_candidate(info: &[Value]) -> MedalCandidate {
+    let Some(meta) = info.first().and_then(Value::as_array) else {
+        return MedalCandidate::Missing;
+    };
+    let Some(slot) = meta.get(15) else {
+        return MedalCandidate::Missing;
+    };
+    let Some(container) = parse_json_value(slot) else {
+        return MedalCandidate::Malformed;
+    };
+    let Some(medal) = container.get("user").and_then(|user| user.get("medal")) else {
+        return MedalCandidate::Missing;
+    };
+    medal_candidate_from_value(medal)
+}
+
+fn legacy_medal_candidate(info: &[Value]) -> MedalCandidate {
+    let Some(value) = info.get(3) else {
+        return MedalCandidate::Missing;
+    };
+    let Some(medal) = value.as_array() else {
+        return MedalCandidate::Malformed;
+    };
+    if medal.is_empty() {
+        return MedalCandidate::None;
+    }
+    medal
+        .get(12)
+        .map(medal_candidate_from_anchor_uid)
+        .unwrap_or(MedalCandidate::Malformed)
+}
+
+fn medal_candidate_from_value(value: &Value) -> MedalCandidate {
+    if value.is_null() {
+        return MedalCandidate::None;
+    }
+    value
+        .get("ruid")
+        .map(medal_candidate_from_anchor_uid)
+        .unwrap_or(MedalCandidate::Malformed)
+}
+
+fn medal_candidate_from_anchor_uid(value: &Value) -> MedalCandidate {
+    value
+        .as_u64()
+        .filter(|uid| *uid > 0)
+        .map(MedalCandidate::Anchor)
+        .unwrap_or(MedalCandidate::Malformed)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MedalLevelCandidate {
+    Missing,
+    Valid(u32),
+    Malformed,
+}
+
+fn resolve_current_room_fan_medal_level(
+    info: &[Value],
+    ownership: CurrentRoomFanMedal,
+) -> Option<u32> {
+    if ownership != CurrentRoomFanMedal::Yes {
+        return None;
+    }
+
+    let new_candidate = new_medal_level_candidate(info);
+    let legacy_candidate = legacy_medal_level_candidate(info);
+    match (new_candidate, legacy_candidate) {
+        (MedalLevelCandidate::Valid(new), MedalLevelCandidate::Valid(legacy)) if new == legacy => {
+            Some(new)
+        }
+        (MedalLevelCandidate::Valid(level), MedalLevelCandidate::Missing)
+        | (MedalLevelCandidate::Missing, MedalLevelCandidate::Valid(level)) => Some(level),
+        _ => None,
+    }
+}
+
+fn new_medal_level_candidate(info: &[Value]) -> MedalLevelCandidate {
+    let Some(meta) = info.first().and_then(Value::as_array) else {
+        return MedalLevelCandidate::Missing;
+    };
+    let Some(slot) = meta.get(15) else {
+        return MedalLevelCandidate::Missing;
+    };
+    let Some(container) = parse_json_value(slot) else {
+        return MedalLevelCandidate::Malformed;
+    };
+    let Some(medal) = container.get("user").and_then(|user| user.get("medal")) else {
+        return MedalLevelCandidate::Missing;
+    };
+    if medal.is_null() {
+        return MedalLevelCandidate::Missing;
+    }
+    if !matches!(medal_candidate_from_value(medal), MedalCandidate::Anchor(_)) {
+        return MedalLevelCandidate::Malformed;
+    }
+    medal_level_candidate(medal.get("level"))
+}
+
+fn legacy_medal_level_candidate(info: &[Value]) -> MedalLevelCandidate {
+    let Some(value) = info.get(3) else {
+        return MedalLevelCandidate::Missing;
+    };
+    let Some(medal) = value.as_array() else {
+        return MedalLevelCandidate::Malformed;
+    };
+    if medal.is_empty() {
+        return MedalLevelCandidate::Missing;
+    }
+    if !matches!(legacy_medal_candidate(info), MedalCandidate::Anchor(_)) {
+        return MedalLevelCandidate::Malformed;
+    }
+    medal_level_candidate(medal.first())
+}
+
+fn medal_level_candidate(value: Option<&Value>) -> MedalLevelCandidate {
+    value
+        .and_then(Value::as_u64)
+        .filter(|level| *level > 0)
+        .and_then(|level| u32::try_from(level).ok())
+        .map(MedalLevelCandidate::Valid)
+        .unwrap_or(MedalLevelCandidate::Malformed)
 }
 
 #[derive(Debug, Clone)]
@@ -377,6 +557,7 @@ fn try_extract_gift_message(value: &Value) -> Option<LiveMessage> {
         text,
         timestamp,
     );
+    message.sender_uid = (uid > 0).then_some(uid);
     message.gift_name = Some(gift_name.to_string());
     message.gift_count = Some(count);
     Some(message)
@@ -410,12 +591,17 @@ fn try_extract_guard_message(value: &Value) -> Option<LiveMessage> {
         text,
         timestamp,
     );
+    message.sender_uid = (uid > 0).then_some(uid);
     message.guard_level = Some(guard_level);
     message.guard_name = Some(guard_name.to_string());
     Some(message)
 }
 
-fn try_extract_super_chat_message(value: &Value, self_uid: Option<u64>) -> Option<LiveMessage> {
+fn try_extract_super_chat_message(
+    value: &Value,
+    self_uid: Option<u64>,
+    command: &str,
+) -> Option<LiveMessage> {
     let data = value.get("data")?;
     let text = string_field(data, &["message", "message_trans"])?;
     let user = string_path(data, &["user_info", "uname"])
@@ -427,9 +613,9 @@ fn try_extract_super_chat_message(value: &Value, self_uid: Option<u64>) -> Optio
         .or_else(|| u64_path(data, &["uinfo", "uid"]))
         .unwrap_or(0);
     let timestamp = u64_field(data, &["start_time", "ts"]);
-    let id = data
-        .get("id")
-        .and_then(id_component)
+    let source_message_id = data.get("id").and_then(id_component);
+    let id = source_message_id
+        .as_deref()
         .map(|id| format!("sc-{}", id))
         .unwrap_or_else(|| format!("sc-{}-{}-{}", uid, timestamp.unwrap_or(0), text.len()));
 
@@ -440,6 +626,9 @@ fn try_extract_super_chat_message(value: &Value, self_uid: Option<u64>) -> Optio
         text.to_string(),
         timestamp,
     );
+    message.sender_uid = (uid > 0).then_some(uid);
+    message.source_command = Some(command.to_string());
+    message.source_message_id = source_message_id;
     message.is_self = self_uid.is_some_and(|current_uid| current_uid != 0 && current_uid == uid);
     message.super_chat_price = u64_field(data, &["price", "rmb"]);
     message.super_chat_duration = u64_field(data, &["time"]);
@@ -555,7 +744,37 @@ mod tests {
 
     fn parse_message_with_self_uid(value: Value, self_uid: Option<u64>) -> LiveMessage {
         let bytes = serde_json::to_vec(&value).expect("payload should serialize");
-        try_extract_live_message(&bytes, self_uid).expect("message should parse")
+        try_extract_live_message(&bytes, 7, self_uid).expect("message should parse")
+    }
+
+    fn parse_message_for_anchor(value: Value, anchor_uid: u64) -> LiveMessage {
+        let bytes = serde_json::to_vec(&value).expect("payload should serialize");
+        try_extract_live_message(&bytes, anchor_uid, None).expect("message should parse")
+    }
+
+    fn legacy_medal(uid: u64) -> Value {
+        let mut medal = vec![json!(0); 12];
+        medal.push(json!(uid));
+        Value::Array(medal)
+    }
+
+    fn legacy_medal_with_level(uid: u64, level: Value) -> Value {
+        let mut medal = vec![json!(0); 12];
+        medal[0] = level;
+        medal.push(json!(uid));
+        Value::Array(medal)
+    }
+
+    fn danmaku_medal_payload(new_medal: Option<Value>, legacy: Option<Value>) -> Value {
+        let mut meta = vec![json!(0); 15];
+        if let Some(medal) = new_medal {
+            meta.push(json!({ "user": { "medal": medal } }));
+        }
+        let mut info = vec![Value::Array(meta), json!("正文"), json!([42, "用户"])];
+        if let Some(medal) = legacy {
+            info.push(medal);
+        }
+        json!({ "cmd": "DANMU_MSG", "info": info })
     }
 
     fn danmaku_payload(text: &str, extra_slot: Option<Value>) -> Value {
@@ -613,13 +832,15 @@ mod tests {
         }"#;
 
         let message =
-            try_extract_live_message(payload.as_bytes(), Some(42)).expect("gift should parse");
+            try_extract_live_message(payload.as_bytes(), 7, Some(42)).expect("gift should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::Gift));
         assert_eq!(message.user, "送礼用户");
         assert_eq!(message.text, "送礼用户 送出 小花花 x3");
         assert_eq!(message.gift_name.as_deref(), Some("小花花"));
         assert_eq!(message.gift_count, Some(3));
+        assert_eq!(message.sender_uid, Some(42));
+        assert_eq!(message.current_room_fan_medal, None);
     }
 
     #[test]
@@ -636,13 +857,15 @@ mod tests {
         }"#;
 
         let message =
-            try_extract_live_message(payload.as_bytes(), Some(7)).expect("guard should parse");
+            try_extract_live_message(payload.as_bytes(), 7, Some(7)).expect("guard should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::Guard));
         assert_eq!(message.user, "上舰用户");
         assert_eq!(message.text, "上舰用户 开通 舰长");
         assert_eq!(message.guard_level, Some(3));
         assert_eq!(message.guard_name.as_deref(), Some("舰长"));
+        assert_eq!(message.sender_uid, Some(7));
+        assert_eq!(message.current_room_fan_medal, None);
     }
 
     #[test]
@@ -665,7 +888,7 @@ mod tests {
             }
         }"##;
 
-        let message = try_extract_live_message(payload.as_bytes(), Some(42))
+        let message = try_extract_live_message(payload.as_bytes(), 7, Some(42))
             .expect("super chat should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::SuperChat));
@@ -675,6 +898,8 @@ mod tests {
         assert_eq!(message.super_chat_price, Some(2));
         assert_eq!(message.super_chat_duration, Some(5));
         assert_eq!(message.super_chat_color.as_deref(), Some("#eff6ff"));
+        assert_eq!(message.sender_uid, Some(42));
+        assert_eq!(message.current_room_fan_medal, None);
         assert!(message.is_self);
     }
 
@@ -688,7 +913,7 @@ mod tests {
         }"#;
 
         let message =
-            try_extract_live_message(payload.as_bytes(), None).expect("super chat should parse");
+            try_extract_live_message(payload.as_bytes(), 7, None).expect("super chat should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::SuperChat));
         assert_eq!(message.user, "匿名用户");
@@ -697,7 +922,67 @@ mod tests {
         assert_eq!(message.super_chat_price, None);
         assert_eq!(message.super_chat_duration, None);
         assert_eq!(message.super_chat_color, None);
+        assert_eq!(message.sender_uid, None);
+        assert_eq!(message.current_room_fan_medal, None);
         assert!(!message.is_self);
+    }
+
+    #[test]
+    fn extracts_stable_super_chat_source_metadata_for_both_commands() {
+        let regular = parse_message(json!({
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": { "id": 6522809, "message": "同一条 SC" }
+        }));
+        let jpn = parse_message(json!({
+            "cmd": "SUPER_CHAT_MESSAGE_JPN",
+            "data": { "id": "6522809", "message": "同一条 SC", "message_jpn": "翻译" }
+        }));
+
+        assert_eq!(regular.id, "sc-6522809");
+        assert_eq!(jpn.id, "sc-6522809");
+        assert_eq!(regular.source_message_id.as_deref(), Some("6522809"));
+        assert_eq!(jpn.source_message_id.as_deref(), Some("6522809"));
+        assert_eq!(
+            regular.source_command.as_deref(),
+            Some("SUPER_CHAT_MESSAGE")
+        );
+        assert_eq!(
+            jpn.source_command.as_deref(),
+            Some("SUPER_CHAT_MESSAGE_JPN")
+        );
+    }
+
+    #[test]
+    fn fallback_super_chat_has_no_dedup_source_id() {
+        let message = parse_message(json!({
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": { "uid": 42, "start_time": 100, "message": "fallback" }
+        }));
+
+        assert_eq!(message.id, "sc-42-100-8");
+        assert_eq!(message.source_message_id, None);
+        assert_eq!(
+            message.source_command.as_deref(),
+            Some("SUPER_CHAT_MESSAGE")
+        );
+    }
+
+    #[test]
+    fn super_chat_source_metadata_is_not_serialized_to_frontend() {
+        let message = parse_message(json!({
+            "cmd": "SUPER_CHAT_MESSAGE",
+            "data": { "id": 6522809, "message": "不泄漏内部字段" }
+        }));
+        let serialized = serde_json::to_value(message).expect("message should serialize");
+
+        assert!(serialized.get("sourceCommand").is_none());
+        assert!(serialized.get("sourceMessageId").is_none());
+        assert!(serialized.get("source_command").is_none());
+        assert!(serialized.get("source_message_id").is_none());
+        assert_eq!(
+            serialized.get("id").and_then(Value::as_str),
+            Some("sc-6522809")
+        );
     }
 
     #[test]
@@ -712,7 +997,7 @@ mod tests {
         }"#;
 
         let message =
-            try_extract_live_message(payload.as_bytes(), None).expect("super chat should parse");
+            try_extract_live_message(payload.as_bytes(), 7, None).expect("super chat should parse");
 
         assert!(matches!(message.kind, LiveMessageKind::SuperChat));
         assert_eq!(message.text, "价格决定颜色");
@@ -751,8 +1036,148 @@ mod tests {
         assert!(matches!(message.kind, LiveMessageKind::Danmaku));
         assert_eq!(message.user, "测试用户");
         assert_eq!(message.text, "普通弹幕");
+        assert_eq!(message.sender_uid, Some(42));
+        assert_eq!(
+            message.current_room_fan_medal,
+            Some(CurrentRoomFanMedal::No)
+        );
         assert!(message.segments.is_none());
         assert!(!message.is_self);
+    }
+
+    #[test]
+    fn resolves_current_room_fan_medal_from_new_and_legacy_shapes() {
+        let cases = [
+            (
+                Some(json!({"ruid": 7})),
+                Some(legacy_medal(7)),
+                CurrentRoomFanMedal::Yes,
+            ),
+            (
+                Some(json!({"ruid": 8})),
+                Some(legacy_medal(8)),
+                CurrentRoomFanMedal::No,
+            ),
+            (Some(json!({"ruid": 7})), None, CurrentRoomFanMedal::Yes),
+            (None, Some(legacy_medal(8)), CurrentRoomFanMedal::No),
+            (Some(Value::Null), Some(json!([])), CurrentRoomFanMedal::No),
+            (None, None, CurrentRoomFanMedal::Unknown),
+            (Some(json!({})), None, CurrentRoomFanMedal::Unknown),
+            (None, Some(json!([1])), CurrentRoomFanMedal::Unknown),
+            (
+                Some(json!({"ruid": 7})),
+                Some(legacy_medal(8)),
+                CurrentRoomFanMedal::Unknown,
+            ),
+        ];
+
+        for (new_medal, legacy, expected) in cases {
+            let message = parse_message_for_anchor(danmaku_medal_payload(new_medal, legacy), 7);
+            assert_eq!(message.sender_uid, Some(42));
+            assert_eq!(message.current_room_fan_medal, Some(expected));
+
+            let serialized = serde_json::to_value(message).expect("message should serialize");
+            let expected_value = match expected {
+                CurrentRoomFanMedal::Yes => "yes",
+                CurrentRoomFanMedal::No => "no",
+                CurrentRoomFanMedal::Unknown => "unknown",
+            };
+            assert_eq!(
+                serialized
+                    .get("currentRoomFanMedal")
+                    .and_then(Value::as_str),
+                Some(expected_value)
+            );
+        }
+    }
+
+    #[test]
+    fn extracts_current_room_fan_medal_level_from_supported_shapes() {
+        let cases = [
+            (
+                Some(json!({ "ruid": 7, "level": 13 })),
+                Some(legacy_medal_with_level(7, json!(13))),
+                13,
+            ),
+            (Some(json!({ "ruid": 7, "level": 21 })), None, 21),
+            (None, Some(legacy_medal_with_level(7, json!(37))), 37),
+        ];
+
+        for (new_medal, legacy, expected_level) in cases {
+            let message = parse_message_for_anchor(danmaku_medal_payload(new_medal, legacy), 7);
+            assert_eq!(
+                message.current_room_fan_medal,
+                Some(CurrentRoomFanMedal::Yes)
+            );
+            assert_eq!(message.current_room_fan_medal_level, Some(expected_level));
+
+            let serialized = serde_json::to_value(message).expect("message should serialize");
+            assert_eq!(
+                serialized
+                    .get("currentRoomFanMedalLevel")
+                    .and_then(Value::as_u64),
+                Some(u64::from(expected_level))
+            );
+        }
+    }
+
+    #[test]
+    fn omits_fan_medal_level_for_non_current_or_absent_medals() {
+        let cases = [
+            danmaku_medal_payload(Some(Value::Null), Some(json!([]))),
+            danmaku_medal_payload(
+                Some(json!({ "ruid": 8, "level": 13 })),
+                Some(legacy_medal_with_level(8, json!(13))),
+            ),
+        ];
+
+        for payload in cases {
+            let message = parse_message_for_anchor(payload, 7);
+            assert_eq!(message.current_room_fan_medal_level, None);
+            let serialized = serde_json::to_value(message).expect("message should serialize");
+            assert!(serialized.get("currentRoomFanMedalLevel").is_none());
+        }
+    }
+
+    #[test]
+    fn omits_fan_medal_level_for_conflicting_missing_or_malformed_levels() {
+        let cases = [
+            danmaku_medal_payload(
+                Some(json!({ "ruid": 7, "level": 13 })),
+                Some(legacy_medal_with_level(7, json!(14))),
+            ),
+            danmaku_medal_payload(Some(json!({ "ruid": 7 })), None),
+            danmaku_medal_payload(Some(json!({ "ruid": 7, "level": "13" })), None),
+            danmaku_medal_payload(Some(json!({ "ruid": 7, "level": 0 })), None),
+            danmaku_medal_payload(Some(json!({ "ruid": 7, "level": 13.5 })), None),
+            danmaku_medal_payload(Some(json!({ "ruid": 7, "level": 4_294_967_296_u64 })), None),
+            danmaku_medal_payload(
+                Some(json!({ "ruid": 7, "level": 13 })),
+                Some(legacy_medal(7)),
+            ),
+        ];
+
+        for payload in cases {
+            let message = parse_message_for_anchor(payload, 7);
+            assert_eq!(
+                message.current_room_fan_medal,
+                Some(CurrentRoomFanMedal::Yes)
+            );
+            assert_eq!(message.current_room_fan_medal_level, None);
+            let serialized = serde_json::to_value(message).expect("message should serialize");
+            assert!(serialized.get("currentRoomFanMedalLevel").is_none());
+        }
+    }
+
+    #[test]
+    fn omits_zero_sender_uid_from_serialized_messages() {
+        let message = parse_message(json!({
+            "cmd": "SEND_GIFT",
+            "data": { "uid": 0, "uname": "匿名用户", "giftName": "礼物" }
+        }));
+        let serialized = serde_json::to_value(message).expect("message should serialize");
+
+        assert!(serialized.get("senderUid").is_none());
     }
 
     #[test]

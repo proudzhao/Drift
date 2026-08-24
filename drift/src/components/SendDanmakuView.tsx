@@ -28,10 +28,22 @@ const TONE_CLASSES: Record<
   SendFeedbackTone,
   { dot: string; text: string }
 > = {
-  signal: { dot: "bg-drift-signal", text: "text-[#8edee8]" },
-  success: { dot: "bg-[#42c983]", text: "text-[#78dca5]" },
-  warning: { dot: "bg-[#e6a15a]", text: "text-[#e9b779]" },
-  danger: { dot: "bg-[#e06c75]", text: "text-[#f0a0a7]" },
+  signal: {
+    dot: "bg-[var(--drift-ui-signal)]",
+    text: "text-[var(--drift-ui-signal-text)]",
+  },
+  success: {
+    dot: "bg-[var(--drift-ui-success)]",
+    text: "text-[var(--drift-ui-success)]",
+  },
+  warning: {
+    dot: "bg-[var(--drift-ui-warning)]",
+    text: "text-[var(--drift-ui-warning)]",
+  },
+  danger: {
+    dot: "bg-[var(--drift-ui-danger)]",
+    text: "text-[var(--drift-ui-danger)]",
+  },
 };
 
 export function formatRemainingText(remaining: number) {
@@ -59,22 +71,24 @@ export function SendDanmakuView({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <main className="drift-send-shell box-border grid h-full w-full grid-cols-[minmax(0,1fr)] grid-rows-[34px_46px_minmax(0,1fr)] overflow-hidden rounded-[13px] border text-drift-ink">
+      <main className="drift-send-shell drift-theme-transition box-border grid h-full w-full grid-cols-[minmax(0,1fr)] grid-rows-[34px_46px_minmax(0,1fr)] overflow-hidden rounded-[13px] border text-[var(--drift-ui-ink)]">
         <header
           aria-label="拖动发送窗口"
-          className="flex cursor-move select-none items-center justify-between gap-3 px-2.5 pl-3"
+          className="drift-theme-transition flex cursor-move select-none items-center justify-between gap-3 px-2.5 pl-3"
           onMouseDown={onDragStart}
         >
           <div className="flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden">
-            <span className="shrink-0 text-[10px] text-[#789097]">发送到</span>
-            <strong className="min-w-0 truncate text-[12px] font-semibold text-drift-ink">
+            <span className="drift-theme-transition shrink-0 text-[10px] text-[var(--drift-ui-muted)]">
+              发送到
+            </span>
+            <strong className="drift-theme-transition min-w-0 truncate text-[12px] font-semibold text-[var(--drift-ui-ink)]">
               {targetText}
             </strong>
           </div>
           <Tooltip content="关闭">
             <IconButton
               aria-label="关闭发送窗口"
-              className={NO_DRAG_CLASS}
+              className={classNames(NO_DRAG_CLASS, "drift-theme-transition")}
               onClick={onClose}
               onMouseDown={(event) => event.stopPropagation()}
               size="sm"
@@ -113,10 +127,10 @@ export function SendDanmakuView({
           </Button>
         </div>
 
-        <footer className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-drift-line px-3 text-[10px]">
+        <footer className="drift-theme-transition grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t border-[var(--drift-ui-line)] px-3 text-[10px]">
           <span
             className={classNames(
-              "flex min-w-0 items-center gap-2",
+              "drift-theme-transition flex min-w-0 items-center gap-2",
               toneClasses.text,
             )}
             data-tone={tone}
@@ -125,7 +139,7 @@ export function SendDanmakuView({
             <span
               aria-hidden="true"
               className={classNames(
-                "size-1.5 shrink-0 rounded-full",
+                "drift-theme-transition size-1.5 shrink-0 rounded-full",
                 toneClasses.dot,
               )}
             />
@@ -133,9 +147,9 @@ export function SendDanmakuView({
           </span>
           <span
             className={classNames(
-              "drift-data-text whitespace-nowrap text-[#789097]",
-              countTone === "warning" && "text-[#e9b779]",
-              countTone === "danger" && "text-[#f0a0a7]",
+              "drift-data-text drift-theme-transition whitespace-nowrap text-[var(--drift-ui-muted)]",
+              countTone === "warning" && "text-[var(--drift-ui-warning)]",
+              countTone === "danger" && "text-[var(--drift-ui-danger)]",
             )}
             data-count-tone={countTone}
           >

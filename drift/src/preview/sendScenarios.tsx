@@ -3,6 +3,7 @@ import {
   SendDanmakuView,
   type SendFeedbackTone,
 } from "../components/SendDanmakuView";
+import { ThemeScenarioScope } from "./ThemeScenarioScope";
 
 export type SendWindowScenarioId =
   | "send-ready"
@@ -12,7 +13,8 @@ export type SendWindowScenarioId =
   | "send-success"
   | "send-error"
   | "send-over-limit"
-  | "send-long-content";
+  | "send-long-content"
+  | "send-theme-light";
 
 export const SEND_WINDOW_SCENARIOS = [
   { id: "send-ready", label: "发送窗口 / 准备发送" },
@@ -23,6 +25,7 @@ export const SEND_WINDOW_SCENARIOS = [
   { id: "send-error", label: "发送窗口 / 失败" },
   { id: "send-over-limit", label: "发送窗口 / 超限" },
   { id: "send-long-content", label: "发送窗口 / 长内容" },
+  { id: "send-theme-light", label: "发送窗口 / 亮色主题" },
 ] as const;
 
 const SEND_SCENARIO_IDS = new Set<string>(
@@ -45,16 +48,18 @@ type SendFixture = {
   tone: SendFeedbackTone;
 };
 
+const READY_FIXTURE: SendFixture = {
+  canSend: true,
+  feedback: "准备发送",
+  isSending: false,
+  remaining: 60,
+  targetText: "星瞳_Official",
+  text: "",
+  tone: "signal",
+};
+
 const FIXTURES: Record<SendWindowScenarioId, SendFixture> = {
-  "send-ready": {
-    canSend: true,
-    feedback: "准备发送",
-    isSending: false,
-    remaining: 60,
-    targetText: "星瞳_Official",
-    text: "",
-    tone: "signal",
-  },
+  "send-ready": READY_FIXTURE,
   "send-unavailable": {
     canSend: false,
     feedback: "请先登录 B 站并连接直播间",
@@ -120,6 +125,7 @@ const FIXTURES: Record<SendWindowScenarioId, SendFixture> = {
     text: "长内容预览",
     tone: "danger",
   },
+  "send-theme-light": READY_FIXTURE,
 };
 
 export function SendWindowScenarioPreview({
@@ -131,21 +137,30 @@ export function SendWindowScenarioPreview({
   const { text: initialText, ...viewProps } = fixture;
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(initialText);
+  const theme = scenarioId === "send-theme-light" ? "light" : "dark";
 
   return (
-    <div className="grid min-h-screen place-items-center overflow-auto bg-[linear-gradient(135deg,#344b55,#16262e)] p-6">
-      <div className="h-[132px] w-[460px] shrink-0">
-        <SendDanmakuView
-          {...viewProps}
-          inputRef={inputRef}
-          onClose={() => undefined}
-          onDragStart={() => undefined}
-          onInputKeyDown={() => undefined}
-          onSend={() => undefined}
-          onTextChange={setText}
-          text={text}
-        />
+    <ThemeScenarioScope theme={theme}>
+      <div
+        className={
+          theme === "light"
+            ? "grid h-screen w-screen place-items-center overflow-hidden bg-[var(--drift-ui-workspace)]"
+            : "grid min-h-screen place-items-center overflow-auto bg-[linear-gradient(135deg,#344b55,#16262e)] p-6"
+        }
+      >
+        <div className="h-[132px] w-[460px] shrink-0">
+          <SendDanmakuView
+            {...viewProps}
+            inputRef={inputRef}
+            onClose={() => undefined}
+            onDragStart={() => undefined}
+            onInputKeyDown={() => undefined}
+            onSend={() => undefined}
+            onTextChange={setText}
+            text={text}
+          />
+        </div>
       </div>
-    </div>
+    </ThemeScenarioScope>
   );
 }

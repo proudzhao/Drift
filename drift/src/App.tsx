@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
+import { VerticalChatOverlay } from "./components/VerticalChatOverlay";
 import {
   OverlayEditWorkspace,
   type OverlayResizeDirection,
@@ -18,11 +25,17 @@ import {
   type AppConfig,
 } from "./types/config";
 import type { DanmakuStatus, LiveMessage } from "./types/danmaku";
+import type { VerticalFlowStatus } from "./types/verticalFlow";
 import {
   MIN_TRACK_COUNT,
   TRACK_HEIGHT,
 } from "./utils/danmakuRuntime";
 import { classNames } from "./utils/classNames";
+import {
+  applyDocumentUiTheme,
+  applyNativeAppTheme,
+  readBootstrapUiTheme,
+} from "./utils/uiTheme";
 import "./styles/tailwind.css";
 import "./App.css";
 
@@ -35,11 +48,47 @@ const TERMINAL_DANMAKU_STATUSES: DanmakuStatus["status"][] = [
   "invalid_room",
 ];
 
+function selectSafeVerticalFlowStatus(
+  status: VerticalFlowStatus,
+): VerticalFlowStatus {
+  return {
+    active: status.active,
+    policy: status.policy,
+    backlog: status.backlog,
+    speedMultiplier: status.speedMultiplier,
+    droppedTotal: status.droppedTotal,
+  };
+}
+
+function sameVerticalFlowStatus(
+  previous: VerticalFlowStatus | null,
+  next: VerticalFlowStatus,
+) {
+  return (
+    previous !== null &&
+    previous.active === next.active &&
+    previous.policy === next.policy &&
+    previous.backlog === next.backlog &&
+    previous.speedMultiplier === next.speedMultiplier &&
+    previous.droppedTotal === next.droppedTotal
+  );
+}
+
 type EditModeChanged = {
   is_edit_mode: boolean;
   is_click_through: boolean;
   shortcut: string;
 };
+
+function createInitialConfig(): AppConfig {
+  return {
+    ...DEFAULT_APP_CONFIG,
+    appearance: {
+      ...DEFAULT_APP_CONFIG.appearance,
+      theme: readBootstrapUiTheme(),
+    },
+  };
+}
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -47,7 +96,7 @@ function App() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [shortcut, setShortcut] = useState(DEFAULT_SHORTCUT);
   const [trackCount, setTrackCount] = useState(MIN_TRACK_COUNT);
-  const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
+  const [config, setConfig] = useState<AppConfig>(createInitialConfig);
   const [status, setStatus] = useState<DanmakuStatus>({
     status: "idle",
     message: "尚未连接直播间",
@@ -63,7 +112,9 @@ function App() {
     handleMockRateChange,
     historySnapshot,
     items,
+    messageFlow,
     mock,
+    pruneVerticalItems,
     removeDanmakuItem,
     setShowStats,
     setShowHistory,
@@ -73,12 +124,52 @@ function App() {
     statsSnapshot,
     stopMockDanmaku,
     triggerMockBurst,
+    verticalFlowStatus,
+    verticalItems,
   } = useDanmakuRuntime({
     config,
     status,
     trackCount,
     windowLabel,
   });
+  const verticalFlowStatusRef = useRef(
+    selectSafeVerticalFlowStatus(verticalFlowStatus),
+  );
+  const verticalFlowListenerReadyRef = useRef(false);
+  const lastScheduledVerticalFlowStatusRef =
+    useRef<VerticalFlowStatus | null>(null);
+  const verticalFlowEmitQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const verticalFlowWarningLatchedRef = useRef(false);
+
+  const publishVerticalFlowStatus = useCallback((force = false) => {
+    const snapshot = selectSafeVerticalFlowStatus(
+      verticalFlowStatusRef.current,
+    );
+    if (
+      !force &&
+      sameVerticalFlowStatus(
+        lastScheduledVerticalFlowStatusRef.current,
+        snapshot,
+      )
+    ) {
+      return;
+    }
+    lastScheduledVerticalFlowStatusRef.current = snapshot;
+
+    verticalFlowEmitQueueRef.current = verticalFlowEmitQueueRef.current.then(
+      async () => {
+        try {
+          await emit("vertical-flow-status", snapshot);
+          verticalFlowWarningLatchedRef.current = false;
+        } catch {
+          if (!verticalFlowWarningLatchedRef.current) {
+            verticalFlowWarningLatchedRef.current = true;
+            console.warn("Failed to publish vertical flow status.");
+          }
+        }
+      },
+    );
+  }, []);
 
   async function setEditMode(enabled: boolean) {
     const result = await invoke<EditModeChanged>("set_edit_mode", { enabled });
@@ -112,10 +203,74 @@ function App() {
     await getCurrentWindow().startResizeDragging(direction);
   }
 
+  useLayoutEffect(() => {
+    if (windowLabel !== "main") {
+      return;
+    }
+
+    const safeStatus = selectSafeVerticalFlowStatus(verticalFlowStatus);
+    verticalFlowStatusRef.current = safeStatus;
+    if (verticalFlowListenerReadyRef.current) {
+      publishVerticalFlowStatus();
+    }
+  }, [publishVerticalFlowStatus, verticalFlowStatus, windowLabel]);
+
   useEffect(() => {
-    void invoke<AppConfig>("load_app_config").then((loadedConfig) => {
-      setConfig(mergeAppConfig(loadedConfig));
+    if (windowLabel !== "main") {
+      return;
+    }
+
+    let disposed = false;
+    let disposeListener: (() => void) | undefined;
+    const listener = listen("vertical-flow-status-request", () => {
+      publishVerticalFlowStatus(true);
     });
+    void listener
+      .then((dispose) => {
+        if (disposed) {
+          dispose();
+        } else {
+          disposeListener = dispose;
+          verticalFlowListenerReadyRef.current = true;
+          publishVerticalFlowStatus();
+        }
+      })
+      .catch(() => {
+        console.warn("Failed to listen for vertical flow status requests.");
+      });
+
+    return () => {
+      disposed = true;
+      verticalFlowListenerReadyRef.current = false;
+      disposeListener?.();
+    };
+  }, [publishVerticalFlowStatus, windowLabel]);
+
+  useEffect(() => {
+    if (windowLabel === "send") {
+      return;
+    }
+
+    let disposed = false;
+    let receivedConfigEvent = false;
+    const unlistenConfig = listen<AppConfig>("app-config-changed", (event) => {
+      receivedConfigEvent = true;
+      if (!disposed) {
+        setConfig(mergeAppConfig(event.payload));
+      }
+    });
+
+    void (async () => {
+      await unlistenConfig;
+      if (disposed) {
+        return;
+      }
+
+      const loadedConfig = await invoke<AppConfig>("load_app_config");
+      if (!disposed && !receivedConfigEvent) {
+        setConfig(mergeAppConfig(loadedConfig));
+      }
+    })();
 
     const unlistenMessage = listen<LiveMessage[]>(
       "danmaku-messages",
@@ -165,17 +320,24 @@ function App() {
         setShortcut(event.payload.shortcut);
       },
     );
-    const unlistenConfig = listen<AppConfig>("app-config-changed", (event) => {
-      setConfig(mergeAppConfig(event.payload));
-    });
-
     return () => {
+      disposed = true;
       void unlistenMessage.then((unlisten) => unlisten());
       void unlistenStatus.then((unlisten) => unlisten());
       void unlistenEditMode.then((unlisten) => unlisten());
       void unlistenConfig.then((unlisten) => unlisten());
     };
   }, [windowLabel]);
+
+  useEffect(() => {
+    if (windowLabel === "send") {
+      return;
+    }
+
+    const theme = config.appearance.theme;
+    applyDocumentUiTheme(theme);
+    void applyNativeAppTheme(theme);
+  }, [config.appearance.theme, windowLabel]);
 
   useEffect(() => {
     if (windowLabel !== "main") {
@@ -259,7 +421,7 @@ function App() {
         "relative h-screen w-screen min-w-0 overflow-hidden",
         isClickThrough && "is-click-through",
         isEditMode
-          ? "is-edit-mode bg-[rgba(9,14,20,0.16)] [outline:1px_dashed_rgba(126,168,196,0.82)]"
+          ? "is-edit-mode bg-[var(--drift-ui-edit-backdrop)] [outline:1px_dashed_var(--drift-ui-edit-outline)]"
           : "is-display-mode bg-transparent outline-0",
       )}
       style={
@@ -269,13 +431,23 @@ function App() {
         } as CSSProperties
       }
     >
-      <DanmakuOverlay
-        items={items}
-        onItemDone={isConnected || mock.active ? removeDanmakuItem : undefined}
-        showEmotes={config.messageDisplay.showEmotes}
-        showUsername={config.appearance.showUsername}
-        trackCount={trackCount}
-      />
+      {messageFlow === "vertical" ? (
+        <VerticalChatOverlay
+          items={verticalItems}
+          onItemsPruned={pruneVerticalItems}
+          showEmotes={config.messageDisplay.showEmotes}
+        />
+      ) : (
+        <DanmakuOverlay
+          items={items}
+          onItemDone={
+            isConnected || mock.active ? removeDanmakuItem : undefined
+          }
+          showEmotes={config.messageDisplay.showEmotes}
+          showUsername={config.appearance.showUsername}
+          trackCount={trackCount}
+        />
+      )}
       {isEditMode ? (
         <OverlayEditWorkspace
           historyMessages={historySnapshot}

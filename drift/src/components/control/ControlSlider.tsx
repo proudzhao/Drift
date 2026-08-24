@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
 import { DataValue, SettingsRow } from "./settings-ui";
 
 type ControlSliderProps = {
+  description?: ReactNode;
+  disabled?: boolean;
   label: string;
   max: number;
   min: number;
@@ -10,6 +13,8 @@ type ControlSliderProps = {
 };
 
 export function ControlSlider({
+  description,
+  disabled = false,
   label,
   max,
   min,
@@ -26,6 +31,7 @@ export function ControlSlider({
           <input
             aria-label={label}
             className="w-full accent-drift-signal"
+            disabled={disabled}
             id={id}
             max={max}
             min={min}
@@ -39,6 +45,7 @@ export function ControlSlider({
           </DataValue>
         </div>
       }
+      description={description}
       htmlFor={id}
       label={label}
     />

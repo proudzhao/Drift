@@ -9,6 +9,18 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      (() => {
+        const storageKey = "drift-ui-theme";
+        let theme = "dark";
+        try {
+          const stored = localStorage.getItem(storageKey);
+          if (stored === "light" || stored === "dark") theme = stored;
+        } catch {}
+        document.documentElement.dataset.driftTheme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

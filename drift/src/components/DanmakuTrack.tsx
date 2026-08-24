@@ -1,7 +1,8 @@
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties } from "react";
 import type { DanmakuItem } from "../types/danmaku";
-import type { LiveMessageSegment } from "../types/danmaku";
 import { TRACK_HEIGHT } from "../utils/danmakuRuntime";
+import { resolveUsernameColor } from "../utils/usernameColor";
+import { DanmakuMessageContent } from "./DanmakuMessageContent";
 
 type DanmakuTrackProps = {
   item: DanmakuItem;
@@ -19,15 +20,12 @@ export function DanmakuTrack({
   trackCount,
 }: DanmakuTrackProps) {
   const track = item.track % trackCount;
-  const hasVisibleSegments =
-    showEmotes && item.segments && item.segments.length > 0;
   const isSuperChat = item.kind === "super_chat";
-  const fallbackText =
-    showUsername && item.user ? `${item.user}: ${item.text}` : item.text;
   const superChatColor = item.superChatColor ?? "#F5A962";
   const className = [
     "danmaku",
     `danmaku-${item.kind}`,
+    item.followedUser ? "is-followed" : "",
     item.highlighted ? "is-highlighted" : "",
     item.isSelf ? "is-self" : "",
   ]
@@ -37,6 +35,7 @@ export function DanmakuTrack({
     top: `${track * TRACK_HEIGHT + 16}px`,
     animationDuration: `${item.duration}s`,
     animationDelay: `${item.delay}s`,
+    "--username-color": resolveUsernameColor(item),
     ...(isSuperChat ? { "--super-chat-color": superChatColor } : {}),
   } as CSSProperties;
 
@@ -50,51 +49,11 @@ export function DanmakuTrack({
       }}
       style={style}
     >
-      {isSuperChat ? (
-        <span className="danmaku-super-chat-content">
-          <span className="danmaku-super-chat-badge">
-            {item.superChatPrice ? `SC ¥${item.superChatPrice}` : "SC"}
-          </span>
-          {showUsername && item.user ? (
-            <span className="danmaku-user-prefix">{item.user}: </span>
-          ) : null}
-          <span className="danmaku-super-chat-text">{item.text}</span>
-        </span>
-      ) : hasVisibleSegments ? (
-        <span className="danmaku-content">
-          {showUsername && item.user ? (
-            <span className="danmaku-user-prefix">{item.user}: </span>
-          ) : null}
-          {item.segments?.map((segment, index) => (
-            <DanmakuSegment segment={segment} key={`${item.id}-${index}`} />
-          ))}
-        </span>
-      ) : (
-        fallbackText
-      )}
+      <DanmakuMessageContent
+        item={item}
+        showEmotes={showEmotes}
+        showUsername={showUsername}
+      />
     </div>
-  );
-}
-
-type DanmakuSegmentProps = {
-  segment: LiveMessageSegment;
-};
-
-function DanmakuSegment({ segment }: DanmakuSegmentProps) {
-  const [failed, setFailed] = useState(false);
-
-  if (segment.type !== "emote" || !segment.url || failed) {
-    return <span className="danmaku-text-segment">{segment.text}</span>;
-  }
-
-  return (
-    <img
-      alt={segment.text}
-      className="danmaku-emote"
-      draggable={false}
-      onError={() => setFailed(true)}
-      referrerPolicy="no-referrer"
-      src={segment.url}
-    />
   );
 }

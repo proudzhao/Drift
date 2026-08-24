@@ -345,3 +345,59 @@ export function createMockDanmakuItems(): DanmakuItem[] {
     },
   ];
 }
+
+export function createFollowedUserPreviewItems(): DanmakuItem[] {
+  const base = {
+    duration: 18,
+    delay: 0,
+    createdAt: 1,
+    followedUser: true,
+  } as const;
+
+  return [
+    {
+      ...base,
+      id: "follow-danmaku",
+      kind: "danmaku",
+      user: "关注用户A",
+      text: "普通弹幕",
+      track: 0,
+    },
+    {
+      ...base,
+      id: "follow-sc",
+      kind: "super_chat",
+      user: "关注用户B",
+      text: "醒目留言",
+      track: 1,
+      superChatPrice: 100,
+      superChatColor: "#e2b52b",
+    },
+    {
+      ...base,
+      id: "follow-gift",
+      kind: "gift",
+      user: "关注用户C",
+      text: "关注用户C 送出 小花 x2",
+      track: 2,
+    },
+    {
+      ...base,
+      id: "follow-guard",
+      kind: "guard",
+      user: "关注用户D",
+      text: "关注用户D 开通 舰长",
+      track: 3,
+    },
+    {
+      ...base,
+      id: "follow-self",
+      kind: "danmaku",
+      user: "本人关注",
+      text: "本人、关注和普通高亮组合",
+      track: 4,
+      isSelf: true,
+      highlighted: true,
+    },
+  ];
+}
