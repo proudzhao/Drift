@@ -4,7 +4,24 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { DEFAULT_APP_CONFIG, type AppConfig } from "../../types/config";
 import { EMPTY_DANMAKU_RECORDING_STATUS } from "../../types/recording";
+import type { RoomSessionSnapshot } from "../../types/roomSession";
 import { ControlPanel } from "./ControlPanel";
+
+const roomSessionsMock = vi.hoisted(() => ({
+  sessions: [] as RoomSessionSnapshot[],
+  snapshotError: "",
+  useRoomSessions: vi.fn(),
+}));
+
+vi.mock("../../hooks/useRoomSessions", () => ({
+  useRoomSessions: (params: unknown) => {
+    roomSessionsMock.useRoomSessions(params);
+    return {
+      sessions: roomSessionsMock.sessions,
+      snapshotError: roomSessionsMock.snapshotError,
+    };
+  },
+}));
 
 vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(async () => undefined),
@@ -12,13 +29,24 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 beforeEach(() => {
+  roomSessionsMock.sessions = [];
+  roomSessionsMock.snapshotError = "";
   mockIPC((command) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
       return {
-        roomId: 6,
-        pausedFanMedalRuleIds: ["fan-only"],
-        pauseReason: "fan_medal_protocol_unknown",
+        rooms: [
+          {
+            roomId: 6,
+            pausedFanMedalRuleIds: ["fan-only"],
+            pauseReason: "fan_medal_protocol_unknown",
+          },
+          {
+            roomId: 7,
+            pausedFanMedalRuleIds: [],
+            pauseReason: null,
+          },
+        ],
       };
     }
     if (command === "get_danmaku_recording_status") {
@@ -29,6 +57,16 @@ beforeEach(() => {
 });
 
 test("passes runtime warnings to the filter page", async () => {
+  roomSessionsMock.sessions = [
+    {
+      sessionId: "s-6",
+      requestedRoomId: 6,
+      roomId: 6,
+      anchorName: "主播甲",
+      status: "connected",
+      message: "已连接",
+    },
+  ];
   const user = userEvent.setup();
   render(
     <ControlPanel
@@ -50,17 +88,16 @@ test("passes runtime warnings to the filter page", async () => {
         },
         update: { checkOnStartup: false },
       }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
   await user.click(screen.getByRole("button", { name: "过滤规则" }));
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "本次连接已暂停相关规则",
-  );
+  expect(screen.getByRole("alert")).toHaveTextContent("主播甲 · 6");
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(roomSessionsMock.useRoomSessions).toHaveBeenCalledWith({
+    enabled: true,
+  });
 });
 
 afterEach(() => {
@@ -75,10 +112,7 @@ test("switches existing pages through the new control shell", async () => {
         ...DEFAULT_APP_CONFIG,
         update: { checkOnStartup: false },
       }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -95,17 +129,13 @@ test("wires recording status and commands without optimistic toggles", async () 
     commands.push({ command, payload });
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return {
-        roomId: null,
-        pausedFanMedalRuleIds: [],
-        pauseReason: null,
-      };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return {
         enabled: true,
         state: "error",
-        currentFileName: null,
+        activeFiles: [],
         errorMessage: "记录目录无访问权限，记录已暂停",
       };
     }
@@ -118,10 +148,7 @@ test("wires recording status and commands without optimistic toggles", async () 
         ...DEFAULT_APP_CONFIG,
         update: { checkOnStartup: false },
       }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -156,7 +183,7 @@ test("persists light theme from the header action", async () => {
     commands.push({ command, payload });
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -171,10 +198,7 @@ test("persists light theme from the header action", async () => {
   render(
     <ControlPanel
       config={{ ...DEFAULT_APP_CONFIG, update: { checkOnStartup: false } }}
-      isConnected={false}
       onConfigChange={onConfigChange}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -196,7 +220,7 @@ test("restores the prior theme and error when header theme persistence fails", a
   mockIPC((command) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -208,10 +232,7 @@ test("restores the prior theme and error when header theme persistence fails", a
   render(
     <ControlPanel
       config={{ ...DEFAULT_APP_CONFIG, update: { checkOnStartup: false } }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -229,7 +250,7 @@ test("keeps the selected UI theme when display settings are reset", async () => 
     commands.push({ command, payload });
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -247,10 +268,7 @@ test("keeps the selected UI theme when display settings are reset", async () => 
         appearance: { ...DEFAULT_APP_CONFIG.appearance, theme: "light" },
         update: { checkOnStartup: false },
       }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -271,7 +289,7 @@ test("reports display config save failure without changing the selected flow", a
   mockIPC((command) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -283,10 +301,7 @@ test("reports display config save failure without changing the selected flow", a
   render(
     <ControlPanel
       config={{ ...DEFAULT_APP_CONFIG, update: { checkOnStartup: false } }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -307,7 +322,7 @@ test("clears a display config error after the next successful save", async () =>
   mockIPC((command, payload) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -323,10 +338,7 @@ test("clears a display config error after the next successful save", async () =>
   render(
     <ControlPanel
       config={{ ...DEFAULT_APP_CONFIG, update: { checkOnStartup: false } }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -349,7 +361,7 @@ test("lets the later serialized display save own the final error state", async (
   mockIPC((command, payload) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -365,10 +377,7 @@ test("lets the later serialized display save own the final error state", async (
   render(
     <ControlPanel
       config={{ ...DEFAULT_APP_CONFIG, update: { checkOnStartup: false } }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 
@@ -387,7 +396,7 @@ test("keeps authoritative appearance when display reset fails", async () => {
   mockIPC((command) => {
     if (command === "auth_get_status") return { isLoggedIn: false };
     if (command === "get_filter_runtime_status") {
-      return { roomId: null, pausedFanMedalRuleIds: [], pauseReason: null };
+      return { rooms: [] };
     }
     if (command === "get_danmaku_recording_status") {
       return EMPTY_DANMAKU_RECORDING_STATUS;
@@ -406,10 +415,7 @@ test("keeps authoritative appearance when display reset fails", async () => {
         },
         update: { checkOnStartup: false },
       }}
-      isConnected={false}
       onConfigChange={vi.fn()}
-      onStatusChange={vi.fn()}
-      status={{ status: "idle", message: "尚未连接直播间" }}
     />,
   );
 

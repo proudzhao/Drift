@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import overlayCss from "../styles/tailwind.css?raw";
-import { createEmptyStatsSnapshot } from "../utils/danmakuStats";
+import { createEmptyScopedStatsSnapshots } from "../utils/danmakuStats";
 import controlDockSource from "./OverlayControlDock.tsx?raw";
 import historyDrawerSource from "./DanmakuHistoryDrawer.tsx?raw";
 import mockPanelSource from "./MockDanmakuPanel.tsx?raw";
@@ -88,10 +88,11 @@ function props(
     onShowMock: vi.fn(),
     onToggleHistory: vi.fn(),
     onToggleStats: vi.fn(),
+    roomSources: [],
     shortcut: "Command+Option+K",
     showHistory: false,
     showStats: false,
-    stats: createEmptyStatsSnapshot(1),
+    statsSnapshots: createEmptyScopedStatsSnapshots(1),
     ...overrides,
   } satisfies ComponentProps<typeof OverlayEditWorkspace>;
 }

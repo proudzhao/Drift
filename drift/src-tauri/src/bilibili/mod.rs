@@ -8,12 +8,10 @@ pub(crate) mod http;
 pub(crate) mod medal_probe;
 pub(crate) mod protocol;
 pub(crate) mod recording;
+pub(crate) mod room_manager;
 pub(crate) mod sc_dedup;
 pub(crate) mod sc_probe;
 pub(crate) mod send;
 pub(crate) mod session;
 pub(crate) mod types;
 pub(crate) mod ws;
-
-// Re-export public type used by lib.rs
-pub use types::DanmakuTaskState;

@@ -65,11 +65,6 @@ pub(crate) static ANCHOR_NAME_CACHE: LazyLock<Mutex<HashMap<u64, String>>> =
 
 // ── Public API types ──
 
-#[derive(Default)]
-pub struct DanmakuTaskState {
-    pub(crate) task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LiveMessage {
@@ -161,12 +156,15 @@ pub enum LiveMessageKind {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DanmakuStatus {
-    pub status: String,
-    pub message: String,
-    pub room_id: Option<u64>,
+pub struct DanmakuRoomBatch {
+    pub session_id: String,
+    pub room_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_name: Option<String>,
-    pub live_status: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fan_medal_name: Option<String>,
+    pub active_source_count: usize,
+    pub messages: Vec<LiveMessage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -185,8 +183,20 @@ pub struct ApiTestStep {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ApiResponse<T> {
     pub(crate) code: i32,
+    #[serde(default)]
     pub(crate) message: String,
     pub(crate) data: Option<T>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MasterInfoData {
+    pub(crate) info: MasterInfo,
+    pub(crate) medal_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MasterInfo {
+    pub(crate) uid: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -362,4 +372,71 @@ pub(crate) fn compact_token(value: &str) -> String {
 
 pub(crate) fn elapsed_ms(started_at: std::time::Instant) -> u64 {
     started_at.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn message() -> LiveMessage {
+        LiveMessage {
+            id: "message-1".to_string(),
+            room_id: Some(6),
+            sender_uid: None,
+            current_room_fan_medal: None,
+            current_room_fan_medal_level: None,
+            kind: LiveMessageKind::Danmaku,
+            user: "观众".to_string(),
+            text: "内容".to_string(),
+            segments: None,
+            is_self: false,
+            timestamp: None,
+            gift_name: None,
+            gift_count: None,
+            guard_level: None,
+            guard_name: None,
+            super_chat_price: None,
+            super_chat_duration: None,
+            super_chat_color: None,
+            source_command: None,
+            source_message_id: None,
+        }
+    }
+
+    #[test]
+    fn room_batch_serializes_only_safe_room_context() {
+        let batch = DanmakuRoomBatch {
+            session_id: "session-2".into(),
+            room_id: 6,
+            anchor_name: Some("主播".into()),
+            fan_medal_name: Some("粉丝牌".into()),
+            active_source_count: 2,
+            messages: vec![message()],
+        };
+
+        let value = serde_json::to_value(batch).expect("json");
+        let mut keys = value
+            .as_object()
+            .expect("batch object")
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec![
+                "activeSourceCount".to_string(),
+                "anchorName".to_string(),
+                "fanMedalName".to_string(),
+                "messages".to_string(),
+                "roomId".to_string(),
+                "sessionId".to_string(),
+            ]
+        );
+        assert_eq!(value["sessionId"], "session-2");
+        assert_eq!(value["activeSourceCount"], 2);
+        for forbidden in ["generation", "anchorUid", "cookie", "token"] {
+            assert!(value.get(forbidden).is_none());
+        }
+    }
 }

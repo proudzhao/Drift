@@ -1,12 +1,18 @@
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { LiveMessageKind } from "../types/danmaku";
-import type { DanmakuStatsSnapshot } from "../utils/danmakuStats";
+import type { RoomSourceOption } from "../types/roomSession";
+import {
+  createEmptyStatsSnapshot,
+  type ScopedStatsSnapshots,
+} from "../utils/danmakuStats";
 import { classNames } from "../utils/classNames";
-import { IconButton, Tooltip, TooltipProvider } from "./ui";
+import { IconButton, Select, Tooltip, TooltipProvider } from "./ui";
 
 type DanmakuStatsDrawerProps = {
   onClose: () => void;
-  stats: DanmakuStatsSnapshot;
+  roomSources: RoomSourceOption[];
+  snapshots: ScopedStatsSnapshots;
 };
 
 const KIND_LABELS: Record<LiveMessageKind, string> = {
@@ -25,13 +31,35 @@ export function kindSharePercent(count: number, total: number) {
 
 export function DanmakuStatsDrawer({
   onClose,
-  stats,
+  roomSources,
+  snapshots,
 }: DanmakuStatsDrawerProps) {
+  const [selectedRoomId, setSelectedRoomId] = useState<number | "all">("all");
+
+  useEffect(() => {
+    if (
+      selectedRoomId !== "all" &&
+      !roomSources.some((source) => source.roomId === selectedRoomId)
+    ) {
+      setSelectedRoomId("all");
+    }
+  }, [roomSources, selectedRoomId]);
+
+  const stats = useMemo(() => {
+    if (selectedRoomId === "all") {
+      return snapshots.all;
+    }
+    return (
+      snapshots.byRoom[selectedRoomId] ??
+      createEmptyStatsSnapshot(snapshots.all.startedAt)
+    );
+  }, [selectedRoomId, snapshots]);
+
   return (
     <TooltipProvider delayDuration={300}>
       <aside
         aria-label="弹幕统计"
-        className="drift-theme-transition overlay-drawer overlay-stats-drawer pointer-events-auto absolute bottom-[42px] right-0 top-0 z-[2] box-border grid w-[296px] min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden border-l border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-drawer)] px-3 py-2.5 text-[var(--drift-ui-ink)] backdrop-blur-[20px] select-none"
+        className="drift-theme-transition overlay-drawer overlay-stats-drawer pointer-events-auto absolute bottom-[42px] right-0 top-0 z-[2] box-border grid w-[296px] min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden border-l border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-drawer)] px-3 py-2.5 text-[var(--drift-ui-ink)] backdrop-blur-[20px] select-none"
       >
         <header className="overlay-drawer-header flex min-w-0 items-center justify-between">
           <strong className="drift-theme-transition text-[11px] font-semibold">弹幕统计</strong>
@@ -47,6 +75,27 @@ export function DanmakuStatsDrawer({
             </IconButton>
           </Tooltip>
         </header>
+
+        <Select
+          aria-label="筛选直播间"
+          className="border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-surface)] text-[var(--drift-ui-ink)] focus:border-[var(--drift-ui-signal)] focus:ring-[color-mix(in_srgb,var(--drift-ui-signal)_15%,transparent)]"
+          onChange={(event) =>
+            setSelectedRoomId(
+              event.currentTarget.value === "all"
+                ? "all"
+                : Number(event.currentTarget.value),
+            )
+          }
+          selectSize="sm"
+          value={selectedRoomId}
+        >
+          <option value="all">全部直播间</option>
+          {roomSources.map((source) => (
+            <option key={source.roomId} value={source.roomId}>
+              {source.label}
+            </option>
+          ))}
+        </Select>
 
         <div className="overlay-stats-scroll overlay-drawer-scroll grid min-h-0 content-start gap-2 overflow-y-auto pr-0.5 [scrollbar-color:var(--drift-ui-overlay-scrollbar)_transparent] [scrollbar-width:thin]">
           <section className="grid grid-cols-4 gap-1.5" aria-label="消息概览">

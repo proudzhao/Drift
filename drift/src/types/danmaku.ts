@@ -1,3 +1,5 @@
+import type { RoomSessionStatus } from "./roomSession";
+
 export type LiveMessageKind = "danmaku" | "gift" | "guard" | "super_chat";
 
 export type LiveMessageSegment =
@@ -16,6 +18,8 @@ export type LiveMessageSegment =
 export type DisplayMessageItem = {
   id: string;
   kind: LiveMessageKind;
+  sourceLabel?: string;
+  sourceColorIndex?: number;
   user?: string;
   text: string;
   segments?: LiveMessageSegment[];
@@ -65,21 +69,12 @@ export type QueuedLiveMessage = LiveMessage & {
   followedUser?: boolean;
   highlighted?: boolean;
   queuedAt: number;
-};
-
-export type DanmakuStatus = {
-  status:
-    | "idle"
-    | "connecting"
-    | "connected"
-    | "reconnecting"
-    | "disconnected"
-    | "not_live"
-    | "invalid_room";
-  message: string;
-  roomId?: number;
-  anchorName?: string;
-  liveStatus?: number;
+  sourceLabel?: string;
+  sourceColorIndex?: number;
+  sourceSessionId?: string;
+  sourceRoomId?: number;
+  sourceAnchorName?: string;
+  sourceFanMedalName?: string;
 };
 
 export type SendDanmakuStatus = {
@@ -87,7 +82,7 @@ export type SendDanmakuStatus = {
   reason: string;
   roomId?: number;
   anchorName?: string;
-  status: DanmakuStatus["status"];
+  status: RoomSessionStatus | null;
   cooldownMs: number;
 };
 

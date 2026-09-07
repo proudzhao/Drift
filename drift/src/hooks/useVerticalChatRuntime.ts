@@ -47,6 +47,8 @@ function toVerticalChatItem(
   return {
     id: `${message.id}-vertical-${sequence}`,
     kind: message.kind,
+    sourceLabel: message.sourceLabel,
+    sourceColorIndex: message.sourceColorIndex,
     user: message.user,
     text: message.text,
     segments: message.segments,

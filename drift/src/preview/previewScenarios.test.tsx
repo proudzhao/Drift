@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import {
@@ -10,11 +10,12 @@ import {
 } from "./previewScenarios";
 
 test("combines control, send, and overlay preview scenarios", () => {
-  expect(PREVIEW_SCENARIOS).toHaveLength(43);
+  expect(PREVIEW_SCENARIOS).toHaveLength(49);
   expect(PREVIEW_SCENARIOS.map((scenario) => scenario.id)).toEqual([
     "default",
     "room-empty",
     "room-connected",
+    "control-room-multi",
     "control-recording-disabled",
     "control-recording-waiting",
     "control-recording-recording",
@@ -32,6 +33,7 @@ test("combines control, send, and overlay preview scenarios", () => {
     "control-theme-save-error",
     "control-display-vertical-dropped",
     "send-ready",
+    "send-multi-room-targets",
     "send-unavailable",
     "send-cooldown",
     "send-sending",
@@ -42,16 +44,20 @@ test("combines control, send, and overlay preview scenarios", () => {
     "send-theme-light",
     "overlay-edit-basic",
     "overlay-followed-messages",
+    "overlay-horizontal-multi-room",
     "overlay-mock-idle",
     "overlay-mock-active",
     "overlay-history-empty",
     "overlay-history-filled",
     "overlay-history-search-empty",
+    "overlay-history-room-filter",
     "overlay-stats-empty",
     "overlay-stats-filled",
+    "overlay-stats-room-filter",
     "overlay-narrow-history",
     "overlay-narrow-stats",
     "overlay-theme-light",
+    "overlay-vertical-multi-room",
     "overlay-vertical-mixed",
     "overlay-vertical-backlog",
     "overlay-vertical-long",
@@ -83,6 +89,10 @@ test("keeps the combined picker collapsed and reports a send selection", async (
 test.each<{ expectedText: string; scenarioId: PreviewScenarioId }>([
   { scenarioId: "send-ready", expectedText: "准备发送" },
   {
+    scenarioId: "send-multi-room-targets",
+    expectedText: "房间 7 发送已就绪",
+  },
+  {
     scenarioId: "send-unavailable",
     expectedText: "请先登录 B 站并连接直播间",
   },
@@ -112,12 +122,34 @@ test.each<{ expectedText: string; scenarioId: PreviewScenarioId }>([
   },
 );
 
-test("fits the light send preview to the exact viewport without changing the dark canvas", () => {
+test("renders the multi-room send scenario with room 7 selected", () => {
+  render(<PreviewScenario scenarioId="send-multi-room-targets" />);
+
+  const select = screen.getByRole("combobox", { name: "发送目标直播间" });
+  const options = within(select).getAllByRole("option");
+  const connectedOptions = options.filter((option) => option.getAttribute("value"));
+
+  expect(select).toHaveValue("7");
+  expect(options.map((option) => option.getAttribute("value"))).toEqual([
+    "",
+    "6",
+    "7",
+  ]);
+  expect(connectedOptions).toHaveLength(2);
+  expect(connectedOptions.map((option) => option.textContent)).toEqual([
+    "补给箱 · 6",
+    "小海梓 · 7",
+  ]);
+  expect((connectedOptions[1] as HTMLOptionElement).selected).toBe(true);
+  expect(screen.getByRole("button", { name: "发送" })).toBeEnabled();
+});
+
+test("fits the light send preview to the exact viewport and makes the dark 460px boundary inclusive", () => {
   const light = render(<PreviewScenario scenarioId="send-theme-light" />);
   const lightFrame = screen.getByRole("main").parentElement;
   const lightCanvas = lightFrame?.parentElement;
 
-  expect(lightFrame).toHaveClass("h-[132px]", "w-[460px]");
+  expect(lightFrame).toHaveClass("h-[132px]", "w-full", "max-w-[460px]");
   expect(lightCanvas).toHaveClass("h-screen", "w-screen", "overflow-hidden");
   expect(lightCanvas).not.toHaveClass("p-6");
 
@@ -127,11 +159,14 @@ test("fits the light send preview to the exact viewport without changing the dar
   const darkFrame = screen.getByRole("main").parentElement;
   const darkCanvas = darkFrame?.parentElement;
 
-  expect(darkFrame).toHaveClass("h-[132px]", "w-[460px]");
+  expect(darkFrame).toHaveClass("h-[132px]", "w-full", "max-w-[460px]");
   expect(darkCanvas).toHaveClass(
+    "w-screen",
     "overflow-auto",
     "bg-[linear-gradient(135deg,#344b55,#16262e)]",
     "p-6",
+    "max-[461px]:overflow-hidden",
+    "max-[461px]:p-0",
   );
 });
 

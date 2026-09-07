@@ -2,6 +2,8 @@ export type AppConfig = {
   roomId: string;
   savedRoomGroups: SavedRoomGroup[];
   savedRooms: SavedRoom[];
+  selectedSavedRoomIds: string[];
+  send: SendConfig;
   auth: AuthConfig;
   update: UpdateConfig;
   recording: RecordingConfig;
@@ -35,6 +37,10 @@ export type UpdateConfig = {
 
 export type RecordingConfig = {
   enabled: boolean;
+};
+
+export type SendConfig = {
+  lastRoomId?: string;
 };
 
 export type SavedRoom = {
@@ -140,6 +146,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   roomId: "",
   savedRoomGroups: createDefaultSavedRoomGroups(),
   savedRooms: [],
+  selectedSavedRoomIds: [],
+  send: {},
   auth: {
     enabled: false,
   },
@@ -183,6 +191,11 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
   const savedRoomGroups = normalizeSavedRoomGroups(config.savedRoomGroups);
   const savedRooms = normalizeSavedRooms(config.savedRooms, savedRoomGroups);
+  const selectedSavedRoomIds = normalizeSelectedSavedRoomIds(
+    config.selectedSavedRoomIds,
+    savedRooms,
+  );
+  const lastRoomId = normalizePositiveRoomId(config.send?.lastRoomId);
   const roomId =
     typeof config.roomId === "string"
       ? config.roomId
@@ -242,6 +255,8 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     },
     savedRoomGroups,
     savedRooms,
+    selectedSavedRoomIds,
+    send: lastRoomId ? { lastRoomId } : {},
     shortcuts: {
       ...DEFAULT_APP_CONFIG.shortcuts,
       ...config.shortcuts,
@@ -255,6 +270,27 @@ export function mergeAppConfig(config: Partial<AppConfig>): AppConfig {
     },
     mockPanelEnabled,
   };
+}
+
+const MAX_SELECTED_ROOMS = 5;
+
+function normalizeSelectedSavedRoomIds(ids: unknown, savedRooms: SavedRoom[]) {
+  const valid = new Set(
+    savedRooms
+      .map((room) => room.id)
+      .filter((id) => id.trim().length > 0),
+  );
+  return Array.isArray(ids)
+    ? [...new Set(ids.filter((id): id is string =>
+        typeof id === "string" && id.trim().length > 0 && valid.has(id),
+      ))].slice(0, MAX_SELECTED_ROOMS)
+    : [];
+}
+
+function normalizePositiveRoomId(value: unknown) {
+  return typeof value === "string" && /^[1-9]\d*$/.test(value)
+    ? value
+    : undefined;
 }
 
 function normalizeSavedRoomGroups(

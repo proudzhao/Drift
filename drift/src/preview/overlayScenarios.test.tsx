@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeAll, expect, test, vi } from "vitest";
 import {
   OVERLAY_SCENARIOS,
@@ -14,20 +15,83 @@ test("provides all stable overlay workspace scenarios", () => {
   expect(OVERLAY_SCENARIOS.map((scenario) => scenario.id)).toEqual([
     "overlay-edit-basic",
     "overlay-followed-messages",
+    "overlay-horizontal-multi-room",
     "overlay-mock-idle",
     "overlay-mock-active",
     "overlay-history-empty",
     "overlay-history-filled",
     "overlay-history-search-empty",
+    "overlay-history-room-filter",
     "overlay-stats-empty",
     "overlay-stats-filled",
+    "overlay-stats-room-filter",
     "overlay-narrow-history",
     "overlay-narrow-stats",
     "overlay-theme-light",
+    "overlay-vertical-multi-room",
     "overlay-vertical-mixed",
     "overlay-vertical-backlog",
     "overlay-vertical-long",
   ]);
+});
+
+test("renders the multi-room horizontal overlay with two source labels and one unlabeled message", () => {
+  const { container } = render(
+    <OverlayScenarioPreview scenarioId="overlay-horizontal-multi-room" />,
+  );
+
+  expect(screen.getByText("补给箱")).toHaveClass("danmaku-room-source");
+  expect(screen.getByText("小海梓")).toHaveClass("danmaku-room-source");
+  const horizontalLeftColor = screen
+    .getByText("补给箱")
+    .getAttribute("data-source-color");
+  const horizontalRightColor = screen
+    .getByText("小海梓")
+    .getAttribute("data-source-color");
+  expect(horizontalLeftColor).toMatch(/^[0-4]$/);
+  expect(horizontalRightColor).toMatch(/^[0-4]$/);
+  expect(horizontalLeftColor).not.toBe(horizontalRightColor);
+  expect(container.querySelectorAll(".danmaku-room-source")).toHaveLength(2);
+  expect(screen.getByText("普通观众:")).toBeInTheDocument();
+  expect(screen.getByText("无标签消息保持语义")).toBeInTheDocument();
+  expect(screen.getByText("粉丝牌样式保持").closest(".danmaku")).toHaveStyle({
+    "--username-color": "#bd6686",
+  });
+  expect(screen.getByText("SC ¥30")).toBeInTheDocument();
+  expect(
+    screen.getByText("关注 SC 样式保持").closest(".danmaku"),
+  ).toHaveClass("is-followed");
+});
+
+test("renders the multi-room vertical overlay with two source labels and one unlabeled message", () => {
+  const { container } = render(
+    <OverlayScenarioPreview scenarioId="overlay-vertical-multi-room" />,
+  );
+
+  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+    height: "220px",
+    width: "560px",
+  });
+  expect(screen.getByText("补给箱")).toHaveClass("danmaku-room-source");
+  expect(screen.getByText("小海梓")).toHaveClass("danmaku-room-source");
+  const verticalLeftColor = screen
+    .getByText("补给箱")
+    .getAttribute("data-source-color");
+  const verticalRightColor = screen
+    .getByText("小海梓")
+    .getAttribute("data-source-color");
+  expect(verticalLeftColor).toMatch(/^[0-4]$/);
+  expect(verticalRightColor).toMatch(/^[0-4]$/);
+  expect(verticalLeftColor).not.toBe(verticalRightColor);
+  expect(container.querySelectorAll(".danmaku-room-source")).toHaveLength(2);
+  expect(screen.getByText("无标签消息保持语义")).toBeInTheDocument();
+  expect(
+    container.querySelector('[data-message-id="vertical-multi-room-medal"]'),
+  ).toHaveStyle({ "--username-color": "#bd6686" });
+  expect(
+    container.querySelector('[data-message-id="vertical-multi-room-followed-sc"]'),
+  ).toHaveClass("is-followed");
+  expect(screen.getByText("SC ¥30")).toBeInTheDocument();
 });
 
 test("renders the mixed vertical fixture through the real overlay", () => {
@@ -236,6 +300,24 @@ test("provides empty, filled, and unmatched history states", () => {
   expect(screen.getByText("没有匹配的弹幕")).toBeInTheDocument();
 });
 
+test("keeps room 6 and room 7 filters reachable in the history drawer fixture", async () => {
+  const user = userEvent.setup();
+  render(<OverlayScenarioPreview scenarioId="overlay-history-room-filter" />);
+
+  const select = screen.getByRole("combobox", { name: "筛选直播间" });
+  expect(select).toHaveValue("all");
+  expect(screen.getByRole("option", { name: "主播甲 · 6" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "主播乙 · 7" })).toBeInTheDocument();
+
+  await user.selectOptions(select, "6");
+  expect(screen.getByText("房间 6 的第三条固定消息")).toBeVisible();
+  expect(screen.queryByText("房间 7 的第三条固定消息")).not.toBeInTheDocument();
+
+  await user.selectOptions(select, "7");
+  expect(screen.getByText("房间 7 的第三条固定消息")).toBeVisible();
+  expect(screen.queryByText("房间 6 的第三条固定消息")).not.toBeInTheDocument();
+});
+
 test.each([
   "overlay-history-filled",
   "overlay-narrow-history",
@@ -266,5 +348,28 @@ test("provides empty and filled statistics", () => {
   render(<OverlayScenarioPreview scenarioId="overlay-stats-filled" />);
   expect(screen.getByText("用于检查截断的超长用户名_Official")).toBeInTheDocument();
   expect(screen.getByText("超长高频词条用于检查截断")).toBeInTheDocument();
-  expect(screen.getByText("100")).toBeInTheDocument();
+  expectTotalMessagesTileValue("100");
 });
+
+test("keeps room 6 and room 7 totals stable in the scoped stats fixture", async () => {
+  const user = userEvent.setup();
+  render(<OverlayScenarioPreview scenarioId="overlay-stats-room-filter" />);
+
+  const select = screen.getByRole("combobox", { name: "筛选直播间" });
+  expect(select).toHaveValue("all");
+  expectTotalMessagesTileValue("9");
+
+  await user.selectOptions(select, "6");
+  expectTotalMessagesTileValue("6");
+
+  await user.selectOptions(select, "7");
+  expectTotalMessagesTileValue("3");
+});
+
+function expectTotalMessagesTileValue(value: string) {
+  const label = screen.getByText("总消息");
+  const tile = label.closest("div");
+
+  expect(tile).not.toBeNull();
+  expect(within(tile as HTMLDivElement).getByText(value, { selector: "strong" })).toBeInTheDocument();
+}

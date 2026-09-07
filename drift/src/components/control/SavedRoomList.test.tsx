@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import type { SavedRoom, SavedRoomGroup } from "../../types/config";
+import type { RoomSessionSnapshot } from "../../types/roomSession";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
 
 const GROUPS: SavedRoomGroup[] = [
@@ -25,12 +26,16 @@ const ROOM: SavedRoom = {
 function renderSavedRoomList(
   rooms: SavedRoom[],
   editingSavedRoom: EditingSavedRoom | null = null,
+  sessions: RoomSessionSnapshot[] = [],
 ) {
   const callbacks = {
+    onConnectRoom: vi.fn(),
     onDeleteRoom: vi.fn(),
+    onDisconnectSession: vi.fn(),
     onEditRoomChange: vi.fn(),
+    onRetrySession: vi.fn(),
+    onRoomSelected: vi.fn(),
     onSaveEditedRoom: vi.fn(),
-    onSelectRoom: vi.fn(),
     onStartEditRoom: vi.fn(),
     onStopEditRoom: vi.fn(),
   };
@@ -39,8 +44,10 @@ function renderSavedRoomList(
     <SavedRoomList
       editingSavedRoom={editingSavedRoom}
       groups={GROUPS}
-      isConnected={false}
+      commandErrors={{}}
       rooms={rooms}
+      selectedSavedRoomIds={new Set()}
+      sessions={sessions}
       {...callbacks}
     />,
   );
@@ -55,7 +62,7 @@ test("renders the migrated empty state", () => {
   expect(screen.getByText("输入房间号后可保存到这里。")).toBeVisible();
 });
 
-test("keeps select, edit, and delete callbacks", async () => {
+test("selects without connecting and keeps connect, edit, and delete callbacks", async () => {
   const user = userEvent.setup();
   const callbacks = renderSavedRoomList([ROOM]);
 
@@ -64,13 +71,39 @@ test("keeps select, edit, and delete callbacks", async () => {
     "bg-[var(--drift-ui-surface)]",
   );
 
-  await user.click(screen.getByRole("button", { name: "选择" }));
+  await user.click(
+    screen.getByRole("switch", { name: "加入多房间 深夜电台" }),
+  );
+  await user.click(screen.getByRole("button", { name: "连接房间 123456" }));
   await user.click(screen.getByRole("button", { name: "修改" }));
   await user.click(screen.getByRole("button", { name: "删除" }));
 
-  expect(callbacks.onSelectRoom).toHaveBeenCalledWith(ROOM);
+  expect(callbacks.onRoomSelected).toHaveBeenCalledWith("room-1", true);
+  expect(callbacks.onConnectRoom).toHaveBeenCalledWith(ROOM);
   expect(callbacks.onStartEditRoom).toHaveBeenCalledWith(ROOM);
   expect(callbacks.onDeleteRoom).toHaveBeenCalledWith("room-1");
+});
+
+test("shows matching session state and the appropriate row action", async () => {
+  const user = userEvent.setup();
+  const connected: RoomSessionSnapshot = {
+    sessionId: "s-1",
+    requestedRoomId: 123456,
+    roomId: 123456,
+    status: "connected",
+    message: "已连接",
+  };
+  const callbacks = renderSavedRoomList([ROOM], null, [connected]);
+
+  expect(screen.getByText("已连接")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "连接房间 123456" }),
+  ).toBeNull();
+  await user.click(
+    screen.getByRole("button", { name: "断开房间 123456" }),
+  );
+
+  expect(callbacks.onDisconnectSession).toHaveBeenCalledWith("s-1");
 });
 
 test("keeps edited room fields and save or cancel actions", async () => {

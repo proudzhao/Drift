@@ -1,13 +1,58 @@
 use super::types::{
     cache_anchor_name, cached_anchor_name, response_preview, ApiResponse, BuvidData, DanmuInfo,
-    DeviceCookie, NavData, RoomBaseInfoData, RoomInfoByRoom, RoomInitData, SpaceInfo,
-    BROWSER_USER_AGENT, BUVID_URL, DANMU_INFO_URL, NAV_URL, ROOM_BASE_INFO_URL, ROOM_INFO_URL,
-    ROOM_INIT_URL, SPACE_INFO_URL,
+    DeviceCookie, MasterInfoData, NavData, RoomBaseInfoData, RoomInfoByRoom, RoomInitData,
+    SpaceInfo, BROWSER_USER_AGENT, BUVID_URL, DANMU_INFO_URL, NAV_URL, ROOM_BASE_INFO_URL,
+    ROOM_INFO_URL, ROOM_INIT_URL, SPACE_INFO_URL,
 };
 use super::types::{encode_wbi_component, extract_url_file_stem, filter_wbi_value, mixin_key};
 use reqwest::header::{ACCEPT, REFERER, USER_AGENT};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, warn};
+
+const MASTER_INFO_URL: &str = "https://api.live.bilibili.com/live_user/v1/Master/info";
+
+pub(crate) fn parse_anchor_fan_medal_name(
+    body: &[u8],
+    expected_uid: u64,
+) -> Result<Option<String>, String> {
+    let response = serde_json::from_slice::<ApiResponse<MasterInfoData>>(body)
+        .map_err(|error| format!("主播粉丝牌 JSON 解析失败：{error}"))?;
+    if response.code != 0 {
+        return Err(format!("主播粉丝牌返回错误：{}", response.code));
+    }
+    let data = response
+        .data
+        .ok_or_else(|| "主播粉丝牌响应缺少 data 字段".to_string())?;
+    if data.info.uid != expected_uid {
+        return Err("主播粉丝牌响应 UID 不匹配".to_string());
+    }
+    let medal_name = data.medal_name.trim();
+    Ok((!medal_name.is_empty()).then(|| medal_name.to_string()))
+}
+
+pub(crate) async fn fetch_anchor_fan_medal_name(uid: u64) -> Result<Option<String>, String> {
+    debug!(target: "drift::bilibili.http", anchor_uid = uid, "requesting anonymous anchor fan medal metadata");
+    let response = reqwest::Client::new()
+        .get(MASTER_INFO_URL)
+        .header(ACCEPT, "application/json, text/plain, */*")
+        .header(USER_AGENT, BROWSER_USER_AGENT)
+        .header(REFERER, "https://live.bilibili.com/")
+        .query(&[("uid", uid)])
+        .send()
+        .await
+        .map_err(|error| format!("主播粉丝牌请求失败：{error}"))?;
+
+    let status = response.status();
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("主播粉丝牌响应读取失败：{error}"))?;
+    if !status.is_success() {
+        return Err(format!("主播粉丝牌 HTTP {status}"));
+    }
+
+    parse_anchor_fan_medal_name(&bytes, uid)
+}
 
 pub(crate) async fn fetch_room_info(room_id: u64, cookie: &str) -> Result<RoomInfoByRoom, String> {
     debug!(target: "drift::bilibili.http", room_id, "requesting room info");
@@ -471,4 +516,35 @@ pub(crate) async fn fetch_buvid() -> Result<DeviceCookie, String> {
         buvid3: data.b_3,
         cookie,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_trimmed_fan_medal_for_matching_anchor() {
+        let body = r#"{
+          "code": 0,
+          "message": "",
+          "data": {
+            "info": { "uid": 50333369, "uname": "赛事主播" },
+            "medal_name": " 补给箱 ",
+            "room_id": 14073662
+          }
+        }"#
+        .as_bytes();
+        assert_eq!(
+            parse_anchor_fan_medal_name(body, 50333369).expect("parse"),
+            Some("补给箱".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_mismatched_anchor_and_treats_blank_medal_as_absent() {
+        let mismatch = r#"{"code":0,"data":{"info":{"uid":9},"medal_name":"牌"}}"#.as_bytes();
+        assert!(parse_anchor_fan_medal_name(mismatch, 7).is_err());
+        let blank = br#"{"code":0,"data":{"info":{"uid":7},"medal_name":"  "}}"#;
+        assert_eq!(parse_anchor_fan_medal_name(blank, 7).expect("blank"), None);
+    }
 }

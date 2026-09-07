@@ -16,24 +16,33 @@ export function useFilterRuntimeStatus() {
     let receivedEvent = false;
     let unlisten: (() => void) | null = null;
 
-    void invoke<FilterRuntimeStatus>("get_filter_runtime_status")
-      .then((snapshot) => {
-        if (!disposed && !receivedEvent) setStatus(snapshot);
-      })
-      .catch(() => undefined);
-
-    void listen<FilterRuntimeStatus>("filter-runtime-status", (event) => {
-      receivedEvent = true;
-      if (!disposed) setStatus(event.payload);
-    })
-      .then((disposeListener) => {
+    void (async () => {
+      try {
+        const disposeListener = await listen<FilterRuntimeStatus>(
+          "filter-runtime-status",
+          (event) => {
+            receivedEvent = true;
+            if (!disposed) setStatus(event.payload);
+          },
+        );
         if (disposed) {
           disposeListener();
-        } else {
-          unlisten = disposeListener;
+          return;
         }
-      })
-      .catch(() => undefined);
+        unlisten = disposeListener;
+      } catch {
+        if (disposed) return;
+      }
+
+      try {
+        const snapshot = await invoke<FilterRuntimeStatus>(
+          "get_filter_runtime_status",
+        );
+        if (!disposed && !receivedEvent) setStatus(snapshot);
+      } catch {
+        // Keep the last event or the empty initial status.
+      }
+    })();
 
     return () => {
       disposed = true;

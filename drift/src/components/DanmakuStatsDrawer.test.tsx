@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { DanmakuStatsDrawer, kindSharePercent } from "./DanmakuStatsDrawer";
+import type { RoomSourceOption } from "../types/roomSession";
 
 const FILLED_STATS = {
   startedAt: 1,
@@ -16,6 +18,11 @@ const FILLED_STATS = {
   topWords: [{ word: "这是一个非常长的高频词条", count: 12 }],
 };
 
+const ROOM_SOURCES: RoomSourceOption[] = [
+  { roomId: 6, label: "主播甲 · 6" },
+  { roomId: 7, label: "主播乙 · 7" },
+];
+
 test("calculates bounded message kind shares", () => {
   expect(kindSharePercent(25, 100)).toBe(25);
   expect(kindSharePercent(1, 0)).toBe(0);
@@ -23,7 +30,13 @@ test("calculates bounded message kind shares", () => {
 });
 
 test("keeps the drawer positioned before the workspace stylesheet lands", () => {
-  render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
+  render(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={ROOM_SOURCES}
+      snapshots={{ all: FILLED_STATS, byRoom: {} }}
+    />,
+  );
 
   expect(screen.getByLabelText("弹幕统计")).toHaveClass(
     "absolute",
@@ -36,7 +49,13 @@ test("keeps the drawer positioned before the workspace stylesheet lands", () => 
 });
 
 test("uses shared drawer, KPI, progress and ranking theme tokens", () => {
-  render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
+  render(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={ROOM_SOURCES}
+      snapshots={{ all: FILLED_STATS, byRoom: {} }}
+    />,
+  );
 
   expect(screen.getByLabelText("弹幕统计")).toHaveClass(
     "drift-theme-transition",
@@ -58,7 +77,13 @@ test("uses shared drawer, KPI, progress and ranking theme tokens", () => {
 });
 
 test("keeps the header fixed and puts all statistics in one scroll area", () => {
-  render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
+  render(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={ROOM_SOURCES}
+      snapshots={{ all: FILLED_STATS, byRoom: {} }}
+    />,
+  );
 
   const drawer = screen.getByRole("complementary", { name: "弹幕统计" });
   const header = drawer.querySelector<HTMLElement>(".overlay-drawer-header");
@@ -79,7 +104,13 @@ test("keeps the header fixed and puts all statistics in one scroll area", () => 
 });
 
 test("renders KPI, exact counts, shares and ranking labels", () => {
-  render(<DanmakuStatsDrawer onClose={vi.fn()} stats={FILLED_STATS} />);
+  render(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={ROOM_SOURCES}
+      snapshots={{ all: FILLED_STATS, byRoom: {} }}
+    />,
+  );
 
   expect(screen.getByText("100")).toBeVisible();
   expect(screen.getByRole("progressbar", { name: "弹幕占比" })).toHaveAttribute(
@@ -102,10 +133,14 @@ test("renders zero-width shares when no messages exist", () => {
   render(
     <DanmakuStatsDrawer
       onClose={vi.fn()}
-      stats={{
-        ...FILLED_STATS,
-        totalMessages: 0,
-        kindCounts: { danmaku: 0, super_chat: 0, gift: 0, guard: 0 },
+      roomSources={ROOM_SOURCES}
+      snapshots={{
+        all: {
+          ...FILLED_STATS,
+          totalMessages: 0,
+          kindCounts: { danmaku: 0, super_chat: 0, gift: 0, guard: 0 },
+        },
+        byRoom: {},
       }}
     />,
   );
@@ -114,4 +149,46 @@ test("renders zero-width shares when no messages exist", () => {
     expect(progressbar).toHaveAttribute("aria-valuenow", "0");
     expect(progressbar.firstElementChild).toHaveStyle({ width: "0%" });
   }
+});
+
+test("switches between all rooms and a single room snapshot", async () => {
+  const user = userEvent.setup();
+  const view = render(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={ROOM_SOURCES}
+      snapshots={{
+        all: { ...FILLED_STATS, totalMessages: 3 },
+        byRoom: {
+          6: { ...FILLED_STATS, totalMessages: 2 },
+          7: { ...FILLED_STATS, totalMessages: 1 },
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByText("3")).toBeVisible();
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "筛选直播间" }),
+    "7",
+  );
+  expect(screen.getByText("1")).toBeVisible();
+
+  view.rerender(
+    <DanmakuStatsDrawer
+      onClose={vi.fn()}
+      roomSources={[ROOM_SOURCES[0]]}
+      snapshots={{
+        all: { ...FILLED_STATS, totalMessages: 2 },
+        byRoom: {
+          6: { ...FILLED_STATS, totalMessages: 2 },
+        },
+      }}
+    />,
+  );
+  expect(screen.getByRole("combobox", { name: "筛选直播间" })).toHaveValue(
+    "all",
+  );
+  expect(screen.getByText("2")).toBeVisible();
+
 });

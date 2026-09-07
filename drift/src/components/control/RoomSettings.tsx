@@ -1,12 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppConfig, SavedRoom } from "../../types/config";
-import type { DanmakuStatus } from "../../types/danmaku";
+import type { RoomSessionSnapshot } from "../../types/roomSession";
 import type { DanmakuRecordingStatus } from "../../types/recording";
 import { Button, Input, IconButton, Toggle } from "../ui";
+import { RoomSessionList } from "./RoomSessionList";
 import { SavedRoomGroupControls } from "./SavedRoomGroupControls";
 import { SavedRoomList, type EditingSavedRoom } from "./SavedRoomList";
 import {
-  DataValue,
   SettingsPage,
   SettingsRow,
   SettingsSection,
@@ -16,27 +16,32 @@ import {
 } from "./settings-ui";
 
 type RoomSettingsProps = {
+  commandErrors: Record<string, string>;
   config: AppConfig;
   draftRoomId: string;
   editingSavedRoom: EditingSavedRoom | null;
   filteredSavedRooms: SavedRoom[];
-  isConnected: boolean;
+  onConnectDraftRoom: () => void | Promise<void>;
+  onConnectSavedRoom: (room: SavedRoom) => void | Promise<void>;
+  onConnectSelectedRooms: () => void | Promise<void>;
   onCreateGroup: (name: string) => Promise<boolean>;
-  onConnect: () => void;
   onDeleteGroup: (groupId: string) => Promise<boolean>;
   onDeleteRoom: (roomId: string) => void;
-  onDisconnect: () => void;
+  onDisconnectAllRooms: () => void | Promise<void>;
+  onDisconnectSession: (sessionId: string) => void | Promise<void>;
   onEditRoomChange: (room: EditingSavedRoom) => void;
   onGroupChange: (groupId: string) => void;
   onOpenRecordingDir: () => void | Promise<void>;
   onRecordingEnabledChange: (enabled: boolean) => void | Promise<void>;
   onRenameGroup: (groupId: string, name: string) => Promise<boolean>;
   onRetryRecording: () => void | Promise<void>;
+  onRetrySession: (session: RoomSessionSnapshot) => void | Promise<void>;
   onRoomIdChange: (roomId: string) => void;
+  onRoomSelected: (savedRoomId: string, selected: boolean) => void | Promise<void>;
   onSaveCurrentRoom: () => void;
   onSaveEditedRoom: () => void;
+  onSaveTemporaryRoom: (session: RoomSessionSnapshot) => void | Promise<void>;
   onSearchQueryChange: (query: string) => void;
-  onSelectRoom: (room: SavedRoom) => void;
   onStartEditRoom: (room: SavedRoom) => void;
   onStopEditRoom: () => void;
   recordingCommandError: string;
@@ -44,31 +49,40 @@ type RoomSettingsProps = {
   savedRoomError: string;
   savedRoomSearchQuery: string;
   selectedGroupId: string;
-  status: DanmakuStatus;
+  selectedSavedRoomIds: Set<string>;
+  selectionError: string;
+  sessions: RoomSessionSnapshot[];
+  snapshotError: string;
+  temporarySessions: RoomSessionSnapshot[];
 };
 
 export function RoomSettings({
+  commandErrors,
   config,
   draftRoomId,
   editingSavedRoom,
   filteredSavedRooms,
-  isConnected,
+  onConnectDraftRoom,
+  onConnectSavedRoom,
+  onConnectSelectedRooms,
   onCreateGroup,
-  onConnect,
   onDeleteGroup,
   onDeleteRoom,
-  onDisconnect,
+  onDisconnectAllRooms,
+  onDisconnectSession,
   onEditRoomChange,
   onGroupChange,
   onOpenRecordingDir,
   onRecordingEnabledChange,
   onRenameGroup,
   onRetryRecording,
+  onRetrySession,
   onRoomIdChange,
+  onRoomSelected,
   onSaveCurrentRoom,
   onSaveEditedRoom,
+  onSaveTemporaryRoom,
   onSearchQueryChange,
-  onSelectRoom,
   onStartEditRoom,
   onStopEditRoom,
   recordingCommandError,
@@ -76,21 +90,45 @@ export function RoomSettings({
   savedRoomError,
   savedRoomSearchQuery,
   selectedGroupId,
-  status,
+  selectedSavedRoomIds,
+  selectionError,
+  sessions,
+  snapshotError,
+  temporarySessions,
 }: RoomSettingsProps) {
   return (
     <SettingsPage>
-      <SettingsSection title="连接">
+      <SettingsSection
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Button
+              disabled={selectedSavedRoomIds.size === 0}
+              onClick={() => void onConnectSelectedRooms()}
+              size="sm"
+              variant="primary"
+            >
+              连接已选房间
+            </Button>
+            <Button
+              disabled={sessions.length === 0}
+              onClick={() => void onDisconnectAllRooms()}
+              size="sm"
+              variant="danger"
+            >
+              全部断开
+            </Button>
+          </div>
+        }
+        description={roomSessionSummary(sessions)}
+        title="连接"
+      >
         <SettingsRow
           control={
-            <div className="grid min-w-[280px] grid-cols-[minmax(0,1fr)_28px_64px] gap-2 max-[519px]:min-w-0">
+            <div className="grid min-w-[360px] grid-cols-[minmax(0,1fr)_28px_112px] gap-2 max-[619px]:min-w-[280px] max-[519px]:min-w-0 max-[519px]:grid-cols-[minmax(0,1fr)_28px]">
               <Input
-                disabled={isConnected}
                 id="control-room-id"
                 inputMode="numeric"
-                onChange={(event) =>
-                  onRoomIdChange(event.currentTarget.value)
-                }
+                onChange={(event) => onRoomIdChange(event.currentTarget.value)}
                 placeholder="输入房间号"
                 value={draftRoomId}
               />
@@ -103,37 +141,43 @@ export function RoomSettings({
               >
                 ?
               </IconButton>
-              {isConnected ? (
-                <Button onClick={onDisconnect}>断开</Button>
-              ) : (
-                <Button disabled={!draftRoomId.trim()} onClick={onConnect}>
-                  连接
-                </Button>
-              )}
+              <Button
+                className="max-[519px]:col-span-2"
+                disabled={!draftRoomId.trim()}
+                onClick={() => void onConnectDraftRoom()}
+              >
+                连接
+              </Button>
             </div>
           }
-          description={status.message}
-          descriptionLayout="inline"
           htmlFor="control-room-id"
           label="房间号"
         />
-        <SettingsRow
-          control={<DataValue>{status.anchorName || "未知"}</DataValue>}
-          description="当前直播间主播"
-          descriptionLayout="inline"
-          label="主播"
-        />
-        <SettingsRow
-          control={
-            <StatusDot
-              label={roomStatusText(status)}
-              tone={roomStatusTone(status.status)}
-            />
-          }
-          description="连接、重连或房间状态"
-          descriptionLayout="inline"
-          label="状态"
-        />
+        {snapshotError || commandErrors.draft || commandErrors.all ? (
+          <div className="grid gap-2 border-t border-drift-line p-3">
+            {snapshotError ? (
+              <StatusBanner
+                description={snapshotError}
+                title="房间会话状态不可用"
+                tone="danger"
+              />
+            ) : null}
+            {commandErrors.draft ? (
+              <StatusBanner
+                description={commandErrors.draft}
+                title="临时房间连接失败"
+                tone="danger"
+              />
+            ) : null}
+            {commandErrors.all ? (
+              <StatusBanner
+                description={commandErrors.all}
+                title="全部断开失败"
+                tone="danger"
+              />
+            ) : null}
+          </div>
+        ) : null}
       </SettingsSection>
 
       <SettingsSection
@@ -164,9 +208,19 @@ export function RoomSettings({
             />
           }
           description={
-            recordingStatus.currentFileName
-              ? recordingStatus.currentFileName
-              : "尚未生成记录文件"
+            recordingStatus.activeFiles.length === 0 ? (
+              "尚未生成记录文件"
+            ) : recordingStatus.activeFiles.length === 1 ? (
+              recordingStatus.activeFiles[0].fileName
+            ) : (
+              <>
+                {recordingStatus.activeFiles.map((file) => (
+                  <span className="block" key={file.roomId}>
+                    {file.fileName}
+                  </span>
+                ))}
+              </>
+            )
           }
           label="状态"
         />
@@ -201,7 +255,7 @@ export function RoomSettings({
             保存当前直播间
           </Button>
         }
-        description={`${filteredSavedRooms.length} 个`}
+        description={`${filteredSavedRooms.length} 个 · 已选 ${selectedSavedRoomIds.size}/5`}
         title="常用直播间"
       >
         <div className="grid min-h-0 gap-2 p-3">
@@ -215,29 +269,69 @@ export function RoomSettings({
             searchQuery={savedRoomSearchQuery}
             selectedGroupId={selectedGroupId}
           />
-          {savedRoomError ? (
+          {savedRoomError || selectionError ? (
             <StatusBanner
-              description={savedRoomError}
+              description={savedRoomError || selectionError}
               title="常用直播间操作失败"
               tone="danger"
             />
           ) : null}
           <SavedRoomList
+            commandErrors={commandErrors}
             editingSavedRoom={editingSavedRoom}
             groups={config.savedRoomGroups}
-            isConnected={isConnected}
+            onConnectRoom={onConnectSavedRoom}
             onDeleteRoom={onDeleteRoom}
+            onDisconnectSession={onDisconnectSession}
             onEditRoomChange={onEditRoomChange}
+            onRetrySession={onRetrySession}
+            onRoomSelected={onRoomSelected}
             onSaveEditedRoom={onSaveEditedRoom}
-            onSelectRoom={onSelectRoom}
             onStartEditRoom={onStartEditRoom}
             onStopEditRoom={onStopEditRoom}
             rooms={filteredSavedRooms}
+            selectedSavedRoomIds={selectedSavedRoomIds}
+            sessions={sessions}
           />
         </div>
       </SettingsSection>
+
+      {temporarySessions.length > 0 ? (
+        <SettingsSection
+          description="未匹配当前常用直播间，只保留到本次运行结束"
+          title="临时连接"
+        >
+          <RoomSessionList
+            commandErrors={commandErrors}
+            onDisconnectSession={onDisconnectSession}
+            onRetrySession={onRetrySession}
+            onSaveRoom={onSaveTemporaryRoom}
+            sessions={temporarySessions}
+          />
+        </SettingsSection>
+      ) : null}
     </SettingsPage>
   );
+}
+
+function roomSessionSummary(sessions: RoomSessionSnapshot[]) {
+  if (sessions.length === 0) return "尚未连接直播间";
+  const labels: Array<[RoomSessionSnapshot["status"], string]> = [
+    ["connected", "已连接"],
+    ["connecting", "连接中"],
+    ["reconnecting", "重连中"],
+    ["not_live", "未开播"],
+    ["invalid_room", "房间号不存在"],
+    ["error", "连接失败"],
+    ["disconnected", "已断开"],
+  ];
+  return labels
+    .map(([status, label]) => {
+      const count = sessions.filter((session) => session.status === status).length;
+      return count > 0 ? `${label} ${count}` : "";
+    })
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function recordingStatusText(status: DanmakuRecordingStatus) {
@@ -245,7 +339,9 @@ function recordingStatusText(status: DanmakuRecordingStatus) {
     case "waiting":
       return "等待连接";
     case "recording":
-      return "记录中";
+      return status.activeFiles.length > 1
+        ? `记录中 · ${status.activeFiles.length} 个房间`
+        : "记录中";
     case "error":
       return "记录已暂停";
     case "disabled":
@@ -263,43 +359,6 @@ function recordingStatusTone(status: DanmakuRecordingStatus): StatusTone {
     case "error":
       return "danger";
     case "disabled":
-    default:
-      return "neutral";
-  }
-}
-
-function roomStatusText(status: DanmakuStatus) {
-  switch (status.status) {
-    case "connected":
-      return "已连接";
-    case "connecting":
-      return "连接中";
-    case "reconnecting":
-      return "重连中";
-    case "not_live":
-      return "未开播";
-    case "invalid_room":
-      return "房间号不存在";
-    case "disconnected":
-      return "未连接";
-    case "idle":
-    default:
-      return "未连接";
-  }
-}
-
-function roomStatusTone(status: DanmakuStatus["status"]): StatusTone {
-  switch (status) {
-    case "connected":
-      return "success";
-    case "connecting":
-    case "reconnecting":
-      return "signal";
-    case "not_live":
-    case "invalid_room":
-    case "disconnected":
-      return "warning";
-    case "idle":
     default:
       return "neutral";
   }

@@ -9,10 +9,55 @@ import {
 import { FilterSettings } from "./FilterSettings";
 
 const RUNTIME_STATUS: FilterRuntimeStatus = {
-  roomId: 6,
-  pausedFanMedalRuleIds: ["fan-only"],
-  pauseReason: "fan_medal_protocol_unknown",
+  rooms: [
+    {
+      roomId: 6,
+      pausedFanMedalRuleIds: ["fan-only"],
+      pauseReason: "fan_medal_protocol_unknown",
+    },
+  ],
 };
+
+test("renders separate warnings for two simultaneously paused rooms", () => {
+  const fanRule: FilterRule = {
+    id: "fan-only",
+    enabled: true,
+    name: "只看本房牌",
+    target: "currentRoomFanMedal",
+    operator: "equals",
+    value: "no",
+    action: "hide",
+  };
+  render(
+    <FilterSettings
+      onRulesChange={vi.fn()}
+      roomLabels={new Map([
+        [6, "主播甲 · 6"],
+        [7, "主播乙 · 7"],
+      ])}
+      rules={[fanRule]}
+      runtimeStatus={{
+        rooms: [
+          {
+            roomId: 6,
+            pausedFanMedalRuleIds: ["fan-only"],
+            pauseReason: "fan_medal_protocol_unknown",
+          },
+          {
+            roomId: 7,
+            pausedFanMedalRuleIds: ["fan-only"],
+            pauseReason: "fan_medal_protocol_unknown",
+          },
+        ],
+      }}
+    />,
+  );
+
+  expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+    "主播甲 · 6 的粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试",
+    "主播乙 · 7 的粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试",
+  ]);
+});
 
 test("shows grouped empty state and rejects empty rule values", async () => {
   const user = userEvent.setup();
@@ -176,7 +221,7 @@ test("creates a manual UID rule with fixed equals matching", async () => {
     ["action", "enabled", "id", "name", "operator", "target", "value"].sort(),
   );
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "本次连接已暂停相关规则",
+    "房间 6",
   );
 });
 
@@ -276,6 +321,29 @@ test("only warns for paused enabled fan medal rules", () => {
     />,
   );
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("uses room labels supplied by the session snapshot", () => {
+  render(
+    <FilterSettings
+      onRulesChange={vi.fn()}
+      roomLabels={new Map([[6, "主播甲 · 6"]])}
+      rules={[
+        {
+          id: "fan-only",
+          enabled: true,
+          name: "只看本房牌",
+          target: "currentRoomFanMedal",
+          operator: "equals",
+          value: "no",
+          action: "hide",
+        },
+      ]}
+      runtimeStatus={RUNTIME_STATUS}
+    />,
+  );
+
+  expect(screen.getByRole("alert")).toHaveTextContent("主播甲 · 6");
 });
 
 test("distinguishes enabled valid followed user rules from generic highlights", () => {

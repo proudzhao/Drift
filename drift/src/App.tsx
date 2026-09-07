@@ -18,13 +18,14 @@ import {
 } from "./components/OverlayEditWorkspace";
 import { SendDanmakuWindow } from "./components/SendDanmakuWindow";
 import { useDanmakuRuntime } from "./hooks/useDanmakuRuntime";
+import { useRoomSessions } from "./hooks/useRoomSessions";
 import {
   DEFAULT_APP_CONFIG,
   defaultShortcutLabel,
   mergeAppConfig,
   type AppConfig,
 } from "./types/config";
-import type { DanmakuStatus, LiveMessage } from "./types/danmaku";
+import type { DanmakuRoomBatch } from "./types/roomSession";
 import type { VerticalFlowStatus } from "./types/verticalFlow";
 import {
   MIN_TRACK_COUNT,
@@ -42,12 +43,6 @@ import "./App.css";
 const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 160;
 const DEFAULT_SHORTCUT = defaultShortcutLabel();
-const TERMINAL_DANMAKU_STATUSES: DanmakuStatus["status"][] = [
-  "disconnected",
-  "not_live",
-  "invalid_room",
-];
-
 function selectSafeVerticalFlowStatus(
   status: VerticalFlowStatus,
 ): VerticalFlowStatus {
@@ -97,18 +92,11 @@ function App() {
   const [shortcut, setShortcut] = useState(DEFAULT_SHORTCUT);
   const [trackCount, setTrackCount] = useState(MIN_TRACK_COUNT);
   const [config, setConfig] = useState<AppConfig>(createInitialConfig);
-  const [status, setStatus] = useState<DanmakuStatus>({
-    status: "idle",
-    message: "尚未连接直播间",
+  const { isInitialReady: roomSessionsReady, sessions: roomSessions } = useRoomSessions({
+    enabled: windowLabel === "main",
   });
-  const isConnected =
-    status.status === "connecting" ||
-    status.status === "connected" ||
-    status.status === "reconnecting";
   const {
-    activeRoomIdRef,
-    clearLiveMessageState,
-    enqueueLiveMessages,
+    enqueueLiveBatch,
     handleMockRateChange,
     historySnapshot,
     items,
@@ -116,19 +104,21 @@ function App() {
     mock,
     pruneVerticalItems,
     removeDanmakuItem,
+    roomSources,
     setShowStats,
     setShowHistory,
     showHistory,
     showStats,
     startMockDanmaku,
-    statsSnapshot,
+    statsSnapshots,
     stopMockDanmaku,
     triggerMockBurst,
     verticalFlowStatus,
     verticalItems,
   } = useDanmakuRuntime({
     config,
-    status,
+    roomSessions,
+    roomSessionsReady,
     trackCount,
     windowLabel,
   });
@@ -272,46 +262,12 @@ function App() {
       }
     })();
 
-    const unlistenMessage = listen<LiveMessage[]>(
-      "danmaku-messages",
-      (event) => {
-        if (windowLabel !== "main") {
-          return;
-        }
-
-        enqueueLiveMessages(event.payload);
-      },
-    );
-    const unlistenStatus = listen<DanmakuStatus>("danmaku-status", (event) => {
-      if (windowLabel === "main") {
-        const nextRoomId = event.payload.roomId ?? null;
-        const isNewConnectionStart =
-          event.payload.status === "connecting" && nextRoomId === null;
-        const isRoomChanged =
-          nextRoomId !== null && nextRoomId !== activeRoomIdRef.current;
-        const isTerminalStatus = TERMINAL_DANMAKU_STATUSES.includes(
-          event.payload.status,
-        );
-
-        if (isNewConnectionStart || isRoomChanged) {
-          clearLiveMessageState();
-        }
-
-        if (isTerminalStatus || isNewConnectionStart) {
-          activeRoomIdRef.current = null;
-        } else if (nextRoomId !== null) {
-          activeRoomIdRef.current = nextRoomId;
-        }
-      }
-
-      setStatus((current) => ({
-        ...current,
-        ...event.payload,
-        anchorName: event.payload.anchorName ?? current.anchorName,
-        roomId: event.payload.roomId ?? current.roomId,
-        liveStatus: event.payload.liveStatus ?? current.liveStatus,
-      }));
-    });
+    const unlistenMessage =
+      windowLabel === "main"
+        ? listen<DanmakuRoomBatch>("danmaku-messages", (event) => {
+            enqueueLiveBatch(event.payload);
+          })
+        : Promise.resolve(() => undefined);
     const unlistenEditMode = listen<EditModeChanged>(
       "edit-mode-changed",
       (event) => {
@@ -323,7 +279,6 @@ function App() {
     return () => {
       disposed = true;
       void unlistenMessage.then((unlisten) => unlisten());
-      void unlistenStatus.then((unlisten) => unlisten());
       void unlistenEditMode.then((unlisten) => unlisten());
       void unlistenConfig.then((unlisten) => unlisten());
     };
@@ -403,10 +358,7 @@ function App() {
     return (
       <ControlPanel
         config={config}
-        isConnected={isConnected}
         onConfigChange={(nextConfig) => setConfig(mergeAppConfig(nextConfig))}
-        onStatusChange={setStatus}
-        status={status}
       />
     );
   }
@@ -440,9 +392,7 @@ function App() {
       ) : (
         <DanmakuOverlay
           items={items}
-          onItemDone={
-            isConnected || mock.active ? removeDanmakuItem : undefined
-          }
+          onItemDone={removeDanmakuItem}
           showEmotes={config.messageDisplay.showEmotes}
           showUsername={config.appearance.showUsername}
           trackCount={trackCount}
@@ -472,10 +422,11 @@ function App() {
           onShowMock={showMockWorkspace}
           onToggleHistory={toggleHistoryDrawer}
           onToggleStats={toggleStatsDrawer}
+          roomSources={roomSources}
           shortcut={shortcut}
           showHistory={showHistory}
           showStats={showStats}
-          stats={statsSnapshot}
+          statsSnapshots={statsSnapshots}
         />
       ) : null}
     </main>

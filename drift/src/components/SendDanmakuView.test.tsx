@@ -17,11 +17,13 @@ function renderView(
     onDragStart: vi.fn(),
     onInputKeyDown: vi.fn(),
     onSend: vi.fn(),
+    onTargetChange: vi.fn(),
     onTextChange: vi.fn(),
     remaining: 60,
-    targetText: "星瞳_Official",
+    selectedRoomId: 123456,
     text: "",
     tone: "signal",
+    targets: [{ roomId: 123456, label: "星瞳_Official · 123456" }],
     ...overrides,
   };
   render(<SendDanmakuView {...props} />);
@@ -37,7 +39,10 @@ test("renders the Signal Cyan send surface and status rail", () => {
     "h-full",
     "w-full",
   );
-  expect(screen.getByText("星瞳_Official")).toBeVisible();
+  expect(
+    screen.getByRole("combobox", { name: "发送目标直播间" }),
+  ).toHaveValue("123456");
+  expect(screen.getByRole("option", { name: "星瞳_Official · 123456" })).toBeVisible();
   expect(screen.getByRole("status")).toHaveTextContent("准备发送");
   expect(screen.getByText("60 字可用")).toBeVisible();
   expect(screen.getByRole("textbox", { name: "弹幕内容" })).toBeEnabled();
@@ -73,11 +78,13 @@ test("shows sending and remaining-count states", () => {
       onDragStart={vi.fn()}
       onInputKeyDown={vi.fn()}
       onSend={vi.fn()}
+      onTargetChange={vi.fn()}
       onTextChange={vi.fn()}
       remaining={5}
-      targetText="测试主播"
+      selectedRoomId={123456}
       text="测试"
       tone="signal"
+      targets={[{ roomId: 123456, label: "测试主播 · 123456" }]}
     />,
   );
 
@@ -97,11 +104,13 @@ test("shows sending and remaining-count states", () => {
       onDragStart={vi.fn()}
       onInputKeyDown={vi.fn()}
       onSend={vi.fn()}
+      onTargetChange={vi.fn()}
       onTextChange={vi.fn()}
       remaining={-3}
-      targetText="测试主播"
+      selectedRoomId={123456}
       text="超长内容"
       tone="danger"
+      targets={[{ roomId: 123456, label: "测试主播 · 123456" }]}
     />,
   );
   expect(screen.getByText("超出 3 字")).toHaveAttribute(
@@ -114,15 +123,24 @@ test("shows sending and remaining-count states", () => {
   );
 });
 
-test("constrains long target text inside the draggable header", () => {
+test("constrains long target labels inside the draggable header", () => {
   renderView({
-    targetText:
-      "这是一个用于检查目标文本截断的超长主播名称_Official_持续直播特别加长版本",
+    selectedRoomId: 123456,
+    targets: [
+      {
+        roomId: 123456,
+        label:
+          "这是一个用于检查目标文本截断的超长主播名称_Official_持续直播特别加长版本 · 123456",
+      },
+    ],
   });
 
-  expect(screen.getByText(/这是一个用于检查目标文本截断/).parentElement).toHaveClass(
-    "flex-1",
-    "overflow-hidden",
+  expect(
+    screen
+      .getByRole("combobox", { name: "发送目标直播间" })
+      .parentElement,
+  ).toHaveClass(
+    "min-w-0",
   );
 });
 
@@ -130,7 +148,9 @@ test("forwards view interactions without owning business state", async () => {
   const user = userEvent.setup();
   const props = renderView();
   const input = screen.getByRole("textbox", { name: "弹幕内容" });
+  const select = screen.getByRole("combobox", { name: "发送目标直播间" });
 
+  await user.selectOptions(select, "123456");
   fireEvent.change(input, { target: { value: "你好" } });
   fireEvent.keyDown(input, { key: "Enter" });
   fireEvent.mouseDown(screen.getByLabelText("拖动发送窗口"), {
@@ -141,6 +161,7 @@ test("forwards view interactions without owning business state", async () => {
   await user.click(screen.getByRole("button", { name: "发送" }));
   await user.click(screen.getByRole("button", { name: "关闭发送窗口" }));
 
+  expect(props.onTargetChange).toHaveBeenCalledWith(123456);
   expect(props.onTextChange).toHaveBeenCalledWith("你好");
   expect(props.onInputKeyDown).toHaveBeenCalledOnce();
   expect(props.onDragStart).toHaveBeenCalledOnce();

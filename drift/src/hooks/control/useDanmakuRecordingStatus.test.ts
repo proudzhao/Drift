@@ -40,7 +40,7 @@ test("loads the mount snapshot and follows recording status events", async () =>
   const snapshot: DanmakuRecordingStatus = {
     enabled: true,
     state: "waiting",
-    currentFileName: null,
+    activeFiles: [],
     errorMessage: null,
   };
   mockIPC((command) => {
@@ -54,7 +54,10 @@ test("loads the mount snapshot and follows recording status events", async () =>
   const eventStatus: DanmakuRecordingStatus = {
     enabled: true,
     state: "recording",
-    currentFileName: "2026-08-23-6-示例主播.txt",
+    activeFiles: [
+      { roomId: 6, fileName: "2026-08-27-6-主播甲.txt" },
+      { roomId: 7, fileName: "2026-08-27-7-主播乙.txt" },
+    ],
     errorMessage: null,
   };
   act(() => eventMock.handler?.({ payload: eventStatus }));
@@ -96,7 +99,10 @@ test("does not let a late mount snapshot overwrite a newer event", async () => {
   const eventStatus: DanmakuRecordingStatus = {
     enabled: true,
     state: "recording",
-    currentFileName: "2026-08-23-6-示例主播.txt",
+    activeFiles: [
+      { roomId: 6, fileName: "2026-08-27-6-主播甲.txt" },
+      { roomId: 7, fileName: "2026-08-27-7-主播乙.txt" },
+    ],
     errorMessage: null,
   };
   act(() => eventMock.handler?.({ payload: eventStatus }));

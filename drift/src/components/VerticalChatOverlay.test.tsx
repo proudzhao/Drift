@@ -150,6 +150,23 @@ test("keeps combined semantic classes and full wrapping styles", () => {
   expect(appCss).toContain("pointer-events: none");
 });
 
+test("uses one full-container background instead of separate message cards", () => {
+  expect(appCss).toMatch(
+    /\.vertical-chat-overlay\s*\{[^}]*background:\s*rgba\(8, 18, 31, 0\.58\)/s,
+  );
+  expect(appCss).toMatch(
+    /\.vertical-chat-scroll\s*\{[^}]*mask-image:\s*linear-gradient/s,
+  );
+  expect(appCss).toMatch(
+    /\.vertical-chat-message\s*\{[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*background:\s*transparent/s,
+  );
+  expect(appCss).toContain("animation: vertical-chat-row-fade-in");
+  expect(appCss).toMatch(
+    /@keyframes vertical-chat-row-fade-in\s*\{[^}]*opacity:\s*0;[^}]*}\s*to\s*\{[^}]*opacity:\s*1/s,
+  );
+  expect(appCss).not.toContain("background: rgba(38, 29, 9, 0.62)");
+});
+
 test("scrolls to the bottom and prunes rows above the viewport", async () => {
   installMatchMedia(false);
   const onItemsPruned = vi.fn();

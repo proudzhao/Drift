@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuthPanel } from "../../hooks/control/useAuthPanel";
 import { useControlConfig } from "../../hooks/control/useControlConfig";
@@ -7,12 +6,13 @@ import { useDiagnosticsPanel } from "../../hooks/control/useDiagnosticsPanel";
 import { useDanmakuRecordingStatus } from "../../hooks/control/useDanmakuRecordingStatus";
 import { useFilterRuntimeStatus } from "../../hooks/control/useFilterRuntimeStatus";
 import { useSavedRooms } from "../../hooks/control/useSavedRooms";
+import { useRoomConnections } from "../../hooks/control/useRoomConnections";
 import { useShortcutSettings } from "../../hooks/control/useShortcutSettings";
 import { useThemePreference } from "../../hooks/control/useThemePreference";
 import { useVerticalFlowStatus } from "../../hooks/control/useVerticalFlowStatus";
 import { useAppUpdate } from "../../hooks/control/useAppUpdate";
+import { useRoomSessions } from "../../hooks/useRoomSessions";
 import type { AppConfig } from "../../types/config";
-import type { DanmakuStatus } from "../../types/danmaku";
 import { AccountSettings } from "./AccountSettings";
 import { AboutSettings } from "./AboutSettings";
 import { ControlShell } from "./ControlShell";
@@ -26,18 +26,12 @@ import { ShortcutSettings } from "./ShortcutSettings";
 
 type ControlPanelProps = {
   config: AppConfig;
-  isConnected: boolean;
   onConfigChange: (config: AppConfig) => void;
-  onStatusChange: (status: DanmakuStatus) => void;
-  status: DanmakuStatus;
 };
 
 export function ControlPanel({
   config,
-  isConnected,
   onConfigChange,
-  onStatusChange,
-  status,
 }: ControlPanelProps) {
   const [draftRoomId, setDraftRoomId] = useState(config.roomId);
   const [activeTab, setActiveTab] = useState<SettingsTab>("room");
@@ -51,6 +45,7 @@ export function ControlPanel({
   const filterRuntimeStatus = useFilterRuntimeStatus();
   const danmakuRecording = useDanmakuRecordingStatus();
   const verticalFlowStatus = useVerticalFlowStatus();
+  const { sessions, snapshotError } = useRoomSessions({ enabled: true });
 
   const {
     resetAppearance,
@@ -92,8 +87,8 @@ export function ControlPanel({
     savedRoomError,
     savedRoomSearchQuery,
     saveCurrentRoom,
+    saveRoom,
     saveEditedRoom,
-    selectSavedRoom,
     selectedSavedRoomGroupId,
     setEditingSavedRoom,
     setSavedRoomSearchQuery,
@@ -103,9 +98,8 @@ export function ControlPanel({
     config,
     draftRoomId,
     saveConfig,
-    setDraftRoomId,
-    status,
   });
+  const roomConnections = useRoomConnections({ config, saveConfig, sessions });
   const {
     draftOverlayShortcut,
     draftSendShortcut,
@@ -148,34 +142,6 @@ export function ControlPanel({
     updateState.status === "installing" ||
     updateState.status === "installed";
 
-  async function connectRoom(roomId: string) {
-    const numericRoomId = Number(roomId.trim());
-    if (!Number.isSafeInteger(numericRoomId) || numericRoomId <= 0) {
-      onStatusChange({ status: "idle", message: "请输入有效的直播间房间号" });
-      return;
-    }
-
-    onStatusChange({
-      status: "connecting",
-      message: `正在连接直播间 ${roomId.trim()}`,
-    });
-
-    try {
-      await saveConfig((current) => ({
-        ...current,
-        roomId: roomId.trim(),
-      }));
-      await invoke("start_bilibili_danmaku", { roomId: numericRoomId });
-    } catch (error) {
-      onStatusChange({ status: "disconnected", message: String(error) });
-    }
-  }
-
-  async function disconnectRoom() {
-    await invoke("stop_bilibili_danmaku");
-    onStatusChange({ status: "disconnected", message: "已手动断开" });
-  }
-
   async function persistDisplayConfig(save: () => Promise<void>) {
     try {
       await save();
@@ -201,6 +167,18 @@ export function ControlPanel({
     await persistDisplayConfig(resetAppearance);
   }
 
+  const roomLabels = new Map<number, string>();
+  for (const session of sessions) {
+    const roomId = session.roomId ?? session.requestedRoomId;
+    const anchorName = session.anchorName?.trim();
+    roomLabels.set(
+      roomId,
+      anchorName && anchorName !== "未知"
+        ? `${anchorName} · ${roomId}`
+        : `房间 ${roomId}`,
+    );
+  }
+
   return (
     <ControlShell
       activeTab={activeTab}
@@ -216,7 +194,13 @@ export function ControlPanel({
       onCollapsedChange={setIsSidebarCollapsed}
       onTabChange={setActiveTab}
       onThemeToggle={themePreference.toggleTheme}
-      status={<span>{status.message}</span>}
+      status={
+        <span>
+          {sessions.length === 0
+            ? "尚未连接直播间"
+            : `房间会话 ${sessions.length}`}
+        </span>
+      }
       theme={themePreference.theme}
       themeError={themePreference.themeError}
       updateNotice={
@@ -241,31 +225,44 @@ export function ControlPanel({
             filteredSavedRooms={filteredSavedRooms}
             draftRoomId={draftRoomId}
             editingSavedRoom={editingSavedRoom}
-            isConnected={isConnected}
+            commandErrors={roomConnections.commandErrors}
             onCreateGroup={createSavedRoomGroup}
-            onConnect={() => connectRoom(draftRoomId)}
+            onConnectDraftRoom={() =>
+              roomConnections.connectDraftRoom(draftRoomId)
+            }
+            onConnectSavedRoom={roomConnections.connectSavedRoom}
+            onConnectSelectedRooms={roomConnections.connectSelectedRooms}
             onDeleteRoom={deleteSavedRoom}
             onDeleteGroup={deleteSavedRoomGroup}
-            onDisconnect={disconnectRoom}
+            onDisconnectAllRooms={roomConnections.disconnectAllRooms}
+            onDisconnectSession={roomConnections.disconnectSession}
             onEditRoomChange={setEditingSavedRoom}
             onGroupChange={setSelectedSavedRoomGroupId}
             onOpenRecordingDir={danmakuRecording.openDirectory}
             onRecordingEnabledChange={danmakuRecording.setEnabled}
             onRenameGroup={renameSavedRoomGroup}
             onRetryRecording={danmakuRecording.retry}
+            onRetrySession={roomConnections.retrySession}
             onRoomIdChange={setDraftRoomId}
+            onRoomSelected={roomConnections.setRoomSelected}
             onSaveCurrentRoom={saveCurrentRoom}
             onSaveEditedRoom={saveEditedRoom}
+            onSaveTemporaryRoom={(session) =>
+              saveRoom(String(session.requestedRoomId), session.anchorName)
+            }
             onSearchQueryChange={setSavedRoomSearchQuery}
-            onSelectRoom={selectSavedRoom}
             onStartEditRoom={startEditSavedRoom}
             onStopEditRoom={() => setEditingSavedRoom(null)}
             savedRoomError={savedRoomError}
             savedRoomSearchQuery={savedRoomSearchQuery}
             selectedGroupId={selectedSavedRoomGroupId}
+            selectedSavedRoomIds={roomConnections.selectedSavedRoomIds}
+            selectionError={roomConnections.selectionError}
             recordingCommandError={danmakuRecording.commandError}
             recordingStatus={danmakuRecording.status}
-            status={status}
+            sessions={sessions}
+            snapshotError={snapshotError}
+            temporarySessions={roomConnections.temporarySessions}
           />
         ) : null}
 
@@ -298,6 +295,7 @@ export function ControlPanel({
         {activeTab === "filter" ? (
           <FilterSettings
             onRulesChange={saveFilterRules}
+            roomLabels={roomLabels}
             rules={config.filter.rules}
             runtimeStatus={filterRuntimeStatus}
           />

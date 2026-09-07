@@ -35,9 +35,13 @@ afterEach(() => {
 
 test("loads the mount snapshot and follows runtime status events", async () => {
   const snapshot: FilterRuntimeStatus = {
-    roomId: 6,
-    pausedFanMedalRuleIds: [],
-    pauseReason: null,
+    rooms: [
+      {
+        roomId: 6,
+        pausedFanMedalRuleIds: [],
+        pauseReason: null,
+      },
+    ],
   };
   mockIPC((command) => {
     expect(command).toBe("get_filter_runtime_status");
@@ -48,9 +52,18 @@ test("loads the mount snapshot and follows runtime status events", async () => {
   await waitFor(() => expect(result.current).toEqual(snapshot));
 
   const eventStatus: FilterRuntimeStatus = {
-    ...snapshot,
-    pausedFanMedalRuleIds: ["fan-only"],
-    pauseReason: "fan_medal_protocol_unknown",
+    rooms: [
+      {
+        roomId: 6,
+        pausedFanMedalRuleIds: ["fan-only"],
+        pauseReason: "fan_medal_protocol_unknown",
+      },
+      {
+        roomId: 7,
+        pausedFanMedalRuleIds: [],
+        pauseReason: null,
+      },
+    ],
   };
   act(() => eventMock.handler?.({ payload: eventStatus }));
   expect(result.current).toEqual(eventStatus);
@@ -83,20 +96,48 @@ test("does not let a late mount snapshot overwrite a newer event", async () => {
   await waitFor(() => expect(eventMock.handler).toBeTypeOf("function"));
 
   const eventStatus: FilterRuntimeStatus = {
-    roomId: 6,
-    pausedFanMedalRuleIds: ["fan-only"],
-    pauseReason: "fan_medal_protocol_unknown",
+    rooms: [
+      {
+        roomId: 6,
+        pausedFanMedalRuleIds: ["fan-only"],
+        pauseReason: "fan_medal_protocol_unknown",
+      },
+      {
+        roomId: 7,
+        pausedFanMedalRuleIds: [],
+        pauseReason: null,
+      },
+    ],
   };
   act(() => eventMock.handler?.({ payload: eventStatus }));
   expect(result.current).toEqual(eventStatus);
 
   await act(async () => {
     resolveSnapshot?.({
-      roomId: null,
-      pausedFanMedalRuleIds: [],
-      pauseReason: null,
+      rooms: [],
     });
     await snapshotPromise;
   });
   expect(result.current).toEqual(eventStatus);
+});
+
+test("keeps an event emitted during the initial snapshot recovery", async () => {
+  const eventStatus: FilterRuntimeStatus = {
+    rooms: [
+      {
+        roomId: 6,
+        pausedFanMedalRuleIds: ["fan-only"],
+        pauseReason: "fan_medal_protocol_unknown",
+      },
+    ],
+  };
+  mockIPC((command) => {
+    expect(command).toBe("get_filter_runtime_status");
+    eventMock.handler?.({ payload: eventStatus });
+    return { rooms: [] } satisfies FilterRuntimeStatus;
+  });
+
+  const { result } = renderHook(() => useFilterRuntimeStatus());
+
+  await waitFor(() => expect(result.current).toEqual(eventStatus));
 });

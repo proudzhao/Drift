@@ -164,5 +164,6 @@ test("uses a fixed non-animated followed style", () => {
   expect(appCss).toContain("#ff6fbe");
   expect(appCss).toContain("@keyframes drift-across");
   expect(appCss).toContain("@keyframes vertical-chat-fade-in");
-  expect(appCss.match(/@keyframes/g)).toHaveLength(2);
+  expect(appCss).toContain("@keyframes vertical-chat-row-fade-in");
+  expect(appCss.match(/@keyframes/g)).toHaveLength(3);
 });

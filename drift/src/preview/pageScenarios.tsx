@@ -11,6 +11,7 @@ import type { EditingSavedRoom } from "../components/control/SavedRoomList";
 import type { SettingsTab } from "../components/control/settingsNavigation";
 import {
   ALL_SAVED_ROOM_GROUP_ID,
+  type AppConfig,
   type AppearanceConfig,
   type FilterRule,
   type SavedRoom,
@@ -21,17 +22,20 @@ import {
   type FilterRuntimeStatus,
 } from "../types/filterRuntime";
 import type { DanmakuRecordingStatus } from "../types/recording";
+import type { RoomSessionSnapshot } from "../types/roomSession";
 import {
   PREVIEW_CONFIG,
-  PREVIEW_CONNECTED_STATUS,
   PREVIEW_DIAGNOSTIC_STEPS,
   PREVIEW_FILTER_RULES,
   PREVIEW_FILTER_RUNTIME_STATUS,
+  PREVIEW_MULTI_ROOM_CONFIG,
+  PREVIEW_MULTI_ROOM_RECORDING_ACTIVE,
+  PREVIEW_MULTI_ROOM_SAVED_SESSIONS,
+  PREVIEW_MULTI_ROOM_TEMPORARY_SESSIONS,
   PREVIEW_RECORDING_ACTIVE,
   PREVIEW_RECORDING_DISABLED,
   PREVIEW_RECORDING_ERROR,
   PREVIEW_RECORDING_WAITING,
-  PREVIEW_STATUS,
   PREVIEW_THEME_SAVE_ERROR,
   PREVIEW_UPDATE_AVAILABLE,
   PREVIEW_UPDATE_ERROR,
@@ -43,6 +47,7 @@ export type ControlPageScenarioId =
   | "default"
   | "room-empty"
   | "room-connected"
+  | "control-room-multi"
   | "control-recording-disabled"
   | "control-recording-waiting"
   | "control-recording-recording"
@@ -69,6 +74,7 @@ export const CONTROL_PAGE_SCENARIOS: ControlPageScenario[] = [
   { id: "default", label: "默认控制面板" },
   { id: "room-empty", label: "直播间空列表" },
   { id: "room-connected", label: "直播间已连接" },
+  { id: "control-room-multi", label: "直播间 / 多房状态" },
   { id: "control-recording-disabled", label: "本地记录已关闭" },
   { id: "control-recording-waiting", label: "本地记录等待连接" },
   { id: "control-recording-recording", label: "本地记录进行中" },
@@ -107,6 +113,17 @@ export function ControlPageScenarioPreview({
   switch (scenarioId) {
     case "room-connected":
       return <RoomScenario connected />;
+    case "control-room-multi":
+      return (
+        <RoomScenario
+          config={PREVIEW_MULTI_ROOM_CONFIG}
+          connected
+          draftRoomId="9527"
+          recordingStatus={PREVIEW_MULTI_ROOM_RECORDING_ACTIVE}
+          sessions={PREVIEW_MULTI_ROOM_SAVED_SESSIONS}
+          temporarySessions={PREVIEW_MULTI_ROOM_TEMPORARY_SESSIONS}
+        />
+      );
     case "control-recording-disabled":
       return (
         <RoomScenario
@@ -243,19 +260,29 @@ function ScenarioShell({
 
 function RoomScenario({
   connected,
+  config = PREVIEW_CONFIG,
+  draftRoomId,
   empty = false,
   recordingStatus = PREVIEW_RECORDING_DISABLED,
+  sessions,
   theme = "dark",
   themeError = "",
+  temporarySessions = [],
 }: {
   connected: boolean;
+  config?: AppConfig;
+  draftRoomId?: string;
   empty?: boolean;
   recordingStatus?: DanmakuRecordingStatus;
+  sessions?: RoomSessionSnapshot[];
   theme?: UiTheme;
   themeError?: string;
+  temporarySessions?: RoomSessionSnapshot[];
 }) {
-  const initialRooms = empty ? [] : PREVIEW_CONFIG.savedRooms;
-  const [draftRoomId, setDraftRoomId] = useState(connected ? "123456" : "");
+  const initialRooms = empty ? [] : config.savedRooms;
+  const [draftRoomIdState, setDraftRoomId] = useState(
+    draftRoomId ?? (connected ? "123456" : ""),
+  );
   const [rooms, setRooms] = useState<SavedRoom[]>(initialRooms);
   const [editingSavedRoom, setEditingSavedRoom] =
     useState<EditingSavedRoom | null>(null);
@@ -296,41 +323,64 @@ function RoomScenario({
     );
     setEditingSavedRoom(null);
   }
+  const roomSessions =
+    sessions ??
+    (connected
+      ? [
+          {
+            sessionId: "preview-session-1",
+            requestedRoomId: 123456,
+            roomId: 123456,
+            anchorName: "示例主播",
+            status: "connected",
+            message: "已连接直播间 123456",
+          },
+        ]
+      : []);
 
   return (
     <ScenarioShell activeTab="room" theme={theme} themeError={themeError}>
       <RoomSettings
-        config={{ ...PREVIEW_CONFIG, savedRooms: rooms }}
-        draftRoomId={draftRoomId}
+        commandErrors={{}}
+        config={{ ...config, savedRooms: rooms }}
+        draftRoomId={draftRoomIdState}
         editingSavedRoom={editingSavedRoom}
         filteredSavedRooms={filteredRooms}
-        isConnected={connected}
-        onConnect={noop}
+        onConnectDraftRoom={noop}
+        onConnectSavedRoom={noop}
+        onConnectSelectedRooms={noop}
         onCreateGroup={resolveTrue}
         onDeleteGroup={resolveTrue}
         onDeleteRoom={(roomId) =>
           setRooms((current) => current.filter((room) => room.id !== roomId))
         }
-        onDisconnect={noop}
+        onDisconnectAllRooms={noop}
+        onDisconnectSession={noop}
         onEditRoomChange={setEditingSavedRoom}
         onGroupChange={setSelectedGroupId}
         onOpenRecordingDir={noop}
         onRecordingEnabledChange={noop}
         onRenameGroup={resolveTrue}
         onRetryRecording={noop}
+        onRetrySession={noop}
         onRoomIdChange={setDraftRoomId}
+        onRoomSelected={noop}
         onSaveCurrentRoom={noop}
         onSaveEditedRoom={saveEditedRoom}
+        onSaveTemporaryRoom={noop}
         onSearchQueryChange={setSearchQuery}
-        onSelectRoom={(room) => setDraftRoomId(room.roomId)}
         onStartEditRoom={startEditing}
         onStopEditRoom={() => setEditingSavedRoom(null)}
         savedRoomError=""
         savedRoomSearchQuery={searchQuery}
         selectedGroupId={selectedGroupId}
+        selectedSavedRoomIds={new Set(config.selectedSavedRoomIds)}
+        selectionError=""
         recordingCommandError=""
         recordingStatus={recordingStatus}
-        status={connected ? PREVIEW_CONNECTED_STATUS : PREVIEW_STATUS}
+        sessions={roomSessions}
+        snapshotError=""
+        temporarySessions={temporarySessions}
       />
     </ScenarioShell>
   );
@@ -390,11 +440,20 @@ function FilterScenario({
   runtimeStatus?: FilterRuntimeStatus;
 }) {
   const [rules, setRules] = useState(initialRules);
+  const roomLabels = new Map(
+    PREVIEW_CONFIG.savedRooms.map((room) => [
+      Number(room.roomId),
+      room.anchorName
+        ? `${room.anchorName} · ${room.roomId}`
+        : `房间 ${room.roomId}`,
+    ]),
+  );
 
   return (
     <ScenarioShell activeTab="filter">
       <FilterSettings
         onRulesChange={setRules}
+        roomLabels={roomLabels}
         rules={rules}
         runtimeStatus={runtimeStatus}
       />

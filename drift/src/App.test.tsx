@@ -22,6 +22,13 @@ const controllerMocks = vi.hoisted(() => ({
   startResizeDragging: vi.fn(async () => undefined),
 }));
 
+const runtimeMocks = vi.hoisted(() => ({
+  clearLiveMessageState: vi.fn(),
+  enqueueLiveBatch: vi.fn(),
+}));
+
+const roomSessionsMock = vi.hoisted(() => ({ sessions: [] as unknown[] }));
+
 const windowMock = vi.hoisted(() => ({ label: "main" }));
 
 vi.mock("@tauri-apps/api/window", () => ({
@@ -75,9 +82,8 @@ vi.mock("./App.css", () => ({}));
 
 vi.mock("./hooks/useDanmakuRuntime", () => ({
   useDanmakuRuntime: ({ config }: { config: AppConfig }) => ({
-    activeRoomIdRef: { current: null },
-    clearLiveMessageState: vi.fn(),
-    enqueueLiveMessages: vi.fn(),
+    clearLiveMessageState: runtimeMocks.clearLiveMessageState,
+    enqueueLiveBatch: runtimeMocks.enqueueLiveBatch,
     handleMockRateChange: vi.fn(),
     historySnapshot: [],
     items: [],
@@ -85,6 +91,7 @@ vi.mock("./hooks/useDanmakuRuntime", () => ({
     mock: { active: false, rate: 50, totalGenerated: 0 },
     pruneVerticalItems: vi.fn(),
     removeDanmakuItem: vi.fn(),
+    roomSources: [],
     setShowHistory: controllerMocks.setShowHistory,
     setShowStats: controllerMocks.setShowStats,
     showHistory: false,
@@ -101,6 +108,20 @@ vi.mock("./hooks/useDanmakuRuntime", () => ({
       topUsers: [],
       topWords: [],
     },
+    statsSnapshots: {
+      all: {
+        startedAt: 1,
+        updatedAt: 1,
+        totalMessages: 0,
+        lastMinuteMessages: 0,
+        lastFiveMinuteMessages: 0,
+        messagesPerMinute: 0,
+        kindCounts: { danmaku: 0, super_chat: 0, gift: 0, guard: 0 },
+        topUsers: [],
+        topWords: [],
+      },
+      byRoom: {},
+    },
     stopMockDanmaku: vi.fn(),
     triggerMockBurst: vi.fn(),
     verticalFlowStatus: {
@@ -111,6 +132,14 @@ vi.mock("./hooks/useDanmakuRuntime", () => ({
       droppedTotal: 0,
     },
     verticalItems: [],
+  }),
+}));
+
+vi.mock("./hooks/useRoomSessions", () => ({
+  useRoomSessions: () => ({
+    isInitialReady: true,
+    sessions: roomSessionsMock.sessions,
+    snapshotError: "",
   }),
 }));
 
@@ -168,6 +197,7 @@ afterEach(() => {
   clearMocks();
   vi.clearAllMocks();
   eventMock.reset();
+  roomSessionsMock.sessions = [];
   eventMock.emit.mockImplementation(async (event: string, payload?: unknown) => {
     eventMock.handlers.get(event)?.({ payload });
   });
@@ -223,6 +253,51 @@ test("renders only the horizontal overlay for the default flow", async () => {
   expect(
     screen.queryByRole("region", { name: "Drift vertical chat" }),
   ).not.toBeInTheDocument();
+});
+
+test("leaves connection-cycle clearing to the shared runtime", async () => {
+  installIPC(false);
+  const view = render(<App />);
+  await screen.findByRole("region", { name: "Drift danmaku preview" });
+
+  roomSessionsMock.sessions = [
+    {
+      sessionId: "s1",
+      requestedRoomId: 6,
+      roomId: 6,
+      status: "connecting",
+      message: "connecting",
+    },
+  ];
+  view.rerender(<App />);
+  expect(runtimeMocks.clearLiveMessageState).not.toHaveBeenCalled();
+
+  roomSessionsMock.sessions = [
+    ...roomSessionsMock.sessions,
+    {
+      sessionId: "s2",
+      requestedRoomId: 7,
+      roomId: 7,
+      status: "connected",
+      message: "connected",
+    },
+  ];
+  view.rerender(<App />);
+  expect(runtimeMocks.clearLiveMessageState).not.toHaveBeenCalled();
+
+  roomSessionsMock.sessions = [];
+  view.rerender(<App />);
+  roomSessionsMock.sessions = [
+    {
+      sessionId: "s3",
+      requestedRoomId: 8,
+      roomId: 8,
+      status: "reconnecting",
+      message: "reconnecting",
+    },
+  ];
+  view.rerender(<App />);
+  expect(runtimeMocks.clearLiveMessageState).not.toHaveBeenCalled();
 });
 
 test("renders only the vertical overlay for vertical flow", async () => {

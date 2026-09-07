@@ -32,7 +32,7 @@ async fn open_help_window(app: tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(bilibili::DanmakuTaskState::default())
+        .manage(bilibili::room_manager::RoomConnectionManager::default())
         .manage(bilibili::filter_runtime::FilterRuntimeState::default())
         .manage(bilibili::send::SendDanmakuState::default())
         .manage(bilibili::recording::DanmakuRecorder::default())
@@ -72,6 +72,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_config::load_app_config,
             app_config::save_app_config,
+            app_config::set_last_send_room_id,
             logging::open_log_dir,
             logging::export_diagnostics,
             system_fonts::list_system_fonts,
@@ -89,8 +90,10 @@ pub fn run() {
             window_control::end_send_danmaku_window_drag,
             window_control::save_window_layout,
             window_control::load_window_layout,
-            bilibili::ws::start_bilibili_danmaku,
-            bilibili::ws::stop_bilibili_danmaku,
+            bilibili::ws::connect_bilibili_room,
+            bilibili::ws::disconnect_bilibili_room,
+            bilibili::ws::disconnect_all_bilibili_rooms,
+            bilibili::ws::get_bilibili_room_sessions,
             bilibili::filter_runtime::get_filter_runtime_status,
             bilibili::filter_runtime::pause_fan_medal_rules_for_session,
             bilibili::recording::get_danmaku_recording_status,

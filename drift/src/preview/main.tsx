@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { ControlPanel } from "../components/control/ControlPanel";
 import type { AppConfig } from "../types/config";
-import type { DanmakuStatus } from "../types/danmaku";
-import { PREVIEW_CONFIG, PREVIEW_STATUS } from "./fixtures";
+import { EMPTY_DANMAKU_RECORDING_STATUS } from "../types/recording";
+import { PREVIEW_CONFIG } from "./fixtures";
 import {
   getPreviewScenario,
   PreviewScenario,
@@ -18,6 +18,11 @@ import "../App.css";
 mockIPC((command, payload) => {
   if (command === "plugin:app|set_app_theme") return null;
   if (command === "auth_get_status") return { isLoggedIn: false };
+  if (command === "get_bilibili_room_sessions") return [];
+  if (command === "get_filter_runtime_status") return { rooms: [] };
+  if (command === "get_danmaku_recording_status") {
+    return EMPTY_DANMAKU_RECORDING_STATUS;
+  }
   if (command === "save_app_config") {
     return (payload as { config: AppConfig }).config;
   }
@@ -37,20 +42,8 @@ mockIPC((command, payload) => {
 
 function ControlPanelPreview() {
   const [config, setConfig] = useState(PREVIEW_CONFIG);
-  const [status, setStatus] = useState<DanmakuStatus>(PREVIEW_STATUS);
-  const isConnected = ["connecting", "connected", "reconnecting"].includes(
-    status.status,
-  );
 
-  return (
-    <ControlPanel
-      config={config}
-      isConnected={isConnected}
-      onConfigChange={setConfig}
-      onStatusChange={setStatus}
-      status={status}
-    />
-  );
+  return <ControlPanel config={config} onConfigChange={setConfig} />;
 }
 
 const selectedScenario = getPreviewScenario(

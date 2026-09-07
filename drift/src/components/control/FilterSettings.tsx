@@ -12,6 +12,7 @@ import { EmptyState, SettingsPage, SettingsSection } from "./settings-ui";
 
 type FilterSettingsProps = {
   onRulesChange: (rules: FilterRule[]) => void;
+  roomLabels?: ReadonlyMap<number, string>;
   rules: FilterRule[];
   runtimeStatus: FilterRuntimeStatus;
 };
@@ -55,6 +56,7 @@ function isFollowedUserRule(rule: FilterRule) {
 
 export function FilterSettings({
   onRulesChange,
+  roomLabels,
   rules,
   runtimeStatus,
 }: FilterSettingsProps) {
@@ -64,11 +66,17 @@ export function FilterSettings({
   const [value, setValue] = useState("");
   const [name, setName] = useState("");
   const [ruleError, setRuleError] = useState("");
-  const hasPausedFanMedalRule = rules.some(
-    (rule) =>
-      rule.enabled &&
-      rule.target === "currentRoomFanMedal" &&
-      runtimeStatus.pausedFanMedalRuleIds.includes(rule.id),
+  const enabledFanRuleIds = new Set(
+    rules
+      .filter(
+        (rule) => rule.enabled && rule.target === "currentRoomFanMedal",
+      )
+      .map((rule) => rule.id),
+  );
+  const pausedFanMedalRooms = runtimeStatus.rooms.filter((room) =>
+    room.pausedFanMedalRuleIds.some((ruleId) =>
+      enabledFanRuleIds.has(ruleId),
+    ),
   );
 
   function changeTarget(nextTarget: FilterTarget) {
@@ -132,14 +140,15 @@ export function FilterSettings({
 
   return (
     <SettingsPage>
-      {hasPausedFanMedalRule ? (
+      {pausedFanMedalRooms.map((room) => (
         <p
           className="drift-theme-transition m-0 rounded-lg border border-[var(--drift-ui-warning-border)] bg-[var(--drift-ui-warning-soft)] px-3 py-2 text-[10px] text-[var(--drift-ui-warning)]"
+          key={room.roomId}
           role="alert"
         >
-          粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试
+          {roomLabels?.get(room.roomId) ?? `房间 ${room.roomId}`} 的粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试
         </p>
-      ) : null}
+      ))}
       <SettingsSection
         actions={
           <span className="drift-theme-transition text-[9px] text-[var(--drift-ui-muted)]">

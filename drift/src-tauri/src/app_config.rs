@@ -1,12 +1,19 @@
-use std::{collections::HashSet, fs};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    sync::{LazyLock, Mutex},
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 const APP_CONFIG_FILE: &str = "app-config.json";
+const MAX_SELECTED_ROOMS: usize = 5;
 const UNGROUPED_SAVED_ROOM_GROUP_ID: &str = "uncategorized";
 const DEPRECATED_FILTER_TARGETS: [&str; 4] =
     ["commentText", "messageType", "giftName", "guardLevel"];
+static APP_CONFIG_WRITE_GATE: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -14,6 +21,8 @@ pub struct AppConfig {
     pub room_id: String,
     pub saved_room_groups: Vec<SavedRoomGroup>,
     pub saved_rooms: Vec<SavedRoom>,
+    pub selected_saved_room_ids: Vec<String>,
+    pub send: SendConfig,
     pub auth: AuthConfig,
     pub update: UpdateConfig,
     pub recording: RecordingConfig,
@@ -63,6 +72,12 @@ pub struct UpdateConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct RecordingConfig {
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SendConfig {
+    pub last_room_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,6 +298,8 @@ impl Default for AppConfig {
             room_id: String::new(),
             saved_room_groups: default_saved_room_groups(),
             saved_rooms: Vec::new(),
+            selected_saved_room_ids: Vec::new(),
+            send: SendConfig::default(),
             auth: AuthConfig::default(),
             update: UpdateConfig::default(),
             recording: RecordingConfig::default(),
@@ -301,11 +318,11 @@ pub fn load_app_config(app: AppHandle) -> Result<AppConfig, String> {
 }
 
 #[tauri::command]
-pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<AppConfig, String> {
-    let _ = normalize_app_config(&mut config);
-    write_app_config(&app, &config)?;
-    app.emit("app-config-changed", &config)
-        .map_err(|error| error.to_string())?;
+pub fn save_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
+    let config = update_app_config_atomically(&app, move |current, latest| {
+        *current = config;
+        preserve_authority_owned_sections(current, latest);
+    })?;
     tracing::info!(
         target: "drift::config",
         room_id = %config.room_id,
@@ -319,29 +336,19 @@ pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<AppConfi
     Ok(config)
 }
 
+#[tauri::command]
+pub fn set_last_send_room_id(app: AppHandle, room_id: Option<u64>) -> Result<AppConfig, String> {
+    update_app_config_atomically(&app, move |config, _| {
+        config.send.last_room_id = room_id.map(|value| value.to_string());
+    })
+}
+
 pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
     let path = app_config_path(app)?;
-    if !path.exists() {
-        let mut config = AppConfig::default();
-        let _ = normalize_app_config(&mut config);
-        return Ok(config);
-    }
-
-    let content = fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    let mut config: AppConfig =
-        serde_json::from_str(&content).map_err(|error| error.to_string())?;
-    if config.shortcuts.toggle_edit_mode == legacy_shortcut_label() {
-        config.shortcuts.toggle_edit_mode = shortcut_label().to_string();
-    }
-    if config.shortcuts.toggle_overlay_window.is_empty() {
-        config.shortcuts.toggle_overlay_window = overlay_shortcut_label().to_string();
-    }
-    if config.shortcuts.open_send_danmaku.is_empty() {
-        config.shortcuts.open_send_danmaku = send_danmaku_shortcut_label().to_string();
-    }
-    let removed_filter_rule_count = normalize_app_config(&mut config);
+    let mut config = read_app_config_from_path(&path)?;
+    let removed_filter_rule_count = normalize_loaded_app_config(&mut config);
     if removed_filter_rule_count > 0 {
-        if let Err(error) = write_app_config(app, &config) {
+        if let Err(error) = persist_normalized_config_to_path_if_needed(&path) {
             tracing::warn!(
                 target: "drift::config",
                 removed_filter_rule_count,
@@ -354,16 +361,86 @@ pub fn read_app_config(app: &AppHandle) -> Result<AppConfig, String> {
 }
 
 pub fn update_auth_config(app: &AppHandle, auth: AuthConfig) -> Result<AppConfig, String> {
-    let mut config = read_app_config(app)?;
-    config.auth = auth;
-    write_app_config(app, &config)?;
-    app.emit("app-config-changed", &config)
-        .map_err(|error| error.to_string())?;
+    update_app_config_atomically(app, move |config, _| {
+        config.auth = auth;
+    })
+}
+
+pub fn update_recording_enabled_config(
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<AppConfig, String> {
+    update_app_config_atomically(app, move |config, _| {
+        config.recording.enabled = enabled;
+    })
+}
+
+fn app_config_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|path| path.join(APP_CONFIG_FILE))
+        .map_err(|error| error.to_string())
+}
+
+fn update_app_config_atomically<F>(app: &AppHandle, mutate: F) -> Result<AppConfig, String>
+where
+    F: FnOnce(&mut AppConfig, &AppConfig),
+{
+    let path = app_config_path(app)?;
+    update_app_config_path_atomically(&path, mutate, |config| {
+        app.emit("app-config-changed", config)
+            .map_err(|error| error.to_string())
+    })
+}
+
+fn update_app_config_path_atomically<F, E>(
+    path: &Path,
+    mutate: F,
+    emit: E,
+) -> Result<AppConfig, String>
+where
+    F: FnOnce(&mut AppConfig, &AppConfig),
+    E: FnOnce(&AppConfig) -> Result<(), String>,
+{
+    let _guard = APP_CONFIG_WRITE_GATE
+        .lock()
+        .map_err(|error| format!("配置写入锁获取失败：{error}"))?;
+    let mut config = read_app_config_from_path(path)?;
+    let latest = config.clone();
+    mutate(&mut config, &latest);
+    let _ = normalize_loaded_app_config(&mut config);
+    write_app_config_to_path(path, &config)?;
+    emit(&config)?;
     Ok(config)
 }
 
-fn write_app_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
-    let path = app_config_path(app)?;
+fn read_app_config_from_path(path: &Path) -> Result<AppConfig, String> {
+    if !path.exists() {
+        let mut config = AppConfig::default();
+        let _ = normalize_loaded_app_config(&mut config);
+        return Ok(config);
+    }
+
+    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    serde_json::from_str(&content).map_err(|error| error.to_string())
+}
+
+fn persist_normalized_config_to_path_if_needed(path: &Path) -> Result<(), String> {
+    let _guard = APP_CONFIG_WRITE_GATE
+        .lock()
+        .map_err(|error| format!("配置写入锁获取失败：{error}"))?;
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let mut config = read_app_config_from_path(path)?;
+    if normalize_loaded_app_config(&mut config) == 0 {
+        return Ok(());
+    }
+    write_app_config_to_path(path, &config)
+}
+
+fn write_app_config_to_path(path: &Path, config: &AppConfig) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
@@ -372,11 +449,23 @@ fn write_app_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     fs::write(path, content).map_err(|error| error.to_string())
 }
 
-fn app_config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .app_config_dir()
-        .map(|path| path.join(APP_CONFIG_FILE))
-        .map_err(|error| error.to_string())
+fn preserve_authority_owned_sections(config: &mut AppConfig, latest: &AppConfig) {
+    config.send = latest.send.clone();
+    config.auth = latest.auth.clone();
+    config.recording = latest.recording.clone();
+}
+
+fn normalize_loaded_app_config(config: &mut AppConfig) -> usize {
+    if config.shortcuts.toggle_edit_mode == legacy_shortcut_label() {
+        config.shortcuts.toggle_edit_mode = shortcut_label().to_string();
+    }
+    if config.shortcuts.toggle_overlay_window.is_empty() {
+        config.shortcuts.toggle_overlay_window = overlay_shortcut_label().to_string();
+    }
+    if config.shortcuts.open_send_danmaku.is_empty() {
+        config.shortcuts.open_send_danmaku = send_danmaku_shortcut_label().to_string();
+    }
+    normalize_app_config(config)
 }
 
 fn normalize_app_config(config: &mut AppConfig) -> usize {
@@ -418,12 +507,40 @@ fn normalize_app_config(config: &mut AppConfig) -> usize {
         };
     }
 
+    let valid_saved_room_ids: HashSet<&str> = config
+        .saved_rooms
+        .iter()
+        .filter(|room| !room.id.trim().is_empty())
+        .map(|room| room.id.as_str())
+        .collect();
+    let mut seen_saved_room_ids = HashSet::new();
+    config.selected_saved_room_ids.retain(|id| {
+        !id.trim().is_empty()
+            && valid_saved_room_ids.contains(id.as_str())
+            && seen_saved_room_ids.insert(id.clone())
+            && seen_saved_room_ids.len() <= MAX_SELECTED_ROOMS
+    });
+
+    if config
+        .send
+        .last_room_id
+        .as_deref()
+        .is_some_and(|room_id| !is_positive_room_id(room_id))
+    {
+        config.send.last_room_id = None;
+    }
+
     let original_rule_count = config.filter.rules.len();
     config
         .filter
         .rules
         .retain(|rule| !DEPRECATED_FILTER_TARGETS.contains(&rule.target.as_str()));
     original_rule_count - config.filter.rules.len()
+}
+
+fn is_positive_room_id(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    matches!(bytes.next(), Some(b'1'..=b'9')) && bytes.all(|byte| byte.is_ascii_digit())
 }
 
 fn normalize_saved_room_groups(saved_room_groups: &mut Vec<SavedRoomGroup>) {
@@ -499,6 +616,13 @@ fn send_danmaku_shortcut_label() -> &'static str {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::sync::{Arc, Barrier, Mutex};
+    use std::thread;
+    use tempfile::tempdir;
+
+    fn test_config_path() -> std::path::PathBuf {
+        tempdir().expect("tempdir").keep().join(APP_CONFIG_FILE)
+    }
 
     #[test]
     fn old_config_defaults_recording_to_disabled() {
@@ -515,6 +639,235 @@ mod tests {
         .expect("config");
 
         assert!(config.recording.enabled);
+    }
+
+    #[test]
+    fn atomic_save_preserves_latest_authority_owned_sections() {
+        let path = test_config_path();
+        let mut latest = AppConfig::default();
+        latest.send.last_room_id = Some("7".to_string());
+        latest.auth = AuthConfig {
+            enabled: true,
+            last_login_uid: Some(42),
+            last_login_name: Some("测试账号".to_string()),
+            last_validated_at: Some(123),
+        };
+        latest.recording.enabled = true;
+        write_app_config_to_path(&path, &latest).expect("write latest");
+
+        let mut stale = AppConfig::default();
+        stale.appearance.theme = "light".to_string();
+        stale.room_id = "999".to_string();
+        stale.send.last_room_id = Some("1".to_string());
+        stale.auth.enabled = false;
+        stale.recording.enabled = false;
+
+        let saved = update_app_config_path_atomically(
+            &path,
+            move |config, current| {
+                *config = stale.clone();
+                preserve_authority_owned_sections(config, current);
+            },
+            |_| Ok(()),
+        )
+        .expect("atomic save");
+
+        assert_eq!(saved.room_id, "999");
+        assert_eq!(saved.appearance.theme, "light");
+        assert_eq!(saved.send.last_room_id.as_deref(), Some("7"));
+        assert!(saved.auth.enabled);
+        assert_eq!(saved.auth.last_login_uid, Some(42));
+        assert!(saved.recording.enabled);
+    }
+
+    #[test]
+    fn atomic_updates_serialize_and_keep_latest_changes() {
+        let path = Arc::new(test_config_path());
+        write_app_config_to_path(path.as_ref(), &AppConfig::default()).expect("write default");
+
+        let barrier = Arc::new(Barrier::new(3));
+        let emitted = Arc::new(Mutex::new(Vec::<AppConfig>::new()));
+
+        let send_path = Arc::clone(&path);
+        let send_barrier = Arc::clone(&barrier);
+        let send_emitted = Arc::clone(&emitted);
+        let send_thread = thread::spawn(move || {
+            send_barrier.wait();
+            update_app_config_path_atomically(
+                send_path.as_ref(),
+                |config, _| {
+                    config.send.last_room_id = Some("6".to_string());
+                },
+                |config| {
+                    send_emitted.lock().expect("emit lock").push(config.clone());
+                    Ok(())
+                },
+            )
+            .expect("send update");
+        });
+
+        let auth_path = Arc::clone(&path);
+        let auth_barrier = Arc::clone(&barrier);
+        let auth_emitted = Arc::clone(&emitted);
+        let auth_thread = thread::spawn(move || {
+            auth_barrier.wait();
+            update_app_config_path_atomically(
+                auth_path.as_ref(),
+                |config, _| {
+                    config.auth.enabled = true;
+                    config.auth.last_login_uid = Some(99);
+                },
+                |config| {
+                    auth_emitted.lock().expect("emit lock").push(config.clone());
+                    Ok(())
+                },
+            )
+            .expect("auth update");
+        });
+
+        barrier.wait();
+        send_thread.join().expect("send join");
+        auth_thread.join().expect("auth join");
+
+        let final_config = read_app_config_from_path(path.as_ref()).expect("read final");
+        let emitted = emitted.lock().expect("emit read");
+
+        assert_eq!(emitted.len(), 2);
+        assert_eq!(final_config.send.last_room_id.as_deref(), Some("6"));
+        assert!(final_config.auth.enabled);
+        assert_eq!(final_config.auth.last_login_uid, Some(99));
+        assert!(
+            emitted.iter().any(|config| {
+                config.send.last_room_id.as_deref() == Some("6")
+                    && !config.auth.enabled
+                    && config.auth.last_login_uid.is_none()
+            }) || emitted.iter().any(|config| {
+                config.send.last_room_id.is_none()
+                    && config.auth.enabled
+                    && config.auth.last_login_uid == Some(99)
+            })
+        );
+        assert!(emitted.iter().any(|config| {
+            config.send.last_room_id.as_deref() == Some("6")
+                && config.auth.enabled
+                && config.auth.last_login_uid == Some(99)
+        }));
+    }
+
+    #[test]
+    fn old_config_defaults_multi_room_selection_and_send_target_to_empty() {
+        let mut config: AppConfig = serde_json::from_value(json!({
+            "savedRooms": [{
+                "id": "room-1",
+                "roomId": "1",
+                "displayName": "房间 1",
+                "groupId": "uncategorized",
+                "updatedAt": "2026-08-27T00:00:00.000Z"
+            }]
+        }))
+        .expect("config");
+
+        normalize_app_config(&mut config);
+
+        assert!(config.selected_saved_room_ids.is_empty());
+        assert!(config.send.last_room_id.is_none());
+    }
+
+    #[test]
+    fn normalize_multi_room_selection_keeps_five_valid_unique_ids() {
+        let mut config: AppConfig = serde_json::from_value(json!({
+            "savedRooms": (1..=6).map(|index| json!({
+                "id": format!("room-{index}"),
+                "roomId": index.to_string(),
+                "displayName": format!("房间 {index}"),
+                "groupId": "uncategorized",
+                "updatedAt": "2026-08-27T00:00:00.000Z"
+            })).collect::<Vec<_>>(),
+            "selectedSavedRoomIds": [
+                "room-1", "room-1", "missing", "room-2",
+                "room-3", "room-4", "room-5", "room-6"
+            ],
+            "send": { "lastRoomId": "123456" }
+        }))
+        .expect("config");
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(
+            config.selected_saved_room_ids,
+            vec![
+                "room-1".to_string(),
+                "room-2".to_string(),
+                "room-3".to_string(),
+                "room-4".to_string(),
+                "room-5".to_string(),
+            ]
+        );
+        assert_eq!(config.send.last_room_id.as_deref(), Some("123456"));
+    }
+
+    #[test]
+    fn normalize_multi_room_selection_drops_empty_ids_and_keeps_cap_and_dedup() {
+        let mut saved_rooms = vec![
+            json!({
+                "id": "",
+                "roomId": "100",
+                "displayName": "空 ID",
+                "groupId": "uncategorized",
+                "updatedAt": "2026-09-05T00:00:00.000Z"
+            }),
+            json!({
+                "id": "   ",
+                "roomId": "101",
+                "displayName": "空白 ID",
+                "groupId": "uncategorized",
+                "updatedAt": "2026-09-05T00:00:00.000Z"
+            }),
+        ];
+        saved_rooms.extend((1..=6).map(|index| {
+            json!({
+                "id": format!("room-{index}"),
+                "roomId": index.to_string(),
+                "displayName": format!("房间 {index}"),
+                "groupId": "uncategorized",
+                "updatedAt": "2026-09-05T00:00:00.000Z"
+            })
+        }));
+        let mut config: AppConfig = serde_json::from_value(json!({
+            "savedRooms": saved_rooms,
+            "selectedSavedRoomIds": [
+                "", "   ", "room-1", "room-1", "room-2",
+                "room-3", "room-4", "room-5", "room-6"
+            ]
+        }))
+        .expect("config");
+
+        normalize_app_config(&mut config);
+
+        assert_eq!(
+            config.selected_saved_room_ids,
+            vec![
+                "room-1".to_string(),
+                "room-2".to_string(),
+                "room-3".to_string(),
+                "room-4".to_string(),
+                "room-5".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn normalize_multi_room_selection_drops_invalid_last_send_room_id() {
+        for last_room_id in ["", "0", "-1", "1.5", "1e3", "abc"] {
+            let mut config: AppConfig = serde_json::from_value(json!({
+                "send": { "lastRoomId": last_room_id }
+            }))
+            .expect("config");
+
+            normalize_app_config(&mut config);
+
+            assert!(config.send.last_room_id.is_none(), "{last_room_id}");
+        }
     }
 
     #[test]

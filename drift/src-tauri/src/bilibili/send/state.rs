@@ -1,13 +1,10 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::bilibili::types::DanmakuStatus;
-
 pub(super) const SEND_COOLDOWN: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
 pub struct SendDanmakuState {
-    current_room: Mutex<CurrentRoomState>,
     last_attempt_at: Mutex<Option<Instant>>,
     last_result: Mutex<LastSendDiagnostic>,
 }
@@ -15,7 +12,6 @@ pub struct SendDanmakuState {
 impl Default for SendDanmakuState {
     fn default() -> Self {
         Self {
-            current_room: Mutex::new(CurrentRoomState::default()),
             last_attempt_at: Mutex::new(None),
             last_result: Mutex::new(LastSendDiagnostic::default()),
         }
@@ -23,37 +19,6 @@ impl Default for SendDanmakuState {
 }
 
 impl SendDanmakuState {
-    pub(super) fn sync_status(&self, event: &DanmakuStatus) -> Result<(), String> {
-        let mut current_room = self
-            .current_room
-            .lock()
-            .map_err(|error| format!("发送状态读取失败：{}", error))?;
-
-        if event.status == "connected" && event.room_id.is_none() {
-            return Ok(());
-        }
-
-        current_room.status = event.status.clone();
-        current_room.room_id = event.room_id;
-        current_room.anchor_name = event.anchor_name.clone();
-        current_room.live_status = event.live_status;
-
-        if event.room_id.is_none() && event.status != "connected" {
-            current_room.room_id = None;
-            current_room.anchor_name = None;
-            current_room.live_status = None;
-        }
-
-        Ok(())
-    }
-
-    pub(super) fn room_snapshot(&self) -> Result<CurrentRoomState, String> {
-        self.current_room
-            .lock()
-            .map(|room| room.clone())
-            .map_err(|error| format!("发送状态读取失败：{}", error))
-    }
-
     pub(super) fn mark_attempt(&self, now: Instant) -> Result<(), String> {
         let mut last_attempt_at = self
             .last_attempt_at
@@ -96,25 +61,6 @@ impl SendDanmakuState {
             .lock()
             .map(|result| result.clone())
             .unwrap_or_default()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CurrentRoomState {
-    pub(super) status: String,
-    pub(super) room_id: Option<u64>,
-    pub(super) anchor_name: Option<String>,
-    pub(super) live_status: Option<u8>,
-}
-
-impl Default for CurrentRoomState {
-    fn default() -> Self {
-        Self {
-            status: "disconnected".to_string(),
-            room_id: None,
-            anchor_name: None,
-            live_status: None,
-        }
     }
 }
 

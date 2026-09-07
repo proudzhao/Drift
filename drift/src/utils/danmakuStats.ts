@@ -27,9 +27,19 @@ const STOP_WORDS = new Set([
 
 export type DanmakuStatsEntry = {
   kind: LiveMessageKind;
+  sourceAnchorName?: string;
+  sourceFanMedalName?: string;
+  sourceRoomId?: number;
   text: string;
   timestamp: number;
   user: string;
+};
+
+export type DanmakuStatsState = {
+  entries: DanmakuStatsEntry[];
+  kindCounts: Record<LiveMessageKind, number>;
+  totalMessages: number;
+  startedAt: number;
 };
 
 export type DanmakuStatsSnapshot = {
@@ -44,12 +54,31 @@ export type DanmakuStatsSnapshot = {
   topWords: Array<{ word: string; count: number }>;
 };
 
+export type ScopedStatsState = {
+  all: DanmakuStatsState;
+  byRoom: Record<number, DanmakuStatsState>;
+};
+
+export type ScopedStatsSnapshots = {
+  all: DanmakuStatsSnapshot;
+  byRoom: Record<number, DanmakuStatsSnapshot>;
+};
+
 export function createKindCounts(): Record<LiveMessageKind, number> {
   return {
     danmaku: 0,
     gift: 0,
     guard: 0,
     super_chat: 0,
+  };
+}
+
+export function createStatsState(now = Date.now()): DanmakuStatsState {
+  return {
+    entries: [],
+    kindCounts: createKindCounts(),
+    totalMessages: 0,
+    startedAt: now,
   };
 }
 
@@ -67,6 +96,22 @@ export function createEmptyStatsSnapshot(now = Date.now()): DanmakuStatsSnapshot
   };
 }
 
+export function createScopedStatsState(now = Date.now()): ScopedStatsState {
+  return {
+    all: createStatsState(now),
+    byRoom: {},
+  };
+}
+
+export function createEmptyScopedStatsSnapshots(
+  now = Date.now(),
+): ScopedStatsSnapshots {
+  return {
+    all: createEmptyStatsSnapshot(now),
+    byRoom: {},
+  };
+}
+
 export function appendStatsEntries(
   entries: DanmakuStatsEntry[],
   kindCounts: Record<LiveMessageKind, number>,
@@ -74,15 +119,43 @@ export function appendStatsEntries(
   now = Date.now(),
 ) {
   for (const message of messages) {
-    entries.push({
-      kind: message.kind,
-      text: message.text,
-      timestamp: now,
-      user: message.user,
-    });
-    kindCounts[message.kind] += 1;
+    appendStatsMessage(entries, kindCounts, message, now);
   }
   pruneStatsEntries(entries, now);
+}
+
+export function appendScopedStats(
+  states: ScopedStatsState,
+  messages: Array<
+    LiveMessage & {
+      sourceAnchorName?: string;
+      sourceFanMedalName?: string;
+      sourceRoomId?: number;
+    }
+  >,
+  now = Date.now(),
+) {
+  for (const message of messages) {
+    appendStatsMessage(states.all.entries, states.all.kindCounts, message, now);
+    states.all.totalMessages += 1;
+
+    if (typeof message.sourceRoomId !== "number") {
+      continue;
+    }
+
+    const roomState =
+      states.byRoom[message.sourceRoomId] ??
+      (states.byRoom[message.sourceRoomId] = createStatsState(
+        states.all.startedAt,
+      ));
+    appendStatsMessage(roomState.entries, roomState.kindCounts, message, now);
+    roomState.totalMessages += 1;
+  }
+
+  pruneStatsEntries(states.all.entries, now);
+  for (const roomState of Object.values(states.byRoom)) {
+    pruneStatsEntries(roomState.entries, now);
+  }
 }
 
 export function buildStatsSnapshot(
@@ -115,6 +188,55 @@ export function buildStatsSnapshot(
       ([word, count]) => ({ word, count }),
     ),
   };
+}
+
+export function buildScopedStatsSnapshots(
+  states: ScopedStatsState,
+  now = Date.now(),
+): ScopedStatsSnapshots {
+  return {
+    all: buildStatsSnapshot(
+      states.all.entries,
+      states.all.kindCounts,
+      states.all.totalMessages,
+      states.all.startedAt,
+      now,
+    ),
+    byRoom: Object.fromEntries(
+      Object.entries(states.byRoom).map(([roomId, state]) => [
+        roomId,
+        buildStatsSnapshot(
+          state.entries,
+          state.kindCounts,
+          state.totalMessages,
+          state.startedAt,
+          now,
+        ),
+      ]),
+    ),
+  };
+}
+
+function appendStatsMessage(
+  entries: DanmakuStatsEntry[],
+  kindCounts: Record<LiveMessageKind, number>,
+  message: LiveMessage & {
+    sourceAnchorName?: string;
+    sourceFanMedalName?: string;
+    sourceRoomId?: number;
+  },
+  now: number,
+) {
+  entries.push({
+    kind: message.kind,
+    sourceAnchorName: message.sourceAnchorName,
+    sourceFanMedalName: message.sourceFanMedalName,
+    sourceRoomId: message.sourceRoomId,
+    text: message.text,
+    timestamp: now,
+    user: message.user,
+  });
+  kindCounts[message.kind] += 1;
 }
 
 function pruneStatsEntries(entries: DanmakuStatsEntry[], now: number) {

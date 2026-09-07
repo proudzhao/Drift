@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   type Dispatch,
-  type MutableRefObject,
   type SetStateAction,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -17,11 +16,17 @@ import {
 import type { AppConfig } from "../types/config";
 import type {
   DanmakuItem,
-  DanmakuStatus,
   LiveMessage,
   QueuedLiveMessage,
   VerticalChatItem,
 } from "../types/danmaku";
+import {
+  isNetworkSessionActive,
+  isSourceActive,
+  type DanmakuRoomBatch,
+  type RoomSourceOption,
+  type RoomSessionSnapshot,
+} from "../types/roomSession";
 import type { VerticalFlowStatus } from "../types/verticalFlow";
 import {
   calcDensityLimits,
@@ -38,18 +43,73 @@ import {
   resolveMessageDuration,
 } from "../utils/danmakuRuntime";
 import {
-  appendStatsEntries,
-  buildStatsSnapshot,
-  createEmptyStatsSnapshot,
-  createKindCounts,
-  type DanmakuStatsEntry,
+  appendScopedStats,
+  buildScopedStatsSnapshots,
+  createEmptyScopedStatsSnapshots,
+  createScopedStatsState,
   type DanmakuStatsSnapshot,
+  type ScopedStatsSnapshots,
 } from "../utils/danmakuStats";
 import { applyFilterConfig } from "../utils/filterRules";
 import { useVerticalChatRuntime } from "./useVerticalChatRuntime";
 
 const HISTORY_MAX = 300;
 const STATS_REFRESH_INTERVAL_MS = 1000;
+const ROOM_SOURCE_COLOR_COUNT = 5;
+
+type SourcedLiveMessage = LiveMessage &
+  Pick<
+    QueuedLiveMessage,
+    | "sourceLabel"
+    | "sourceColorIndex"
+    | "sourceSessionId"
+    | "sourceRoomId"
+    | "sourceAnchorName"
+    | "sourceFanMedalName"
+  >;
+
+function createShuffledSourceColorOrder() {
+  const order = Array.from(
+    { length: ROOM_SOURCE_COLOR_COUNT },
+    (_, index) => index,
+  );
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+  }
+  return order;
+}
+
+function syncSourceColorAssignments(
+  assignments: Map<string, number>,
+  colorOrder: number[],
+  sessions: RoomSessionSnapshot[],
+) {
+  const activeSessions = sessions.filter((session) =>
+    isSourceActive(session.status),
+  );
+  const activeSessionIds = new Set(
+    activeSessions.map((session) => session.sessionId),
+  );
+  for (const sessionId of assignments.keys()) {
+    if (!activeSessionIds.has(sessionId)) {
+      assignments.delete(sessionId);
+    }
+  }
+
+  const usedColors = new Set(assignments.values());
+  for (const session of activeSessions) {
+    if (assignments.has(session.sessionId)) {
+      continue;
+    }
+    const colorIndex = colorOrder.find((color) => !usedColors.has(color));
+    if (colorIndex === undefined) {
+      continue;
+    }
+    assignments.set(session.sessionId, colorIndex);
+    usedColors.add(colorIndex);
+  }
+}
 
 export type MockState = {
   active: boolean;
@@ -59,15 +119,15 @@ export type MockState = {
 
 type UseDanmakuRuntimeParams = {
   config: AppConfig;
-  status: DanmakuStatus;
+  roomSessions: RoomSessionSnapshot[];
+  roomSessionsReady?: boolean;
   trackCount: number;
   windowLabel: string;
 };
 
 export type UseDanmakuRuntimeResult = {
-  activeRoomIdRef: MutableRefObject<number | null>;
   clearLiveMessageState: () => void;
-  enqueueLiveMessages: (messages: LiveMessage[]) => void;
+  enqueueLiveBatch: (batch: DanmakuRoomBatch) => void;
   handleMockRateChange: (rate: number) => void;
   historySnapshot: HistoryMessage[];
   items: DanmakuItem[];
@@ -75,12 +135,14 @@ export type UseDanmakuRuntimeResult = {
   mock: MockState;
   pruneVerticalItems: (itemIds: string[]) => void;
   removeDanmakuItem: (itemId: string) => void;
+  roomSources: RoomSourceOption[];
   setShowStats: Dispatch<SetStateAction<boolean>>;
   setShowHistory: Dispatch<SetStateAction<boolean>>;
   showHistory: boolean;
   showStats: boolean;
   startMockDanmaku: () => void;
   statsSnapshot: DanmakuStatsSnapshot;
+  statsSnapshots: ScopedStatsSnapshots;
   stopMockDanmaku: () => void;
   triggerMockBurst: () => void;
   verticalFlowStatus: VerticalFlowStatus;
@@ -89,7 +151,8 @@ export type UseDanmakuRuntimeResult = {
 
 export function useDanmakuRuntime({
   config,
-  status,
+  roomSessions,
+  roomSessionsReady = true,
   trackCount,
   windowLabel,
 }: UseDanmakuRuntimeParams): UseDanmakuRuntimeResult {
@@ -99,18 +162,26 @@ export function useDanmakuRuntime({
   const pendingMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const priorityMessagesRef = useRef<QueuedLiveMessage[]>([]);
   const laneAvailableAtRef = useRef<number[]>([]);
-  const activeRoomIdRef = useRef<number | null>(null);
-  const pausedFanMedalRuleIdsRef = useRef(new Set<string>());
+  const sessionsRef = useRef(new Map<string, RoomSessionSnapshot>());
+  const sourceColorIndexBySessionRef = useRef(new Map<string, number>());
+  const sourceColorOrderRef = useRef<number[] | null>(null);
+  if (sourceColorOrderRef.current === null) {
+    sourceColorOrderRef.current = createShuffledSourceColorOrder();
+  }
+  const roomSessionsReadyRef = useRef(roomSessionsReady);
+  const hadNetworkActiveSessionRef = useRef(false);
+  const bufferedBatchesRef = useRef<DanmakuRoomBatch[]>([]);
+  const pausedRulesBySessionRef = useRef(new Map<string, Set<string>>());
+  const roomSourcesRef = useRef(new Map<number, RoomSourceOption>());
+  const displaySequenceRef = useRef(0);
   const sequenceRef = useRef(0);
   const historyRef = useRef<HistoryMessage[]>([]);
-  const statsStartedAtRef = useRef(Date.now());
-  const statsEntriesRef = useRef<DanmakuStatsEntry[]>([]);
-  const statsKindCountsRef = useRef(createKindCounts());
-  const statsTotalMessagesRef = useRef(0);
+  const scopedStatsStateRef = useRef(createScopedStatsState(Date.now()));
   const statsDirtyRef = useRef(false);
   const [historySnapshot, setHistorySnapshot] = useState<HistoryMessage[]>([]);
-  const [statsSnapshot, setStatsSnapshot] = useState(() =>
-    createEmptyStatsSnapshot(statsStartedAtRef.current),
+  const [roomSources, setRoomSources] = useState<RoomSourceOption[]>([]);
+  const [statsSnapshots, setStatsSnapshots] = useState(() =>
+    createEmptyScopedStatsSnapshots(Date.now()),
   );
   const [showHistory, setShowHistory] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -126,21 +197,21 @@ export function useDanmakuRuntime({
     () => calcDensityLimits(config.appearance.density, trackCount),
     [config.appearance.density, trackCount],
   );
-  const isConnected =
-    status.status === "connecting" ||
-    status.status === "connected" ||
-    status.status === "reconnecting";
-  const items = isConnected || mock.active ? liveItems : [];
+  const hasLiveSource = roomSessions.some(
+    (session) =>
+      session.status === "connected" || session.status === "reconnecting",
+  );
+  const items = liveItems;
   const messageFlow = config.appearance.messageFlow;
   const verticalRuntime = useVerticalChatRuntime({
     active:
       windowLabel === "main" &&
       messageFlow === "vertical" &&
-      (isConnected || mock.active),
+      (hasLiveSource || mock.active),
     density: config.appearance.density,
     policy: config.appearance.verticalOverflowPolicy,
   });
-  const verticalItems = isConnected || mock.active ? verticalRuntime.items : [];
+  const verticalItems = verticalRuntime.items;
 
   function clearHorizontalDisplayState() {
     pendingMessagesRef.current = [];
@@ -154,30 +225,27 @@ export function useDanmakuRuntime({
   function clearLiveMessageState() {
     clearHorizontalDisplayState();
     verticalRuntime.clear();
-    pausedFanMedalRuleIdsRef.current.clear();
+    pausedRulesBySessionRef.current.clear();
+    roomSourcesRef.current = new Map();
     historyRef.current = [];
     resetStats();
     setHistorySnapshot([]);
+    setRoomSources([]);
   }
 
   function resetStats() {
     const now = Date.now();
-    statsStartedAtRef.current = now;
-    statsEntriesRef.current = [];
-    statsKindCountsRef.current = createKindCounts();
-    statsTotalMessagesRef.current = 0;
+    scopedStatsStateRef.current = createScopedStatsState(now);
     statsDirtyRef.current = false;
-    setStatsSnapshot(createEmptyStatsSnapshot(now));
+    setStatsSnapshots(createEmptyScopedStatsSnapshots(now));
   }
 
-  function acceptsCurrentRoomMessage(message: LiveMessage) {
-    const activeRoomId = activeRoomIdRef.current;
-    return activeRoomId !== null && message.roomId === activeRoomId;
-  }
-
-  function filterMessages(messages: LiveMessage[]) {
+  function filterMessages(messages: SourcedLiveMessage[]) {
     const accepted: QueuedLiveMessage[] = [];
-    const newlyPausedRuleIds = new Set<string>();
+    const newlyPausedRuleIdsBySession = new Map<
+      string,
+      { roomId: number; ruleIds: Set<string> }
+    >();
     const now = Date.now();
 
     for (const message of messages) {
@@ -186,13 +254,31 @@ export function useDanmakuRuntime({
         continue;
       }
 
+      const pausedFanMedalRuleIds = message.sourceSessionId
+        ? (pausedRulesBySessionRef.current.get(message.sourceSessionId) ?? new Set())
+        : new Set<string>();
       const decision = applyFilterConfig(message, currentConfig.filter, {
-        pausedFanMedalRuleIds: pausedFanMedalRuleIdsRef.current,
+        pausedFanMedalRuleIds,
       });
       for (const ruleId of decision.pauseFanMedalRuleIds) {
-        if (!pausedFanMedalRuleIdsRef.current.has(ruleId)) {
-          pausedFanMedalRuleIdsRef.current.add(ruleId);
-          newlyPausedRuleIds.add(ruleId);
+        if (
+          message.sourceSessionId &&
+          message.sourceRoomId &&
+          !pausedFanMedalRuleIds.has(ruleId)
+        ) {
+          pausedFanMedalRuleIds.add(ruleId);
+          pausedRulesBySessionRef.current.set(
+            message.sourceSessionId,
+            pausedFanMedalRuleIds,
+          );
+          const paused = newlyPausedRuleIdsBySession.get(
+            message.sourceSessionId,
+          ) ?? { roomId: message.sourceRoomId, ruleIds: new Set<string>() };
+          paused.ruleIds.add(ruleId);
+          newlyPausedRuleIdsBySession.set(
+            message.sourceSessionId,
+            paused,
+          );
         }
       }
       if (!decision.visible) {
@@ -208,15 +294,11 @@ export function useDanmakuRuntime({
       });
     }
 
-    const activeRoomId = activeRoomIdRef.current;
-    if (
-      Number.isInteger(activeRoomId) &&
-      (activeRoomId ?? 0) > 0 &&
-      newlyPausedRuleIds.size > 0
-    ) {
+    for (const [sessionId, { roomId, ruleIds }] of newlyPausedRuleIdsBySession) {
       void invoke("pause_fan_medal_rules_for_session", {
-        roomId: activeRoomId,
-        ruleIds: [...newlyPausedRuleIds],
+        sessionId,
+        roomId,
+        ruleIds: [...ruleIds],
       }).catch(() => {
         console.warn("Failed to report paused fan medal filter rules.");
       });
@@ -230,6 +312,9 @@ export function useDanmakuRuntime({
       historyRef.current.push({
         id: msg.id,
         kind: msg.kind,
+        sourceAnchorName: msg.sourceAnchorName,
+        sourceFanMedalName: msg.sourceFanMedalName,
+        sourceRoomId: msg.sourceRoomId,
         user: msg.user,
         text: msg.text,
         timestamp: Date.now(),
@@ -251,12 +336,7 @@ export function useDanmakuRuntime({
       return;
     }
 
-    appendStatsEntries(
-      statsEntriesRef.current,
-      statsKindCountsRef.current,
-      messages,
-    );
-    statsTotalMessagesRef.current += messages.length;
+    appendScopedStats(scopedStatsStateRef.current, messages);
     statsDirtyRef.current = true;
   }
 
@@ -265,14 +345,37 @@ export function useDanmakuRuntime({
       return;
     }
 
-    const nextSnapshot = buildStatsSnapshot(
-      statsEntriesRef.current,
-      statsKindCountsRef.current,
-      statsTotalMessagesRef.current,
-      statsStartedAtRef.current,
-    );
-    setStatsSnapshot(nextSnapshot);
+    setStatsSnapshots(buildScopedStatsSnapshots(scopedStatsStateRef.current));
     statsDirtyRef.current = false;
+  }
+
+  function registerRoomSources(messages: QueuedLiveMessage[]) {
+    let changed = false;
+
+    for (const message of messages) {
+      if (typeof message.sourceRoomId !== "number") {
+        continue;
+      }
+
+      const anchorName = message.sourceAnchorName?.trim();
+      const nextOption = {
+        roomId: message.sourceRoomId,
+        label: anchorName ? `${anchorName} · ${message.sourceRoomId}` : `${message.sourceRoomId}`,
+      };
+      const previousOption = roomSourcesRef.current.get(message.sourceRoomId);
+      if (previousOption?.label === nextOption.label) {
+        continue;
+      }
+
+      roomSourcesRef.current.set(message.sourceRoomId, nextOption);
+      changed = true;
+    }
+
+    if (changed) {
+      setRoomSources(
+        [...roomSourcesRef.current.values()].sort((left, right) => left.roomId - right.roomId),
+      );
+    }
   }
 
   function enqueueMessages(messages: QueuedLiveMessage[]) {
@@ -331,8 +434,48 @@ export function useDanmakuRuntime({
     }
   }
 
-  function enqueueLiveMessages(messages: LiveMessage[]) {
-    acceptMessages(messages, true);
+  function acceptLiveBatch(batch: DanmakuRoomBatch) {
+    const session = sessionsRef.current.get(batch.sessionId);
+    if (
+      !session ||
+      session.roomId !== batch.roomId ||
+      (session.status !== "connected" && session.status !== "reconnecting") ||
+      batch.messages.some((message) => message.roomId !== batch.roomId)
+    ) {
+      return;
+    }
+
+    const sourceFanMedalName = batch.fanMedalName?.trim();
+    const sourceLabel =
+      batch.activeSourceCount >= 2 && sourceFanMedalName
+        ? sourceFanMedalName
+        : undefined;
+    const sourceColorIndex = sourceLabel
+      ? sourceColorIndexBySessionRef.current.get(batch.sessionId)
+      : undefined;
+    acceptMessages(
+      batch.messages.map((message) => ({
+        ...message,
+        id: `${batch.sessionId}:${message.id}:${displaySequenceRef.current++}`,
+        sourceLabel,
+        sourceColorIndex,
+        sourceSessionId: batch.sessionId,
+        sourceRoomId: batch.roomId,
+        sourceAnchorName: batch.anchorName,
+        sourceFanMedalName: batch.fanMedalName,
+      })),
+    );
+  }
+
+  function enqueueLiveBatch(batch: DanmakuRoomBatch) {
+    if (!roomSessionsReadyRef.current) {
+      if (bufferedBatchesRef.current.length >= 64) {
+        bufferedBatchesRef.current.shift();
+      }
+      bufferedBatchesRef.current.push(batch);
+      return;
+    }
+    acceptLiveBatch(batch);
   }
 
   function routeToDisplayScheduler(messages: QueuedLiveMessage[]) {
@@ -343,15 +486,13 @@ export function useDanmakuRuntime({
     enqueueMessages(messages);
   }
 
-  function acceptMessages(messages: LiveMessage[], requireCurrentRoom: boolean) {
-    const currentRoomMessages = requireCurrentRoom
-      ? messages.filter(acceptsCurrentRoomMessage)
-      : messages;
-    const displayMessages = filterMessages(currentRoomMessages);
+  function acceptMessages(messages: SourcedLiveMessage[]) {
+    const displayMessages = filterMessages(messages);
     if (displayMessages.length === 0) {
       return;
     }
 
+    registerRoomSources(displayMessages);
     pushToHistory(displayMessages);
     pushToStats(displayMessages);
     routeToDisplayScheduler(displayMessages);
@@ -378,7 +519,7 @@ export function useDanmakuRuntime({
 
   function triggerMockBurst() {
     const batch = generateMockBatch(80);
-    acceptMessages(batch, false);
+    acceptMessages(batch);
     setMock((prev) => ({
       ...prev,
       totalGenerated: prev.totalGenerated + batch.length,
@@ -388,6 +529,43 @@ export function useDanmakuRuntime({
   useLayoutEffect(() => {
     configRef.current = config;
   }, [config]);
+
+  useLayoutEffect(() => {
+    const hasNetworkActiveSession = roomSessions.some((session) =>
+      isNetworkSessionActive(session.status),
+    );
+    if (!hadNetworkActiveSessionRef.current && hasNetworkActiveSession) {
+      clearLiveMessageState();
+      sourceColorIndexBySessionRef.current.clear();
+      sourceColorOrderRef.current = createShuffledSourceColorOrder();
+    }
+    hadNetworkActiveSessionRef.current = hasNetworkActiveSession;
+    sessionsRef.current = new Map(
+      roomSessions.map((session) => [session.sessionId, session]),
+    );
+    const sourceColorOrder = sourceColorOrderRef.current;
+    if (sourceColorOrder !== null) {
+      syncSourceColorAssignments(
+        sourceColorIndexBySessionRef.current,
+        sourceColorOrder,
+        roomSessions,
+      );
+    }
+    roomSessionsReadyRef.current = roomSessionsReady;
+    const sessionIds = new Set(sessionsRef.current.keys());
+    for (const sessionId of pausedRulesBySessionRef.current.keys()) {
+      if (!sessionIds.has(sessionId)) {
+        pausedRulesBySessionRef.current.delete(sessionId);
+      }
+    }
+    if (!roomSessionsReady || bufferedBatchesRef.current.length === 0) {
+      return;
+    }
+    const batches = bufferedBatchesRef.current.splice(0);
+    for (const batch of batches) {
+      acceptLiveBatch(batch);
+    }
+  }, [roomSessions, roomSessionsReady]);
 
   const previousMessageFlowRef = useRef(messageFlow);
   useLayoutEffect(() => {
@@ -401,7 +579,11 @@ export function useDanmakuRuntime({
   }, [messageFlow]);
 
   useEffect(() => {
-    if (windowLabel !== "main" || messageFlow !== "horizontal") {
+    if (
+      windowLabel !== "main" ||
+      messageFlow !== "horizontal" ||
+      (!hasLiveSource && !mock.active)
+    ) {
       return;
     }
 
@@ -468,6 +650,8 @@ export function useDanmakuRuntime({
         nextItems.push({
           id: `${message.id}-${sequence}`,
           kind: message.kind,
+          sourceLabel: message.sourceLabel,
+          sourceColorIndex: message.sourceColorIndex,
           user: message.user,
           text: message.text,
           segments: message.segments,
@@ -516,14 +700,16 @@ export function useDanmakuRuntime({
     trackCount,
     windowLabel,
     messageFlow,
+    hasLiveSource,
+    mock.active,
   ]);
 
   useEffect(() => {
-    if (isConnected && mock.active) {
+    if (hasLiveSource && mock.active) {
       setMock((prev) => ({ ...prev, active: false }));
       clearLiveMessageState();
     }
-  }, [isConnected, mock.active]);
+  }, [hasLiveSource, mock.active]);
 
   useEffect(() => {
     if (showHistory) {
@@ -557,7 +743,7 @@ export function useDanmakuRuntime({
     const intervalMs = Math.max(5, Math.floor(1000 / mock.rate));
     const timer = window.setInterval(() => {
       const message = generateMockMessage();
-      acceptMessages([message], false);
+      acceptMessages([message]);
       setMock((prev) => ({
         ...prev,
         totalGenerated: prev.totalGenerated + 1,
@@ -568,9 +754,8 @@ export function useDanmakuRuntime({
   }, [mock.active, mock.rate, windowLabel]);
 
   return {
-    activeRoomIdRef,
     clearLiveMessageState,
-    enqueueLiveMessages,
+    enqueueLiveBatch,
     handleMockRateChange,
     historySnapshot,
     items,
@@ -578,12 +763,14 @@ export function useDanmakuRuntime({
     mock,
     pruneVerticalItems: verticalRuntime.prune,
     removeDanmakuItem,
+    roomSources,
     setShowStats,
     setShowHistory,
     showHistory,
     showStats,
     startMockDanmaku,
-    statsSnapshot,
+    statsSnapshot: statsSnapshots.all,
+    statsSnapshots,
     stopMockDanmaku,
     triggerMockBurst,
     verticalFlowStatus: verticalRuntime.status,

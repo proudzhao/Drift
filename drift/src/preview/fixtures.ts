@@ -1,9 +1,10 @@
 import type { AppUpdateState } from "../hooks/control/useAppUpdate";
 import { DEFAULT_APP_CONFIG, type AppConfig } from "../types/config";
 import type { FilterRule } from "../types/config";
-import type { DanmakuStatus, VerticalChatItem } from "../types/danmaku";
+import type { DanmakuItem, VerticalChatItem } from "../types/danmaku";
 import type { FilterRuntimeStatus } from "../types/filterRuntime";
 import type { DanmakuRecordingStatus } from "../types/recording";
+import type { RoomSessionSnapshot } from "../types/roomSession";
 import type { VerticalFlowStatus } from "../types/verticalFlow";
 import type { ApiTestStep } from "../components/control/DiagnosticsSettings";
 
@@ -28,11 +29,6 @@ export const PREVIEW_CONFIG: AppConfig = {
       updatedAt: "2026-08-16T00:00:00.000Z",
     },
   ],
-};
-
-export const PREVIEW_STATUS: DanmakuStatus = {
-  status: "idle",
-  message: "尚未连接直播间",
 };
 
 const PREVIEW_EMOTE_DATA_URL =
@@ -132,43 +128,229 @@ export const PREVIEW_VERTICAL_DROPPED_STATUS: VerticalFlowStatus = {
   droppedTotal: 17,
 };
 
-export const PREVIEW_CONNECTED_STATUS: DanmakuStatus = {
-  status: "connected",
-  message: "已连接直播间 123456",
-  roomId: 123456,
-  anchorName: "示例主播",
-  liveStatus: 1,
-};
-
 export const PREVIEW_RECORDING_DISABLED: DanmakuRecordingStatus = {
   enabled: false,
   state: "disabled",
-  currentFileName: null,
+  activeFiles: [],
   errorMessage: null,
 };
 
 export const PREVIEW_RECORDING_WAITING: DanmakuRecordingStatus = {
   enabled: true,
   state: "waiting",
-  currentFileName: null,
+  activeFiles: [],
   errorMessage: null,
 };
 
 export const PREVIEW_RECORDING_ACTIVE: DanmakuRecordingStatus = {
   enabled: true,
   state: "recording",
-  currentFileName: "2026-08-23-22625025-示例主播.txt",
+  activeFiles: [
+    { roomId: 6, fileName: "2026-08-27-6-主播甲.txt" },
+    { roomId: 7, fileName: "2026-08-27-7-主播乙.txt" },
+  ],
+  errorMessage: null,
+};
+
+export const PREVIEW_MULTI_ROOM_RECORDING_ACTIVE: DanmakuRecordingStatus = {
+  enabled: true,
+  state: "recording",
+  activeFiles: [
+    { roomId: 6, fileName: "2026-08-27-6-补给箱.txt" },
+    { roomId: 7, fileName: "2026-08-27-7-小海梓.txt" },
+  ],
   errorMessage: null,
 };
 
 export const PREVIEW_RECORDING_ERROR: DanmakuRecordingStatus = {
   enabled: true,
   state: "error",
-  currentFileName: null,
+  activeFiles: [],
   errorMessage: "记录目录无访问权限，记录已暂停",
 };
 
 export const PREVIEW_THEME_SAVE_ERROR = "主题保存失败，已恢复原主题";
+
+export const PREVIEW_MULTI_ROOM_CONFIG: AppConfig = {
+  ...PREVIEW_CONFIG,
+  savedRooms: [
+    {
+      id: "preview-room-6",
+      roomId: "6",
+      displayName: "午夜电台",
+      anchorName: "补给箱",
+      groupId: "chat",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    },
+    {
+      id: "preview-room-7",
+      roomId: "7",
+      displayName: "清晨练歌",
+      anchorName: "小海梓",
+      groupId: "chat",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    },
+    {
+      id: "preview-room-8",
+      roomId: "8",
+      displayName: "周末联机",
+      anchorName: "像素阿遥",
+      groupId: "game",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    },
+    {
+      id: "preview-room-9",
+      roomId: "9",
+      displayName: "午后茶会",
+      anchorName: "薄荷研究员",
+      groupId: "vtuber",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    },
+    {
+      id: "preview-room-10",
+      roomId: "10",
+      displayName: "夜航观测",
+      anchorName: "星图事务所",
+      groupId: "event",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    },
+  ],
+  selectedSavedRoomIds: ["preview-room-6", "preview-room-7"],
+};
+
+export const PREVIEW_MULTI_ROOM_SAVED_SESSIONS: RoomSessionSnapshot[] = [
+  {
+    sessionId: "preview-session-6",
+    requestedRoomId: 6,
+    roomId: 6,
+    anchorName: "补给箱",
+    fanMedalName: "补给箱",
+    status: "connected",
+    message: "已连接直播间 6",
+    liveStatus: 1,
+  },
+  {
+    sessionId: "preview-session-7",
+    requestedRoomId: 7,
+    roomId: 7,
+    anchorName: "小海梓",
+    fanMedalName: "小海梓",
+    status: "reconnecting",
+    message: "网络波动，正在重连直播间 7",
+    liveStatus: 1,
+  },
+  {
+    sessionId: "preview-session-8",
+    requestedRoomId: 8,
+    roomId: 8,
+    anchorName: "像素阿遥",
+    status: "not_live",
+    message: "直播间 8 当前未开播",
+    liveStatus: 0,
+  },
+  {
+    sessionId: "preview-session-9",
+    requestedRoomId: 9,
+    roomId: 9,
+    anchorName: "薄荷研究员",
+    status: "error",
+    message: "获取弹幕服务器失败，请稍后重试",
+  },
+  {
+    sessionId: "preview-session-10",
+    requestedRoomId: 10,
+    roomId: 10,
+    anchorName: "星图事务所",
+    status: "disconnected",
+    message: "直播间 10 已断开",
+  },
+];
+
+export const PREVIEW_MULTI_ROOM_TEMPORARY_SESSIONS: RoomSessionSnapshot[] = [
+  {
+    sessionId: "preview-session-9527",
+    requestedRoomId: 9527,
+    roomId: 9527,
+    anchorName: "巡航测试",
+    fanMedalName: "巡航测试",
+    status: "connected",
+    message: "临时房间 9527 已连接",
+    liveStatus: 1,
+  },
+];
+
+export const PREVIEW_MULTI_ROOM_HORIZONTAL_ITEMS: DanmakuItem[] = [
+  {
+    id: "horizontal-multi-room-medal",
+    kind: "danmaku",
+    sourceLabel: "补给箱",
+    sourceColorIndex: 0,
+    user: "牌友一号",
+    text: "粉丝牌样式保持",
+    currentRoomFanMedalLevel: 13,
+    track: 0,
+    duration: 18,
+    delay: 0,
+    createdAt: 1,
+  },
+  {
+    id: "horizontal-multi-room-followed-sc",
+    kind: "super_chat",
+    sourceLabel: "小海梓",
+    sourceColorIndex: 1,
+    user: "关注对象",
+    text: "关注 SC 样式保持",
+    superChatPrice: 30,
+    superChatColor: "#e2b52b",
+    followedUser: true,
+    track: 1,
+    duration: 18,
+    delay: 0.3,
+    createdAt: 2,
+  },
+  {
+    id: "horizontal-multi-room-plain",
+    kind: "danmaku",
+    user: "普通观众",
+    text: "无标签消息保持语义",
+    track: 2,
+    duration: 18,
+    delay: 0.6,
+    createdAt: 3,
+  },
+];
+
+export const PREVIEW_MULTI_ROOM_VERTICAL_ITEMS: VerticalChatItem[] = [
+  {
+    id: "vertical-multi-room-medal",
+    kind: "danmaku",
+    sourceLabel: "补给箱",
+    sourceColorIndex: 0,
+    user: "牌友一号",
+    text: "粉丝牌样式保持",
+    currentRoomFanMedalLevel: 13,
+    createdAt: 1,
+  },
+  {
+    id: "vertical-multi-room-followed-sc",
+    kind: "super_chat",
+    sourceLabel: "小海梓",
+    sourceColorIndex: 1,
+    user: "关注对象",
+    text: "关注 SC 样式保持",
+    superChatPrice: 30,
+    superChatColor: "#e2b52b",
+    followedUser: true,
+    createdAt: 2,
+  },
+  {
+    id: "vertical-multi-room-plain",
+    kind: "danmaku",
+    user: "普通观众",
+    text: "无标签消息保持语义",
+    createdAt: 3,
+  },
+];
 
 export const PREVIEW_FILTER_RULES: FilterRule[] = [
   {
@@ -219,9 +401,13 @@ export const PREVIEW_FILTER_RULES: FilterRule[] = [
 ];
 
 export const PREVIEW_FILTER_RUNTIME_STATUS: FilterRuntimeStatus = {
-  roomId: 123456,
-  pausedFanMedalRuleIds: ["preview-fan-medal"],
-  pauseReason: "fan_medal_protocol_unknown",
+  rooms: [
+    {
+      roomId: 123456,
+      pausedFanMedalRuleIds: ["preview-fan-medal"],
+      pauseReason: "fan_medal_protocol_unknown",
+    },
+  ],
 };
 
 export const PREVIEW_DIAGNOSTIC_STEPS: ApiTestStep[] = [

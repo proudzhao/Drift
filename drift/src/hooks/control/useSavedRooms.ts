@@ -7,23 +7,18 @@ import {
   type SavedRoomGroup,
   type SavedRoom,
 } from "../../types/config";
-import type { DanmakuStatus } from "../../types/danmaku";
 import type { AppConfigUpdater } from "./useControlConfig";
 
 type UseSavedRoomsParams = {
   config: AppConfig;
   draftRoomId: string;
   saveConfig: (updater: AppConfigUpdater) => Promise<void>;
-  setDraftRoomId: (roomId: string) => void;
-  status: DanmakuStatus;
 };
 
 export function useSavedRooms({
   config,
   draftRoomId,
   saveConfig,
-  setDraftRoomId,
-  status,
 }: UseSavedRoomsParams) {
   const [editingSavedRoom, setEditingSavedRoom] =
     useState<EditingSavedRoom | null>(null);
@@ -55,7 +50,11 @@ export function useSavedRooms({
   }, [config.savedRoomGroups, selectedSavedRoomGroupId]);
 
   async function saveCurrentRoom() {
-    const roomId = draftRoomId.trim();
+    await saveRoom(draftRoomId);
+  }
+
+  async function saveRoom(roomId: string, anchorName?: string) {
+    roomId = roomId.trim();
     if (!isValidRoomId(roomId)) {
       setSavedRoomError("请输入有效的直播间房间号");
       return;
@@ -63,7 +62,7 @@ export function useSavedRooms({
 
     setSavedRoomError("");
     const now = new Date().toISOString();
-    const roomName = status.anchorName?.trim();
+    const roomName = anchorName?.trim();
     const displayName =
       roomName && roomName !== "未知" ? roomName : `房间 ${roomId}`;
     await saveConfig((current) => {
@@ -101,11 +100,6 @@ export function useSavedRooms({
     });
   }
 
-  function selectSavedRoom(room: SavedRoom) {
-    setDraftRoomId(room.roomId);
-    setSavedRoomError("");
-  }
-
   async function deleteSavedRoom(savedRoomId: string) {
     if (editingSavedRoom?.id === savedRoomId) {
       setEditingSavedRoom(null);
@@ -114,6 +108,9 @@ export function useSavedRooms({
     await saveConfig((current) => ({
       ...current,
       savedRooms: current.savedRooms.filter((room) => room.id !== savedRoomId),
+      selectedSavedRoomIds: current.selectedSavedRoomIds.filter(
+        (roomId) => roomId !== savedRoomId,
+      ),
     }));
   }
 
@@ -266,8 +263,8 @@ export function useSavedRooms({
     savedRoomError,
     savedRoomSearchQuery,
     saveCurrentRoom,
+    saveRoom,
     saveEditedRoom,
-    selectSavedRoom,
     selectedSavedRoomGroupId,
     setEditingSavedRoom,
     setSavedRoomSearchQuery,

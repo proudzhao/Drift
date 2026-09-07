@@ -12,6 +12,7 @@ test("provides stable control page preview scenarios", () => {
     "default",
     "room-empty",
     "room-connected",
+    "control-room-multi",
     "control-recording-disabled",
     "control-recording-waiting",
     "control-recording-recording",
@@ -30,6 +31,34 @@ test("provides stable control page preview scenarios", () => {
     "control-display-vertical-dropped",
   ]);
   expect(getControlPageScenario("missing").id).toBe("default");
+});
+
+test("renders the multi-room control scenario through the real room settings", () => {
+  render(<ControlPageScenarioPreview scenarioId="control-room-multi" />);
+
+  expect(
+    screen.getByText("5 个 · 已选 2/5"),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "连接已选房间" })).toBeEnabled();
+  expect(screen.getByText("已连接 1 · 重连中 1 · 未开播 1 · 连接失败 1 · 已断开 1")).toBeVisible();
+  expect(screen.getByText("记录中 · 2 个房间")).toBeVisible();
+  expect(screen.getByText("2026-08-27-6-补给箱.txt")).toBeVisible();
+  expect(screen.getByText("2026-08-27-7-小海梓.txt")).toBeVisible();
+  expect(screen.getByRole("switch", { name: "加入多房间 午夜电台" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  expect(screen.getByRole("switch", { name: "加入多房间 清晨练歌" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  expect(screen.getByRole("switch", { name: "加入多房间 周末联机" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect(screen.getByText("临时连接")).toBeVisible();
+  expect(screen.getByText("巡航测试")).toBeVisible();
+  expect(screen.getByRole("button", { name: "保存房间 9527 为常用" })).toBeVisible();
 });
 
 test("shows the complete vertical policy with backlog and drops", () => {
@@ -70,6 +99,11 @@ test.each<{
     expectedText: "已连接",
   },
   {
+    scenarioId: "control-room-multi",
+    heading: "直播间",
+    expectedText: "记录中 · 2 个房间",
+  },
+  {
     scenarioId: "control-recording-disabled",
     heading: "直播间",
     expectedText: "关闭",
@@ -82,7 +116,7 @@ test.each<{
   {
     scenarioId: "control-recording-recording",
     heading: "直播间",
-    expectedText: "2026-08-23-22625025-示例主播.txt",
+    expectedText: "2026-08-27-6-主播甲.txt",
   },
   {
     scenarioId: "control-recording-error",
@@ -117,7 +151,8 @@ test.each<{
   {
     scenarioId: "control-filter-runtime-warning",
     heading: "过滤规则",
-    expectedText: "粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试",
+    expectedText:
+      "示例主播 · 123456 的粉丝牌协议无法确认，本次连接已暂停相关规则；重新连接后重试",
   },
   {
     scenarioId: "diagnostics-expanded",

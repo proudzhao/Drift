@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { LiveMessageKind } from "../types/danmaku";
-import { IconButton, Input, Tooltip, TooltipProvider } from "./ui";
+import type { RoomSourceOption } from "../types/roomSession";
+import { IconButton, Input, Select, Tooltip, TooltipProvider } from "./ui";
 
 export type HistoryMessage = {
   id: string;
   kind: LiveMessageKind;
+  sourceAnchorName?: string;
+  sourceFanMedalName?: string;
+  sourceRoomId?: number;
   user: string;
   text: string;
   timestamp: number;
@@ -15,6 +19,7 @@ type DanmakuHistoryDrawerProps = {
   initialQuery?: string;
   messages: HistoryMessage[];
   onClose: () => void;
+  roomSources: RoomSourceOption[];
 };
 
 type CopyFeedback = {
@@ -26,20 +31,35 @@ export function DanmakuHistoryDrawer({
   initialQuery = "",
   messages,
   onClose,
+  roomSources,
 }: DanmakuHistoryDrawerProps) {
   const [query, setQuery] = useState(initialQuery);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | "all">("all");
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>(null);
   const copyTimerRef = useRef<number | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (
+      selectedRoomId !== "all" &&
+      !roomSources.some((source) => source.roomId === selectedRoomId)
+    ) {
+      setSelectedRoomId("all");
+    }
+  }, [roomSources, selectedRoomId]);
+
   const normalizedQuery = query.trim().toLowerCase();
+  const roomFiltered =
+    selectedRoomId === "all"
+      ? messages
+      : messages.filter((msg) => msg.sourceRoomId === selectedRoomId);
   const filtered = normalizedQuery
-    ? messages.filter(
+    ? roomFiltered.filter(
         (msg) =>
           msg.text.toLowerCase().includes(normalizedQuery) ||
           msg.user.toLowerCase().includes(normalizedQuery),
       )
-    : messages;
+    : roomFiltered;
 
   useLayoutEffect(() => {
     if (!query.trim()) {
@@ -103,6 +123,26 @@ export function DanmakuHistoryDrawer({
           role="searchbox"
           value={query}
         />
+        <Select
+          aria-label="筛选直播间"
+          className="border-[var(--drift-ui-border)] bg-[var(--drift-ui-overlay-surface)] text-[var(--drift-ui-ink)] focus:border-[var(--drift-ui-signal)] focus:ring-[color-mix(in_srgb,var(--drift-ui-signal)_15%,transparent)]"
+          onChange={(event) =>
+            setSelectedRoomId(
+              event.currentTarget.value === "all"
+                ? "all"
+                : Number(event.currentTarget.value),
+            )
+          }
+          selectSize="sm"
+          value={selectedRoomId}
+        >
+          <option value="all">全部直播间</option>
+          {roomSources.map((source) => (
+            <option key={source.roomId} value={source.roomId}>
+              {source.label}
+            </option>
+          ))}
+        </Select>
         <div className="overlay-drawer-scroll min-h-0 overflow-y-auto [scrollbar-color:var(--drift-ui-overlay-scrollbar)_transparent] [scrollbar-width:thin]">
           {filtered.length === 0 ? (
             <p className="drift-theme-transition overlay-empty-copy m-0 py-6 text-center text-[11px] text-[var(--drift-ui-muted)]">
@@ -145,7 +185,7 @@ export function DanmakuHistoryDrawer({
         <footer className="drift-theme-transition overlay-drawer-footer text-[10px] text-[var(--drift-ui-muted)]">
           {query.trim()
             ? `${filtered.length} 条匹配`
-            : `最近 ${messages.length} 条`}
+            : `最近 ${roomFiltered.length} 条`}
         </footer>
       </aside>
     </TooltipProvider>

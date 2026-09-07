@@ -22,6 +22,10 @@ export function DanmakuMessageContent({
   if (item.kind === "super_chat") {
     return (
       <span className="danmaku-super-chat-content">
+        <SourceLabel
+          colorIndex={item.sourceColorIndex}
+          label={item.sourceLabel}
+        />
         <span className="danmaku-super-chat-badge">
           {item.superChatPrice ? `SC ¥${item.superChatPrice}` : "SC"}
         </span>
@@ -35,6 +39,10 @@ export function DanmakuMessageContent({
 
   return (
     <span className="danmaku-content">
+      <SourceLabel
+        colorIndex={item.sourceColorIndex}
+        label={item.sourceLabel}
+      />
       {shouldShowUsername && item.user ? (
         <span className="danmaku-user-prefix">{item.user}: </span>
       ) : null}
@@ -49,6 +57,23 @@ export function DanmakuMessageContent({
       )}
     </span>
   );
+}
+
+function SourceLabel({
+  colorIndex,
+  label,
+}: {
+  colorIndex?: number;
+  label?: string;
+}) {
+  return label ? (
+    <span
+      className="danmaku-room-source"
+      data-source-color={colorIndex ?? 0}
+    >
+      {label}
+    </span>
+  ) : null;
 }
 
 function stripRenderedUserPrefix(

@@ -1,7 +1,7 @@
 use crate::bilibili::cookies::BilibiliCookieBundle;
+use crate::bilibili::room_manager::{RoomSessionSnapshot, RoomSessionStatus};
 use crate::bilibili::session;
 
-use super::state::CurrentRoomState;
 use super::SendDanmakuStatus;
 
 pub(super) const TEXT_LIMIT: usize = 60;
@@ -16,12 +16,12 @@ pub(super) struct SendRequestContext {
 
 pub(super) fn build_send_context(
     text: &str,
-    room: CurrentRoomState,
+    room: RoomSessionSnapshot,
     bundle: Option<&BilibiliCookieBundle>,
     now: i64,
 ) -> Result<SendRequestContext, String> {
     let text = validate_text(text)?;
-    let room_id = validate_room(room)?;
+    let room_id = validate_target(Some(room))?;
     let bundle = validate_bundle(bundle, now)?;
 
     Ok(SendRequestContext {
@@ -33,35 +33,23 @@ pub(super) fn build_send_context(
 }
 
 pub(super) fn build_send_status(
-    room: CurrentRoomState,
+    room: Option<RoomSessionSnapshot>,
     bundle: Option<&BilibiliCookieBundle>,
     now: i64,
     cooldown_ms: u64,
 ) -> SendDanmakuStatus {
-    let room_id = room.room_id;
-    let anchor_name = room.anchor_name.clone();
-    let status = room.status.clone();
+    let room_id = room.as_ref().and_then(|snapshot| snapshot.room_id);
+    let anchor_name = room
+        .as_ref()
+        .and_then(|snapshot| snapshot.anchor_name.clone());
+    let status = room.as_ref().map(|snapshot| snapshot.status);
 
-    if let Err(reason) = validate_room(room) {
-        return SendDanmakuStatus {
-            can_send: false,
-            reason,
-            room_id,
-            anchor_name,
-            status,
-            cooldown_ms: 0,
-        };
+    if let Err(reason) = validate_target(room) {
+        return unavailable_status(room_id, anchor_name, status, reason);
     }
 
     if let Err(reason) = validate_bundle(bundle, now) {
-        return SendDanmakuStatus {
-            can_send: false,
-            reason,
-            room_id,
-            anchor_name,
-            status,
-            cooldown_ms: 0,
-        };
+        return unavailable_status(room_id, anchor_name, status, reason);
     }
 
     if cooldown_ms > 0 {
@@ -98,18 +86,49 @@ pub(super) fn validate_text(text: &str) -> Result<String, String> {
     Ok(text.to_string())
 }
 
-pub(super) fn validate_room(room: CurrentRoomState) -> Result<u64, String> {
-    if room.status != "connected" {
-        return Err(match room.status.as_str() {
-            "not_live" => "当前直播间未开播，暂不能发送".to_string(),
-            "connecting" | "reconnecting" => "直播间正在连接，请稍后再发送".to_string(),
-            _ => "请先连接直播间".to_string(),
-        });
+pub(super) fn validate_target(room: Option<RoomSessionSnapshot>) -> Result<u64, String> {
+    let Some(room) = room else {
+        return Err("请选择发送目标".to_string());
+    };
+
+    match room.status {
+        RoomSessionStatus::Connected => {}
+        RoomSessionStatus::Connecting => {
+            return Err("目标直播间正在连接，请稍后再发送".to_string());
+        }
+        RoomSessionStatus::Reconnecting => {
+            return Err("目标直播间正在重连，请稍后再发送".to_string());
+        }
+        RoomSessionStatus::NotLive => {
+            return Err("当前直播间未开播，暂不能发送".to_string());
+        }
+        RoomSessionStatus::InvalidRoom => {
+            return Err("目标直播间不可用，请重新连接".to_string());
+        }
+        RoomSessionStatus::Error => {
+            return Err("目标直播间连接异常，请重试".to_string());
+        }
     }
 
     match room.room_id {
         Some(room_id) => Ok(room_id),
         None => Err("当前连接缺少直播间信息，请重新连接".to_string()),
+    }
+}
+
+fn unavailable_status(
+    room_id: Option<u64>,
+    anchor_name: Option<String>,
+    status: Option<RoomSessionStatus>,
+    reason: String,
+) -> SendDanmakuStatus {
+    SendDanmakuStatus {
+        can_send: false,
+        reason,
+        room_id,
+        anchor_name,
+        status,
+        cooldown_ms: 0,
     }
 }
 

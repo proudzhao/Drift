@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import { BarChart3, Beaker, Check, History } from "lucide-react";
-import type { DanmakuStatsSnapshot } from "../utils/danmakuStats";
+import type { RoomSourceOption } from "../types/roomSession";
+import type { ScopedStatsSnapshots } from "../utils/danmakuStats";
 import { DanmakuHistoryDrawer, type HistoryMessage } from "./DanmakuHistoryDrawer";
 import { DanmakuStatsDrawer } from "./DanmakuStatsDrawer";
 import { MockDanmakuPanel } from "./MockDanmakuPanel";
@@ -36,10 +37,11 @@ type OverlayEditWorkspaceProps = {
   onShowMock: () => void;
   onToggleHistory: () => void;
   onToggleStats: () => void;
+  roomSources: RoomSourceOption[];
   shortcut: string;
   showHistory: boolean;
   showStats: boolean;
-  stats: DanmakuStatsSnapshot;
+  statsSnapshots: ScopedStatsSnapshots;
 };
 
 const RESIZE_DIRECTIONS = [
@@ -108,12 +110,14 @@ export function OverlayEditWorkspace(props: OverlayEditWorkspaceProps) {
             initialQuery={props.historyInitialQuery}
             messages={props.historyMessages}
             onClose={props.onToggleHistory}
+            roomSources={props.roomSources}
           />
         ) : null}
         {props.showStats ? (
           <DanmakuStatsDrawer
             onClose={props.onToggleStats}
-            stats={props.stats}
+            roomSources={props.roomSources}
+            snapshots={props.statsSnapshots}
           />
         ) : null}
 
