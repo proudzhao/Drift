@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
@@ -12,6 +12,7 @@ type UseRoomSessionsParams = {
 
 type UseRoomSessionsResult = {
   isInitialReady: boolean;
+  refreshSessions: () => Promise<void>;
   sessions: RoomSessionSnapshot[];
   snapshotError: string;
 };
@@ -34,17 +35,44 @@ export function useRoomSessions({
   const [sessions, setSessions] = useState<RoomSessionSnapshot[]>([]);
   const [snapshotError, setSnapshotError] = useState("");
   const [isInitialReady, setIsInitialReady] = useState(false);
+  const mountedRef = useRef(false);
+  const eventVersionRef = useRef(0);
+
+  const refreshSessions = useCallback(async () => {
+    const requestVersion = eventVersionRef.current;
+    try {
+      const snapshot = await invoke<unknown>("get_bilibili_room_sessions");
+      if (!mountedRef.current || requestVersion !== eventVersionRef.current) {
+        return;
+      }
+      const normalized = normalizeRoomSessionSnapshots(snapshot);
+      if (normalized === null) {
+        setSnapshotError(INVALID_SNAPSHOT_ERROR);
+      } else {
+        setSessions(normalized);
+        setSnapshotError("");
+      }
+      setIsInitialReady(true);
+    } catch (error) {
+      if (!mountedRef.current || requestVersion !== eventVersionRef.current) {
+        return;
+      }
+      setSnapshotError(String(error));
+      setIsInitialReady(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
+      mountedRef.current = false;
       setSessions([]);
       setSnapshotError("");
       setIsInitialReady(false);
       return;
     }
 
+    mountedRef.current = true;
     let disposed = false;
-    let receivedEvent = false;
     let unlisten: (() => void) | undefined;
 
     void (async () => {
@@ -52,7 +80,7 @@ export function useRoomSessions({
         const disposeListener = await listen<unknown>(
           "bilibili-room-sessions",
           (event) => {
-            receivedEvent = true;
+            eventVersionRef.current += 1;
             if (disposed) return;
             setIsInitialReady(true);
             const normalized = normalizeRoomSessionSnapshots(event.payload);
@@ -69,20 +97,9 @@ export function useRoomSessions({
           return;
         }
         unlisten = disposeListener;
-
-        const snapshot = await invoke<unknown>("get_bilibili_room_sessions");
-        if (disposed || receivedEvent) return;
-        const normalized = normalizeRoomSessionSnapshots(snapshot);
-        if (normalized === null) {
-          setSnapshotError(INVALID_SNAPSHOT_ERROR);
-          setIsInitialReady(true);
-          return;
-        }
-        setSessions(normalized);
-        setSnapshotError("");
-        setIsInitialReady(true);
+        await refreshSessions();
       } catch (error) {
-        if (!disposed && !receivedEvent) {
+        if (!disposed) {
           setSnapshotError(String(error));
           setIsInitialReady(true);
         }
@@ -91,11 +108,12 @@ export function useRoomSessions({
 
     return () => {
       disposed = true;
+      mountedRef.current = false;
       unlisten?.();
     };
-  }, [enabled]);
+  }, [enabled, refreshSessions]);
 
-  return { isInitialReady, sessions, snapshotError };
+  return { isInitialReady, refreshSessions, sessions, snapshotError };
 }
 
 export function normalizeRoomSessionSnapshots(

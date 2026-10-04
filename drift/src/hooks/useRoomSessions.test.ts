@@ -181,6 +181,7 @@ test("does not install a listener or request a snapshot when disabled", () => {
     sessions: [],
     snapshotError: "",
     isInitialReady: false,
+    refreshSessions: expect.any(Function),
   });
 });
 

@@ -12,6 +12,7 @@
     "test:ui:watch": "vitest",
     "test:danmaku-runtime": "node --test scripts/danmaku-runtime.test.ts",
     "test:update-error-message": "node --test scripts/update-error-message.test.ts",
+    "test:tauri-capability": "node --test scripts/tauri-capability.test.ts",
     "test:updater-script": "node --test scripts/updater-test.test.mjs",
     "updater:test": "node scripts/updater-test.mjs",
     "tauri": "tauri"

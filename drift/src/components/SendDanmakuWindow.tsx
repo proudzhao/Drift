@@ -60,7 +60,9 @@ export function SendDanmakuWindow() {
   const targetsRef = useRef<Array<{ roomId: number; label: string }>>([]);
   const disposedRef = useRef(false);
   const themeSyncVersionRef = useRef(0);
-  const { isInitialReady, sessions } = useRoomSessions({ enabled: true });
+  const { isInitialReady, refreshSessions, sessions } = useRoomSessions({
+    enabled: true,
+  });
   const [text, setText] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [status, setStatus] = useState<SendDanmakuStatus | null>(null);
@@ -474,7 +476,10 @@ export function SendDanmakuWindow() {
     window.addEventListener("mouseleave", stopManualDrag);
     const unlistenOpened = listen("send-window-opened", () => {
       focusInput();
-      void refreshThemeAndSelectionFromAuthority();
+      void (async () => {
+        await refreshSessions();
+        await refreshThemeAndSelectionFromAuthority();
+      })();
     });
 
     return () => {
@@ -488,7 +493,12 @@ export function SendDanmakuWindow() {
       stopManualDrag();
       void unlistenOpened.then((unlisten) => unlisten());
     };
-  }, [isInitialReady, refreshStatus, refreshThemeAndSelectionFromAuthority]);
+  }, [
+    isInitialReady,
+    refreshSessions,
+    refreshStatus,
+    refreshThemeAndSelectionFromAuthority,
+  ]);
 
   useEffect(() => {
     if (!status || status.cooldownMs <= 0) {

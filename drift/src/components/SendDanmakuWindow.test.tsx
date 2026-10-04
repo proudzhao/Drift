@@ -175,6 +175,46 @@ test("restores a connected last target, persists changes, sends explicit roomId,
   });
 });
 
+test("refreshes connected room targets when the send window opens", async () => {
+  let sessions: RoomSessionSnapshot[] = [];
+  let sessionSnapshotCalls = 0;
+  mockIPC((command, payload) => {
+    if (command === "load_app_config") return configSnapshot("light");
+    if (command === "get_bilibili_room_sessions") {
+      sessionSnapshotCalls += 1;
+      return sessions;
+    }
+    if (command === "get_send_danmaku_status") {
+      const roomId = payloadRoomId(payload);
+      const room = sessions.find((item) => item.roomId === roomId);
+      return statusFor(roomId, room?.anchorName);
+    }
+    return null;
+  });
+  const user = userEvent.setup();
+  render(<SendDanmakuWindow />);
+
+  const select = await screen.findByRole("combobox", {
+    name: "发送目标直播间",
+  });
+  await waitFor(() => expect(sessionSnapshotCalls).toBe(1));
+  expect(screen.queryByRole("option", { name: "主播甲 · 6" })).toBeNull();
+  await waitFor(() =>
+    expect(eventMock.handlers.has("send-window-opened")).toBe(true),
+  );
+
+  sessions = [roomSession(6, "主播甲")];
+  eventMock.emit("send-window-opened", undefined);
+
+  await waitFor(() =>
+    expect(screen.getByRole("option", { name: "主播甲 · 6" })).toBeVisible(),
+  );
+  expect(sessionSnapshotCalls).toBe(2);
+  expect(select).toHaveValue("");
+  await user.selectOptions(select, "6");
+  expect(select).toHaveValue("6");
+});
+
 test("clears only the removed target selection without fallback or input loss", async () => {
   let sessions = [roomSession(6, "主播甲"), roomSession(7, "主播乙")];
   mockIPC((command, payload) => {
