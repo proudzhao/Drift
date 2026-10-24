@@ -131,6 +131,76 @@ test("keeps horizontal emote DOM and text fallback behavior", () => {
   expect(screen.getByText("[小电视]")).toHaveClass("danmaku-text-segment");
 });
 
+test("renders only marked room emotes with the large visual treatment", () => {
+  const { container } = renderTrack(
+    item({
+      segments: [
+        {
+          type: "emote",
+          text: "无辜啾",
+          url: "https://example.test/room.png",
+          isLarge: true,
+        },
+        {
+          type: "emote",
+          text: "[妙]",
+          url: "https://example.test/emoji.png",
+        },
+      ],
+    }),
+  );
+  const emotes = container.querySelectorAll(".danmaku-emote");
+
+  expect(emotes[0]).toHaveClass("is-large");
+  expect(emotes[1]).not.toHaveClass("is-large");
+  expect(appCss).toMatch(
+    /\.danmaku-emote\.is-large\s*\{[^}]*height:\s*2\.4em;[^}]*max-height:\s*52px;/s,
+  );
+});
+
+test("bottom-aligns a large emote only on the final horizontal track", () => {
+  const largeEmote = {
+    segments: [
+      {
+        type: "emote" as const,
+        text: "无辜啾",
+        url: "https://example.test/room.png",
+        isLarge: true,
+      },
+    ],
+  };
+  const finalTrack = renderTrack(item({ ...largeEmote, track: 2 }));
+  const finalRoot = finalTrack.container.querySelector(".danmaku");
+
+  expect(finalRoot).toHaveStyle({ bottom: "0px" });
+  expect(finalRoot).not.toHaveStyle({ top: "92px" });
+  finalTrack.unmount();
+
+  const upperTrack = renderTrack(item({ ...largeEmote, track: 1 }));
+  expect(upperTrack.container.querySelector(".danmaku")).toHaveStyle({
+    top: "54px",
+  });
+  upperTrack.unmount();
+
+  const regularFinalTrack = renderTrack(item({ track: 2 }));
+  expect(regularFinalTrack.container.querySelector(".danmaku")).toHaveStyle({
+    top: "92px",
+  });
+  regularFinalTrack.unmount();
+
+  const hiddenEmotes = render(
+    <DanmakuTrack
+      item={item({ ...largeEmote, track: 2 })}
+      showEmotes={false}
+      showUsername={false}
+      trackCount={3}
+    />,
+  );
+  expect(hiddenEmotes.container.querySelector(".danmaku")).toHaveStyle({
+    top: "92px",
+  });
+});
+
 test("keeps horizontal positioning, timing and drift completion behavior", () => {
   const onDone = vi.fn();
   const { container } = render(
@@ -153,6 +223,20 @@ test("keeps horizontal positioning, timing and drift completion behavior", () =>
   expect(onDone).not.toHaveBeenCalled();
   fireAnimationEnd(root as Element, "drift-across");
   expect(onDone).toHaveBeenCalledWith("message");
+});
+
+test("uses a compact first-track offset below online counts", () => {
+  const { container } = render(
+    <DanmakuTrack
+      item={item({ track: 0 })}
+      showEmotes
+      showUsername={false}
+      topOffset={4}
+      trackCount={3}
+    />,
+  );
+
+  expect(container.querySelector(".danmaku")).toHaveStyle({ top: "4px" });
 });
 
 test("uses a fixed non-animated followed style", () => {

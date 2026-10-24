@@ -5,6 +5,7 @@ type DanmakuOverlayProps = {
   items: DanmakuItem[];
   onItemDone?: (itemId: string) => void;
   showEmotes: boolean;
+  topOffset?: number;
   trackCount: number;
   showUsername: boolean;
 };
@@ -14,6 +15,7 @@ export function DanmakuOverlay({
   onItemDone,
   showEmotes,
   showUsername,
+  topOffset,
   trackCount,
 }: DanmakuOverlayProps) {
   return (
@@ -28,6 +30,7 @@ export function DanmakuOverlay({
           onDone={onItemDone}
           showEmotes={showEmotes}
           showUsername={showUsername}
+          topOffset={topOffset}
           trackCount={trackCount}
         />
       ))}

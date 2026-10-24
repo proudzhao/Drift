@@ -9,6 +9,7 @@ type DanmakuTrackProps = {
   onDone?: (itemId: string) => void;
   showEmotes: boolean;
   showUsername: boolean;
+  topOffset?: number;
   trackCount: number;
 };
 
@@ -17,10 +18,19 @@ export function DanmakuTrack({
   onDone,
   showEmotes,
   showUsername,
+  topOffset = 16,
   trackCount,
 }: DanmakuTrackProps) {
   const track = item.track % trackCount;
   const isSuperChat = item.kind === "super_chat";
+  const hasVisibleLargeEmote = Boolean(
+    showEmotes &&
+      item.segments?.some(
+        (segment) =>
+          segment.type === "emote" && Boolean(segment.url) && segment.isLarge,
+      ),
+  );
+  const anchorToBottom = hasVisibleLargeEmote && track === trackCount - 1;
   const superChatColor = item.superChatColor ?? "#F5A962";
   const className = [
     "danmaku",
@@ -31,13 +41,19 @@ export function DanmakuTrack({
   ]
     .filter(Boolean)
     .join(" ");
-  const style = {
-    top: `${track * TRACK_HEIGHT + 16}px`,
+  const positionStyle: CSSProperties = anchorToBottom
+    ? { bottom: "0px" }
+    : { top: `${track * TRACK_HEIGHT + topOffset}px` };
+  const style: CSSProperties & {
+    "--username-color": string;
+    "--super-chat-color"?: string;
+  } = {
+    ...positionStyle,
     animationDuration: `${item.duration}s`,
     animationDelay: `${item.delay}s`,
     "--username-color": resolveUsernameColor(item),
     ...(isSuperChat ? { "--super-chat-color": superChatColor } : {}),
-  } as CSSProperties;
+  };
 
   return (
     <div

@@ -11,8 +11,8 @@ use super::room_manager::{
 };
 use super::sc_dedup::SuperChatDedupWindow;
 use super::types::{
-    ConnectionResult, DanmakuRoomBatch, DeviceCookie, LiveMessage, DANMAKU_BUFFER_MAX,
-    DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
+    ConnectionResult, DanmakuRoomBatch, DeviceCookie, LiveMessage, OnlineRankCountUpdate,
+    DANMAKU_BUFFER_MAX, DANMAKU_FLUSH_INTERVAL, HEARTBEAT_INTERVAL, RECONNECT_DELAYS,
 };
 use chrono::Local;
 use futures_util::{SinkExt, StreamExt};
@@ -394,7 +394,7 @@ async fn connect_room(
             message = reader.next() => {
                 match message {
                     Some(Ok(Message::Binary(bytes))) => {
-                        let messages = protocol::handle_packet(
+                        let events = protocol::handle_packet(
                             &app,
                             &status_emitter,
                             room_id,
@@ -402,7 +402,16 @@ async fn connect_room(
                             self_uid,
                             &bytes,
                         )?;
-                        let messages = super_chat_dedup.retain_new(room_id, messages);
+                        if let Some(count) = events.online_rank_count {
+                            emit_online_rank_count_update(
+                                &app,
+                                lease,
+                                room_id,
+                                anchor_name.as_deref(),
+                                count,
+                            );
+                        }
+                        let messages = super_chat_dedup.retain_new(room_id, events.messages);
                         danmaku_buffer.extend(messages);
                         if danmaku_buffer.len() >= DANMAKU_BUFFER_MAX {
                             ensure_current(&app, lease)?;
@@ -511,6 +520,50 @@ fn emit_danmaku_batch(
     if let Err(error) = app.emit("danmaku-messages", batch) {
         error!(target: "drift::danmaku", error = %error, "danmaku-messages emit failed");
     }
+}
+
+fn emit_online_rank_count_update(
+    app: &AppHandle,
+    lease: &SessionLease,
+    room_id: u64,
+    anchor_name: Option<&str>,
+    count: u64,
+) {
+    let manager = app.state::<RoomConnectionManager>();
+    let Some(update) = build_online_rank_count_update(
+        || manager.is_current(lease),
+        lease.session_id.clone(),
+        room_id,
+        anchor_name,
+        count,
+    ) else {
+        return;
+    };
+    if let Err(error) = app.emit("bilibili-online-rank-count", update) {
+        error!(target: "drift::bilibili.online_rank", error = %error, "online rank count emit failed");
+    }
+}
+
+fn build_online_rank_count_update(
+    is_current: impl Fn() -> bool,
+    session_id: String,
+    room_id: u64,
+    anchor_name: Option<&str>,
+    count: u64,
+) -> Option<OnlineRankCountUpdate> {
+    if !is_current() {
+        return None;
+    }
+    let anchor_name = anchor_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned);
+    is_current().then_some(OnlineRankCountUpdate {
+        session_id,
+        room_id,
+        anchor_name,
+        count,
+    })
 }
 
 fn build_danmaku_room_batch(
@@ -638,6 +691,36 @@ mod tests {
         assert_eq!(batch.room_id, 6);
         assert_eq!(batch.active_source_count, 2);
         assert_eq!(batch.messages.len(), 1);
+    }
+
+    #[test]
+    fn online_rank_builder_rejects_stale_lease_and_returns_safe_envelope() {
+        assert!(build_online_rank_count_update(
+            || false,
+            "stale-session".to_string(),
+            6,
+            Some("主播"),
+            12000,
+        )
+        .is_none());
+
+        let update = build_online_rank_count_update(
+            || true,
+            "session-1".to_string(),
+            6,
+            Some(" 主播 "),
+            12000,
+        )
+        .expect("current lease update");
+        let value = serde_json::to_value(update).expect("json");
+
+        assert_eq!(value["sessionId"], "session-1");
+        assert_eq!(value["roomId"], 6);
+        assert_eq!(value["anchorName"], "主播");
+        assert_eq!(value["count"], 12000);
+        for forbidden in ["generation", "anchorUid", "cookie", "token"] {
+            assert!(value.get(forbidden).is_none());
+        }
     }
 
     struct CancellationSignal(Option<oneshot::Sender<()>>);

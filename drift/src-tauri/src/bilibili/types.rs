@@ -130,6 +130,8 @@ pub struct LiveMessageSegment {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_large: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -165,6 +167,16 @@ pub struct DanmakuRoomBatch {
     pub fan_medal_name: Option<String>,
     pub active_source_count: usize,
     pub messages: Vec<LiveMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OnlineRankCountUpdate {
+    pub session_id: String,
+    pub room_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_name: Option<String>,
+    pub count: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]

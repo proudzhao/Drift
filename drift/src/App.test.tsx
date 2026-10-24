@@ -255,6 +255,65 @@ test("renders only the horizontal overlay for the default flow", async () => {
   ).not.toBeInTheDocument();
 });
 
+test("renders current multi-room online rank counts and removes disconnected rooms", async () => {
+  roomSessionsMock.sessions = [
+    {
+      sessionId: "s2",
+      requestedRoomId: 7,
+      roomId: 7,
+      anchorName: "小海梓",
+      status: "connected",
+      message: "connected",
+    },
+    {
+      sessionId: "s1",
+      requestedRoomId: 6,
+      roomId: 6,
+      anchorName: "补给箱",
+      status: "connected",
+      message: "connected",
+    },
+  ];
+  installIPC(false);
+  const view = render(<App />);
+
+  await waitFor(() =>
+    expect(eventMock.handlers.has("bilibili-online-rank-count")).toBe(true),
+  );
+  act(() => {
+    eventMock.handlers.get("bilibili-online-rank-count")?.({
+      payload: { sessionId: "s2", roomId: 7, count: 863 },
+    });
+    eventMock.handlers.get("bilibili-online-rank-count")?.({
+      payload: { sessionId: "s1", roomId: 6, count: 12000 },
+    });
+  });
+
+  expect(screen.getByLabelText("直播间同接数")).toHaveTextContent(
+    "同接补给箱1.2万小海梓863",
+  );
+  expect(view.container.querySelector(".danmaku-stage")).toHaveClass(
+    "has-online-rank-counts",
+  );
+
+  roomSessionsMock.sessions = [roomSessionsMock.sessions[0]];
+  view.rerender(<App />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("直播间同接数")).toHaveTextContent(
+      "同接小海梓863",
+    ),
+  );
+
+  roomSessionsMock.sessions = [];
+  view.rerender(<App />);
+  await waitFor(() =>
+    expect(screen.queryByLabelText("直播间同接数")).not.toBeInTheDocument(),
+  );
+  expect(view.container.querySelector(".danmaku-stage")).not.toHaveClass(
+    "has-online-rank-counts",
+  );
+});
+
 test("leaves connection-cycle clearing to the shared runtime", async () => {
   installIPC(false);
   const view = render(<App />);

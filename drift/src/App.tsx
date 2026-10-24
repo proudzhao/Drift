@@ -11,6 +11,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ControlPanel } from "./components/control/ControlPanel";
 import { DanmakuOverlay } from "./components/DanmakuOverlay";
+import { OnlineRankCountOverlay } from "./components/OnlineRankCountOverlay";
 import { VerticalChatOverlay } from "./components/VerticalChatOverlay";
 import {
   OverlayEditWorkspace,
@@ -18,6 +19,7 @@ import {
 } from "./components/OverlayEditWorkspace";
 import { SendDanmakuWindow } from "./components/SendDanmakuWindow";
 import { useDanmakuRuntime } from "./hooks/useDanmakuRuntime";
+import { useOnlineRankCounts } from "./hooks/useOnlineRankCounts";
 import { useRoomSessions } from "./hooks/useRoomSessions";
 import {
   DEFAULT_APP_CONFIG,
@@ -28,8 +30,8 @@ import {
 import type { DanmakuRoomBatch } from "./types/roomSession";
 import type { VerticalFlowStatus } from "./types/verticalFlow";
 import {
+  calculateTrackCount,
   MIN_TRACK_COUNT,
-  TRACK_HEIGHT,
 } from "./utils/danmakuRuntime";
 import { classNames } from "./utils/classNames";
 import {
@@ -95,6 +97,11 @@ function App() {
   const { isInitialReady: roomSessionsReady, sessions: roomSessions } = useRoomSessions({
     enabled: windowLabel === "main",
   });
+  const onlineRankCounts = useOnlineRankCounts({
+    enabled: windowLabel === "main",
+    roomSessions,
+  });
+  const hasOnlineRankCounts = onlineRankCounts.length > 0;
   const {
     enqueueLiveBatch,
     handleMockRateChange,
@@ -312,15 +319,13 @@ function App() {
     }
 
     function updateTrackCount() {
-      setTrackCount(
-        Math.max(MIN_TRACK_COUNT, Math.floor(window.innerHeight / TRACK_HEIGHT)),
-      );
+      setTrackCount(calculateTrackCount(window.innerHeight, hasOnlineRankCounts));
     }
 
     updateTrackCount();
     window.addEventListener("resize", updateTrackCount);
     return () => window.removeEventListener("resize", updateTrackCount);
-  }, [windowLabel]);
+  }, [hasOnlineRankCounts, windowLabel]);
 
   useEffect(() => {
     if (!isEditMode) {
@@ -383,21 +388,30 @@ function App() {
         } as CSSProperties
       }
     >
-      {messageFlow === "vertical" ? (
-        <VerticalChatOverlay
-          items={verticalItems}
-          onItemsPruned={pruneVerticalItems}
-          showEmotes={config.messageDisplay.showEmotes}
-        />
-      ) : (
-        <DanmakuOverlay
-          items={items}
-          onItemDone={removeDanmakuItem}
-          showEmotes={config.messageDisplay.showEmotes}
-          showUsername={config.appearance.showUsername}
-          trackCount={trackCount}
-        />
-      )}
+      <OnlineRankCountOverlay items={onlineRankCounts} />
+      <div
+        className={classNames(
+          "danmaku-stage",
+          hasOnlineRankCounts && "has-online-rank-counts",
+        )}
+      >
+        {messageFlow === "vertical" ? (
+          <VerticalChatOverlay
+            items={verticalItems}
+            onItemsPruned={pruneVerticalItems}
+            showEmotes={config.messageDisplay.showEmotes}
+          />
+        ) : (
+          <DanmakuOverlay
+            items={items}
+            onItemDone={removeDanmakuItem}
+            showEmotes={config.messageDisplay.showEmotes}
+            showUsername={config.appearance.showUsername}
+            topOffset={hasOnlineRankCounts ? 4 : 16}
+            trackCount={trackCount}
+          />
+        )}
+      </div>
       {isEditMode ? (
         <OverlayEditWorkspace
           historyMessages={historySnapshot}

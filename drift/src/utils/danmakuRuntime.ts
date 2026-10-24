@@ -8,6 +8,7 @@ import type {
 export const DANMAKU_FLUSH_INTERVAL_MS = 500;
 export const MIN_TRACK_COUNT = 3;
 export const TRACK_HEIGHT = 38;
+export const ONLINE_RANK_BAR_HEIGHT = 22;
 export const MAX_PENDING_QUEUE = 200;
 export const MAX_REQUEUE_ROUNDS = 6;
 export const MAX_REQUEUE_LATENCY_MS = 3000;
@@ -15,6 +16,8 @@ export const MAX_REQUEUE_LATENCY_MS = 3000;
 const MIN_LANE_GAP_PX = 120;
 const EMOTE_RENDER_HEIGHT_RATIO = 1.55;
 const EMOTE_RENDER_MAX_HEIGHT = 34;
+const LARGE_EMOTE_RENDER_HEIGHT_RATIO = 2.4;
+const LARGE_EMOTE_RENDER_MAX_HEIGHT = 52;
 const EMOTE_FALLBACK_WIDTH_RATIO = 1.8;
 const SEGMENT_GAP_PX = 2;
 const SUPER_CHAT_HORIZONTAL_CHROME_PX = 44;
@@ -37,6 +40,17 @@ const DENSITY_PER_TRACK: Record<
   medium: { itemsPerTrack: 3.0, perFlushPerTrack: 0.5 },
   high: { itemsPerTrack: 5.0, perFlushPerTrack: 1.0 },
 };
+
+export function calculateTrackCount(
+  windowHeight: number,
+  hasOnlineRankCounts: boolean,
+) {
+  const availableHeight = Math.max(
+    0,
+    windowHeight - (hasOnlineRankCounts ? ONLINE_RANK_BAR_HEIGHT : 0),
+  );
+  return Math.max(MIN_TRACK_COUNT, Math.floor(availableHeight / TRACK_HEIGHT));
+}
 
 export function calcDensityLimits(
   density: Density,
@@ -116,14 +130,18 @@ function estimateSegmentWidth(segment: LiveMessageSegment, fontSize: number) {
     return estimateTextWidth(segment.text, fontSize);
   }
 
-  const renderedHeight = Math.min(
-    fontSize * EMOTE_RENDER_HEIGHT_RATIO,
-    EMOTE_RENDER_MAX_HEIGHT,
-  );
+  const renderedHeight = segment.isLarge
+    ? Math.min(
+        fontSize * LARGE_EMOTE_RENDER_HEIGHT_RATIO,
+        LARGE_EMOTE_RENDER_MAX_HEIGHT,
+      )
+    : Math.min(fontSize * EMOTE_RENDER_HEIGHT_RATIO, EMOTE_RENDER_MAX_HEIGHT);
   if (segment.width && segment.height && segment.height > 0) {
     return (segment.width / segment.height) * renderedHeight;
   }
-  return fontSize * EMOTE_FALLBACK_WIDTH_RATIO;
+  return segment.isLarge
+    ? renderedHeight
+    : fontSize * EMOTE_FALLBACK_WIDTH_RATIO;
 }
 
 export function laneCooldownMs(width: number, durationSeconds: number) {

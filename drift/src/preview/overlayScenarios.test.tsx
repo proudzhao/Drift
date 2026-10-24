@@ -58,6 +58,9 @@ test("renders the multi-room horizontal overlay with two source labels and one u
     "--username-color": "#bd6686",
   });
   expect(screen.getByText("SC ¥30")).toBeInTheDocument();
+  expect(screen.getByLabelText("直播间同接数")).toHaveTextContent(
+    "同接主播甲1.2万主播乙863",
+  );
   expect(
     screen.getByText("关注 SC 样式保持").closest(".danmaku"),
   ).toHaveClass("is-followed");
@@ -68,7 +71,9 @@ test("renders the multi-room vertical overlay with two source labels and one unl
     <OverlayScenarioPreview scenarioId="overlay-vertical-multi-room" />,
   );
 
-  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+  expect(
+    screen.getByLabelText("Drift vertical chat").parentElement?.parentElement,
+  ).toHaveStyle({
     height: "220px",
     width: "560px",
   });
@@ -139,7 +144,9 @@ test("renders the mixed vertical fixture through the real overlay", () => {
     "is-self",
   );
   expect(screen.getByAltText("[微笑]")).toBeInTheDocument();
-  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+  expect(
+    screen.getByLabelText("Drift vertical chat").parentElement?.parentElement,
+  ).toHaveStyle({
     "--danmaku-font-size": "14px",
     height: "220px",
     width: "1280px",
@@ -166,7 +173,9 @@ test("keeps the complete long vertical message in the narrow fixture", () => {
       "这是一条需要完整换行的中文消息 EnglishLongTokenWithoutSpaces https://example.com/very/long/path",
     ),
   ).toBeInTheDocument();
-  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+  expect(
+    screen.getByLabelText("Drift vertical chat").parentElement?.parentElement,
+  ).toHaveStyle({
     "--danmaku-font-size": "14px",
     height: "160px",
     width: "320px",
@@ -187,7 +196,9 @@ test("combines the edit workspace and real vertical overlay in backlog", () => {
   ).toEqual(
     Array.from({ length: 18 }, (_, index) => `vertical-backlog-${index + 1}`),
   );
-  expect(screen.getByLabelText("Drift vertical chat").parentElement).toHaveStyle({
+  expect(
+    screen.getByLabelText("Drift vertical chat").parentElement?.parentElement,
+  ).toHaveStyle({
     height: "220px",
     width: "560px",
   });

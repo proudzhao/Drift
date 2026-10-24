@@ -4,15 +4,18 @@ import {
   type OverlayMockProps,
 } from "../components/OverlayEditWorkspace";
 import { DanmakuOverlay } from "../components/DanmakuOverlay";
+import { OnlineRankCountOverlay } from "../components/OnlineRankCountOverlay";
 import { VerticalChatOverlay } from "../components/VerticalChatOverlay";
 import type { HistoryMessage } from "../components/DanmakuHistoryDrawer";
 import type { DanmakuItem, VerticalChatItem } from "../types/danmaku";
+import type { OnlineRankCountItem } from "../hooks/useOnlineRankCounts";
 import type { RoomSourceOption } from "../types/roomSession";
 import { createFollowedUserPreviewItems } from "../data/mockDanmaku";
 import {
   createEmptyScopedStatsSnapshots,
   type ScopedStatsSnapshots,
 } from "../utils/danmakuStats";
+import { calculateTrackCount } from "../utils/danmakuRuntime";
 import { ThemeScenarioScope } from "./ThemeScenarioScope";
 import {
   PREVIEW_MULTI_ROOM_HORIZONTAL_ITEMS,
@@ -249,6 +252,7 @@ type OverlayFixture = {
   historyMessages: HistoryMessage[];
   mockActive: boolean | null;
   narrow: boolean;
+  onlineRankCounts?: OnlineRankCountItem[];
   roomSources: RoomSourceOption[];
   showHistory: boolean;
   showStats: boolean;
@@ -285,10 +289,16 @@ const FIXTURES: Record<OverlayScenarioId, OverlayFixture> = {
     historyMessages: [],
     mockActive: null,
     narrow: false,
+    onlineRankCounts: [
+      { sessionId: "preview-6", roomId: 6, label: "主播甲", count: 12000 },
+      { sessionId: "preview-7", roomId: 7, label: "主播乙", count: 863 },
+    ],
     roomSources: [],
     showHistory: false,
     showStats: false,
     statsSnapshots: EMPTY_STATS,
+    viewportHeight: 160,
+    viewportWidth: 320,
   },
   "overlay-mock-idle": {
     historyMessages: [],
@@ -462,6 +472,11 @@ export function OverlayScenarioPreview({
   scenarioId: OverlayScenarioId;
 }) {
   const fixture = FIXTURES[scenarioId];
+  const hasOnlineRankCounts = (fixture.onlineRankCounts?.length ?? 0) > 0;
+  const horizontalTrackCount = calculateTrackCount(
+    fixture.viewportHeight ?? (fixture.narrow ? 160 : 220),
+    hasOnlineRankCounts,
+  );
   const [showHistory, setShowHistory] = useState(fixture.showHistory);
   const [showStats, setShowStats] = useState(fixture.showStats);
   const [mockActive, setMockActive] = useState(fixture.mockActive ?? false);
@@ -530,34 +545,43 @@ export function OverlayScenarioPreview({
             } as CSSProperties
           }
         >
-          {fixture.verticalItems ? (
-            <VerticalChatOverlay
-              items={fixture.verticalItems}
-              onItemsPruned={() => undefined}
-              showEmotes
-            />
-          ) : fixture.horizontalItems ? (
-            <DanmakuOverlay
-              items={fixture.horizontalItems}
-              showEmotes
-              showUsername
-              trackCount={5}
-            />
-          ) : showRealMessages ? (
-            <DanmakuOverlay
-              items={createFollowedUserPreviewItems()}
-              showEmotes
-              showUsername={false}
-              trackCount={5}
-            />
-          ) : (
-            <div
-              aria-hidden="true"
-              className="absolute right-8 top-10 text-sm text-white"
-            >
-              示例用户：这是一条运行态弹幕背景
-            </div>
-          )}
+          <OnlineRankCountOverlay items={fixture.onlineRankCounts ?? []} />
+          <div
+            className={`danmaku-stage${
+              hasOnlineRankCounts ? " has-online-rank-counts" : ""
+            }`}
+          >
+            {fixture.verticalItems ? (
+              <VerticalChatOverlay
+                items={fixture.verticalItems}
+                onItemsPruned={() => undefined}
+                showEmotes
+              />
+            ) : fixture.horizontalItems ? (
+              <DanmakuOverlay
+                items={fixture.horizontalItems}
+                showEmotes
+                showUsername
+                topOffset={hasOnlineRankCounts ? 4 : 16}
+                trackCount={horizontalTrackCount}
+              />
+            ) : showRealMessages ? (
+              <DanmakuOverlay
+                items={createFollowedUserPreviewItems()}
+                showEmotes
+                showUsername={false}
+                topOffset={hasOnlineRankCounts ? 4 : 16}
+                trackCount={horizontalTrackCount}
+              />
+            ) : (
+              <div
+                aria-hidden="true"
+                className="absolute right-8 top-10 text-sm text-white"
+              >
+                示例用户：这是一条运行态弹幕背景
+              </div>
+            )}
+          </div>
           <OverlayEditWorkspace
             historyInitialQuery={fixture.historyInitialQuery}
             historyMessages={fixture.historyMessages}

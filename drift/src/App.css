@@ -27,6 +27,85 @@ button {
   font-family: inherit;
 }
 
+.online-rank-count-overlay {
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  height: 22px;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 10px;
+  color: rgba(238, 252, 255, 0.86);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.online-rank-count-heading {
+  flex: 0 0 auto;
+  color: rgba(120, 232, 244, 0.8);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+.online-rank-count-overlay ul {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 8px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.online-rank-count-overlay li {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 1px solid rgba(199, 208, 217, 0.14);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.online-rank-count-room {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(199, 208, 217, 0.8);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online-rank-count-value {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.danmaku-stage {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.danmaku-stage.has-online-rank-counts {
+  top: 22px;
+}
+
 /* Runtime danmaku styles stay here: animation, CSS variables, inline emotes, and message-type effects are not Tailwind-owned. */
 .danmaku {
   position: absolute;
@@ -105,6 +184,11 @@ button {
   filter:
     drop-shadow(0 1px 1px rgba(0, 0, 0, 0.78))
     drop-shadow(0 0 2px rgba(0, 0, 0, 0.72));
+}
+
+.danmaku-emote.is-large {
+  height: 2.4em;
+  max-height: 52px;
 }
 
 .danmaku-gift {

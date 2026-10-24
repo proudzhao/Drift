@@ -8,6 +8,12 @@ use serde_json::Value;
 use std::io::Read;
 use tracing::warn;
 
+#[derive(Debug, Default)]
+pub(crate) struct ProtocolEvents {
+    pub messages: Vec<LiveMessage>,
+    pub online_rank_count: Option<u64>,
+}
+
 pub(crate) fn build_packet(operation: u32, protocol: u16, payload: &[u8]) -> Vec<u8> {
     let packet_len = (HEADER_SIZE + payload.len()) as u32;
     let mut packet = Vec::with_capacity(packet_len as usize);
@@ -95,9 +101,9 @@ pub(crate) fn handle_packet(
     anchor_uid: u64,
     self_uid: Option<u64>,
     bytes: &[u8],
-) -> Result<Vec<LiveMessage>, String> {
+) -> Result<ProtocolEvents, String> {
     let packets = unpack_packets(bytes)?;
-    let mut messages = Vec::new();
+    let mut events = ProtocolEvents::default();
 
     for packet in packets {
         match packet.operation {
@@ -112,12 +118,7 @@ pub(crate) fn handle_packet(
                 }
             }
             5 => {
-                if let Some(mut msg) =
-                    try_extract_live_message(&packet.payload, anchor_uid, self_uid)
-                {
-                    msg.room_id = Some(room_id);
-                    messages.push(msg);
-                }
+                append_protocol_payload(&mut events, &packet.payload, anchor_uid, self_uid);
             }
             8 => status_emitter(app, "connected", "认证成功"),
             _ => warn!(
@@ -128,15 +129,54 @@ pub(crate) fn handle_packet(
         }
     }
 
-    Ok(messages)
+    for message in &mut events.messages {
+        message.room_id = Some(room_id);
+    }
+    Ok(events)
 }
 
+fn append_protocol_payload(
+    events: &mut ProtocolEvents,
+    payload: &[u8],
+    anchor_uid: u64,
+    self_uid: Option<u64>,
+) {
+    let Ok(value) = serde_json::from_slice::<Value>(payload) else {
+        return;
+    };
+    if let Some(count) = extract_online_rank_count(&value) {
+        events.online_rank_count = Some(count);
+    }
+    if let Some(message) = try_extract_live_message_value(&value, anchor_uid, self_uid) {
+        events.messages.push(message);
+    }
+}
+
+fn extract_online_rank_count(value: &Value) -> Option<u64> {
+    if value.get("cmd").and_then(Value::as_str)? != "ONLINE_RANK_COUNT" {
+        return None;
+    }
+    let data = value.get("data")?;
+    data.get("count")
+        .and_then(Value::as_u64)
+        .or_else(|| data.get("online_count").and_then(Value::as_u64))
+}
+
+#[cfg(test)]
 fn try_extract_live_message(
     payload: &[u8],
     anchor_uid: u64,
     self_uid: Option<u64>,
 ) -> Option<LiveMessage> {
     let value = serde_json::from_slice::<Value>(payload).ok()?;
+    try_extract_live_message_value(&value, anchor_uid, self_uid)
+}
+
+fn try_extract_live_message_value(
+    value: &Value,
+    anchor_uid: u64,
+    self_uid: Option<u64>,
+) -> Option<LiveMessage> {
     let command = value.get("cmd").and_then(Value::as_str)?;
     match command {
         "DANMU_MSG" => {
@@ -387,28 +427,97 @@ struct ParsedEmote {
     url: String,
     width: Option<u32>,
     height: Option<u32>,
+    is_large: bool,
 }
 
 fn extract_danmaku_segments(info: &[Value], text: &str) -> Option<Vec<LiveMessageSegment>> {
-    let emotes = extract_danmaku_emotes(info);
+    let emotes = extract_danmaku_emotes(info, text);
     if emotes.is_empty() {
         return None;
     }
     build_danmaku_segments(text, &emotes)
 }
 
-fn extract_danmaku_emotes(info: &[Value]) -> Vec<ParsedEmote> {
-    let Some(extra) = extract_danmaku_extra(info) else {
-        return Vec::new();
-    };
-    let Some(emots) = extra.get("emots").and_then(Value::as_object) else {
-        return Vec::new();
-    };
+fn extract_danmaku_emotes(info: &[Value], text: &str) -> Vec<ParsedEmote> {
+    let extra_emotes = extract_danmaku_extra(info)
+        .and_then(|extra| extra.get("emots").and_then(Value::as_object).cloned())
+        .map(|emots| {
+            emots
+                .iter()
+                .filter_map(|(key, value)| parse_emote_entry(key, value))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !extra_emotes.is_empty() {
+        return extra_emotes;
+    }
 
-    emots
-        .iter()
-        .filter_map(|(key, value)| parse_emote_entry(key, value))
+    let Some(meta) = info.first().and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    for index in [13, 14] {
+        let Some(value) = meta.get(index).and_then(parse_json_value) else {
+            continue;
+        };
+        let emotes = parse_meta_slot_emotes(&value, text);
+        if !emotes.is_empty() {
+            return emotes;
+        }
+    }
+
+    Vec::new()
+}
+
+fn parse_meta_slot_emotes(value: &Value, text: &str) -> Vec<ParsedEmote> {
+    if string_field(value, &["url", "emoticon_url", "img_url", "image_url"]).is_some() {
+        let Some(key) = meta_slot_emote_key(value, text) else {
+            return Vec::new();
+        };
+        let Some(mut emote) = parse_emote_entry(&key, value) else {
+            return Vec::new();
+        };
+        emote.key = key;
+        emote.is_large = is_large_meta_emote(value);
+        return vec![emote];
+    }
+
+    value
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(key, entry)| {
+            let mut emote = parse_emote_entry(key, entry)?;
+            emote.is_large = is_large_meta_emote(entry);
+            Some(emote)
+        })
+        .filter(|emote| text.contains(&emote.key))
         .collect()
+}
+
+fn meta_slot_emote_key(value: &Value, text: &str) -> Option<String> {
+    let name = string_field(value, &["emoji", "text", "content"])
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| text.trim());
+    if name.is_empty() {
+        return None;
+    }
+
+    let bracketed = if name.starts_with('[') && name.ends_with(']') {
+        name.to_string()
+    } else {
+        format!("[{name}]")
+    };
+    if text.contains(&bracketed) {
+        return Some(bracketed);
+    }
+    if text.contains(name) {
+        return Some(name.to_string());
+    }
+
+    let start = text.find('[')?;
+    let end = text[start..].find(']')? + start + 1;
+    Some(text[start..end].to_string())
 }
 
 fn extract_danmaku_extra(info: &[Value]) -> Option<Value> {
@@ -442,7 +551,22 @@ fn parse_emote_entry(key: &str, value: &Value) -> Option<ParsedEmote> {
         url,
         width: u32_field(value, &["width", "w"]),
         height: u32_field(value, &["height", "h"]),
+        is_large: false,
     })
+}
+
+fn is_large_meta_emote(value: &Value) -> bool {
+    if u32_field(value, &["bulge_display"]) == Some(1) {
+        return true;
+    }
+
+    matches!(
+        (
+            u32_field(value, &["width", "w"]),
+            u32_field(value, &["height", "h"]),
+        ),
+        (Some(width), Some(height)) if width >= 80 && height >= 80
+    )
 }
 
 fn build_danmaku_segments(text: &str, emotes: &[ParsedEmote]) -> Option<Vec<LiveMessageSegment>> {
@@ -496,6 +620,7 @@ fn text_segment(text: &str) -> LiveMessageSegment {
         url: None,
         width: None,
         height: None,
+        is_large: false,
     }
 }
 
@@ -506,6 +631,7 @@ fn emote_segment(emote: &ParsedEmote) -> LiveMessageSegment {
         url: Some(emote.url.clone()),
         width: emote.width,
         height: emote.height,
+        is_large: emote.is_large,
     }
 }
 
@@ -736,7 +862,9 @@ fn guard_name(level: u8) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use flate2::{write::ZlibEncoder, Compression};
     use serde_json::{json, Value};
+    use std::io::Write;
 
     fn parse_message(value: Value) -> LiveMessage {
         parse_message_with_self_uid(value, None)
@@ -816,6 +944,90 @@ mod tests {
         })
         .to_string()
         .into()
+    }
+
+    fn with_meta_slot(mut payload: Value, index: usize, value: Value) -> Value {
+        payload["info"][0][index] = value;
+        payload
+    }
+
+    #[test]
+    fn extracts_online_rank_count_with_documented_field_priority() {
+        assert_eq!(
+            extract_online_rank_count(&json!({
+                "cmd": "ONLINE_RANK_COUNT",
+                "data": { "count": 12000, "online_count": 999 }
+            })),
+            Some(12000)
+        );
+        assert_eq!(
+            extract_online_rank_count(&json!({
+                "cmd": "ONLINE_RANK_COUNT",
+                "data": { "count": null, "online_count": 863 }
+            })),
+            Some(863)
+        );
+        assert_eq!(
+            extract_online_rank_count(&json!({
+                "cmd": "ONLINE_RANK_COUNT",
+                "data": { "count": 0 }
+            })),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn ignores_invalid_online_rank_count_payloads() {
+        for payload in [
+            json!({ "cmd": "ONLINE_RANK_COUNT", "data": { "count": -1 } }),
+            json!({ "cmd": "ONLINE_RANK_COUNT", "data": { "count": "12000" } }),
+            json!({ "cmd": "ONLINE_RANK_COUNT", "data": {} }),
+            json!({ "cmd": "DANMU_MSG", "data": { "count": 12000 } }),
+        ] {
+            assert_eq!(extract_online_rank_count(&payload), None);
+        }
+    }
+
+    #[test]
+    fn accumulates_online_rank_count_alongside_danmaku_payloads() {
+        let first_count = br#"{"cmd":"ONLINE_RANK_COUNT","data":{"count":12000}}"#;
+        let danmaku = serde_json::to_vec(&danmaku_payload("正文", None)).expect("danmaku json");
+        let latest_count = br#"{"cmd":"ONLINE_RANK_COUNT","data":{"online_count":13000}}"#;
+        let mut bytes = build_packet(5, 0, first_count);
+        bytes.extend(build_packet(5, 0, &danmaku));
+        bytes.extend(build_packet(5, 0, latest_count));
+
+        let mut events = ProtocolEvents::default();
+        let packets = unpack_packets(&bytes).expect("multi-packet payload");
+        assert_eq!(packets.len(), 3);
+        for packet in packets {
+            append_protocol_payload(&mut events, &packet.payload, 7, None);
+        }
+
+        assert_eq!(events.online_rank_count, Some(13000));
+        assert_eq!(events.messages.len(), 1);
+        assert_eq!(events.messages[0].text, "正文");
+    }
+
+    #[test]
+    fn extracts_online_rank_count_from_compressed_packet() {
+        let inner = build_packet(
+            5,
+            0,
+            br#"{"cmd":"ONLINE_RANK_COUNT","data":{"count":12000}}"#,
+        );
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&inner).expect("compress inner packet");
+        let compressed = encoder.finish().expect("finish compression");
+        let outer = build_packet(5, 2, &compressed);
+
+        let packets = unpack_packets(&outer).expect("compressed packet");
+        assert_eq!(packets.len(), 1);
+        let mut events = ProtocolEvents::default();
+        append_protocol_payload(&mut events, &packets[0].payload, 7, None);
+
+        assert_eq!(events.online_rank_count, Some(12000));
+        assert!(events.messages.is_empty());
     }
 
     #[test]
@@ -1219,6 +1431,8 @@ mod tests {
             }))),
         ));
 
+        let serialized = serde_json::to_value(&message).expect("message should serialize");
+        assert!(serialized["segments"][0].get("isLarge").is_none());
         let segments = message.segments.expect("emote segments");
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
@@ -1229,6 +1443,7 @@ mod tests {
         );
         assert_eq!(segments[0].width, Some(20));
         assert_eq!(segments[0].height, Some(20));
+        assert!(!segments[0].is_large);
     }
 
     #[test]
@@ -1257,6 +1472,209 @@ mod tests {
         assert_eq!(segments[1].text, "[妙]");
         assert_eq!(segments[2].segment_type, LiveMessageSegmentKind::Text);
         assert_eq!(segments[2].text, "后缀");
+    }
+
+    #[test]
+    fn extracts_room_emote_from_meta_slot_13() {
+        let payload = with_meta_slot(
+            danmaku_payload(
+                "无辜啾",
+                Some(extra_slot(json!({
+                    "dm_type": 1,
+                    "content": "无辜啾",
+                    "emoticon_unique": "room_1727074031_123462",
+                    "emots": null
+                }))),
+            ),
+            13,
+            json!({
+                "emoticon_unique": "room_1727074031_123462",
+                "url": "http://i0.hdslb.com/bfs/garb/room.png",
+                "width": 162,
+                "height": 162,
+                "bulge_display": 1
+            }),
+        );
+
+        let message = parse_message(payload);
+        let serialized = serde_json::to_value(&message).expect("message should serialize");
+        assert_eq!(serialized["segments"][0]["isLarge"], json!(true));
+        let segments = message.segments.expect("room emote segments");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[0].text, "无辜啾");
+        assert_eq!(
+            segments[0].url.as_deref(),
+            Some("https://i0.hdslb.com/bfs/garb/room.png")
+        );
+        assert_eq!(segments[0].width, Some(162));
+        assert_eq!(segments[0].height, Some(162));
+        assert!(segments[0].is_large);
+    }
+
+    #[test]
+    fn extracts_bracketed_upower_emote_from_legacy_meta_slot_14() {
+        let payload = with_meta_slot(
+            danmaku_payload("[阿梓收藏集表情包_大头]", None),
+            14,
+            json!({
+                "emoticon_unique": "upower_123_456",
+                "url": "https://i0.hdslb.com/bfs/garb/upower.png",
+                "width": 162,
+                "height": 162
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("upower emote segments");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[0].text, "[阿梓收藏集表情包_大头]");
+        assert!(segments[0].is_large);
+    }
+
+    #[test]
+    fn prefers_bracketed_meta_slot_name_that_appears_in_text() {
+        let payload = with_meta_slot(
+            danmaku_payload("[大头]", None),
+            13,
+            json!({
+                "emoji": "大头",
+                "url": "https://i0.hdslb.com/bfs/garb/upower.png"
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("bracketed emote segments");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[0].text, "[大头]");
+    }
+
+    #[test]
+    fn extracts_legacy_emote_dictionary_from_meta_slot() {
+        let payload = with_meta_slot(
+            danmaku_payload("前缀[旧表情]后缀", None),
+            13,
+            json!({
+                "[旧表情]": {
+                    "url": "https://i0.hdslb.com/bfs/garb/legacy.png",
+                    "width": 80,
+                    "height": 80
+                }
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("legacy emote segments");
+
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[1].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[1].text, "[旧表情]");
+    }
+
+    #[test]
+    fn usable_extra_emotes_take_priority_over_meta_slot_fallback() {
+        let payload = with_meta_slot(
+            danmaku_payload(
+                "[妙]",
+                Some(extra_slot(json!({
+                    "emots": {
+                        "[妙]": {
+                            "url": "https://i0.hdslb.com/bfs/live/extra.png"
+                        }
+                    }
+                }))),
+            ),
+            13,
+            json!({
+                "url": "https://i0.hdslb.com/bfs/garb/fallback.png"
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("extra emote segments");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(
+            segments[0].url.as_deref(),
+            Some("https://i0.hdslb.com/bfs/live/extra.png")
+        );
+        assert!(!segments[0].is_large);
+    }
+
+    #[test]
+    fn invalid_extra_emotes_fall_back_to_meta_slot() {
+        let payload = with_meta_slot(
+            danmaku_payload(
+                "无辜啾",
+                Some(extra_slot(json!({
+                    "emots": {
+                        "无辜啾": {
+                            "url": "https://evil.example/room.png"
+                        }
+                    }
+                }))),
+            ),
+            13,
+            json!({
+                "url": "https://i0.hdslb.com/bfs/garb/room.png"
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("fallback emote segments");
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[0].text, "无辜啾");
+        assert_eq!(
+            segments[0].url.as_deref(),
+            Some("https://i0.hdslb.com/bfs/garb/room.png")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_first_bracketed_text_for_meta_slot_key() {
+        let payload = with_meta_slot(
+            danmaku_payload("前缀[实际表情]后缀", None),
+            13,
+            json!({
+                "emoji": "不匹配的名字",
+                "url": "https://i0.hdslb.com/bfs/garb/upower.png"
+            }),
+        );
+
+        let message = parse_message(payload);
+        let segments = message.segments.expect("fallback key segments");
+
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[1].segment_type, LiveMessageSegmentKind::Emote);
+        assert_eq!(segments[1].text, "[实际表情]");
+    }
+
+    #[test]
+    fn unmatched_or_untrusted_meta_slot_emote_falls_back_to_plain_text() {
+        let cases = [
+            json!({
+                "emoji": "[另一表情]",
+                "url": "https://i0.hdslb.com/bfs/garb/other.png"
+            }),
+            json!({
+                "url": "https://evil.example/bfs/garb/room.png"
+            }),
+        ];
+
+        for candidate in cases {
+            let payload = with_meta_slot(danmaku_payload("普通正文", None), 13, candidate);
+            let message = parse_message(payload);
+
+            assert_eq!(message.text, "普通正文");
+            assert!(message.segments.is_none());
+        }
     }
 
     #[test]

@@ -13,6 +13,7 @@ export type LiveMessageSegment =
       url?: string;
       width?: number;
       height?: number;
+      isLarge?: boolean;
     };
 
 export type DisplayMessageItem = {

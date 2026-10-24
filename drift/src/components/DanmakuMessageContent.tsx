@@ -108,7 +108,7 @@ function DanmakuSegment({ segment }: DanmakuSegmentProps) {
   return (
     <img
       alt={segment.text}
-      className="danmaku-emote"
+      className={`danmaku-emote${segment.isLarge ? " is-large" : ""}`}
       draggable={false}
       onError={() => setFailed(true)}
       referrerPolicy="no-referrer"

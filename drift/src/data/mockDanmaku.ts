@@ -33,6 +33,7 @@ const mockEmoteMessages: MockSegmentedMessage[] = [
         url: makeMockEmoteDataUrl("#b8f3d4", "#ff8ea3", "OK"),
         width: 64,
         height: 64,
+        isLarge: true,
       },
     ],
   },
